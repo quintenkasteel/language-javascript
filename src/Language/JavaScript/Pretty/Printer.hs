@@ -164,6 +164,7 @@ instance RenderJS JSBinOp where
     (|>) pacc (JSBinOpBitXor     annot)  = pacc |> annot |> "^"
     (|>) pacc (JSBinOpDivide     annot)  = pacc |> annot |> "/"
     (|>) pacc (JSBinOpEq         annot)  = pacc |> annot |> "=="
+    (|>) pacc (JSBinOpExponentiation annot) = pacc |> annot |> "**"
     (|>) pacc (JSBinOpGe         annot)  = pacc |> annot |> ">="
     (|>) pacc (JSBinOpGt         annot)  = pacc |> annot |> ">"
     (|>) pacc (JSBinOpIn         annot)  = pacc |> annot |> "in"

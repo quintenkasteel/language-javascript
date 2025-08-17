@@ -239,6 +239,7 @@ renderBinOpToJSON op = case op of
     AST.JSBinOpPlus _ -> renderArithmeticOp "+"
     AST.JSBinOpMinus _ -> renderArithmeticOp "-"
     AST.JSBinOpTimes _ -> renderArithmeticOp "*"
+    AST.JSBinOpExponentiation _ -> renderArithmeticOp "**"
     AST.JSBinOpDivide _ -> renderArithmeticOp "/"
     AST.JSBinOpMod _ -> renderArithmeticOp "%"
     AST.JSBinOpEq _ -> renderEqualityOp "=="

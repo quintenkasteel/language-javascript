@@ -246,6 +246,7 @@ instance MinifyJS JSBinOp where
     fix _ (JSBinOpBitXor     _) = JSBinOpBitXor emptyAnnot
     fix _ (JSBinOpDivide     _) = JSBinOpDivide emptyAnnot
     fix _ (JSBinOpEq         _) = JSBinOpEq emptyAnnot
+    fix _ (JSBinOpExponentiation _) = JSBinOpExponentiation emptyAnnot
     fix _ (JSBinOpGe         _) = JSBinOpGe emptyAnnot
     fix _ (JSBinOpGt         _) = JSBinOpGt emptyAnnot
     fix a (JSBinOpIn         _) = JSBinOpIn a
