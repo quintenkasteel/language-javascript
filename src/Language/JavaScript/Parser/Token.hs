@@ -54,6 +54,8 @@ data Token
     -- ^ Literal: string, delimited by either single or double quotes
     | RegExToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Regular Expression
+    | BigIntToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation] }
+    -- ^ Literal: BigInt Integer (e.g., 123n)
 
     -- Keywords
     | AsyncToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
@@ -152,6 +154,12 @@ data Token
     | ArrowToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | SpreadToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | DotToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
+    | OptionalChainingToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation] }
+    -- ^ Optional chaining operator (?.)
+    | OptionalBracketToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation] }
+    -- ^ Optional bracket access (?.[)  
+    | NullishCoalescingToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation] }
+    -- ^ Nullish coalescing operator (??)
     | LeftBracketToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | RightBracketToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | LeftCurlyToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }

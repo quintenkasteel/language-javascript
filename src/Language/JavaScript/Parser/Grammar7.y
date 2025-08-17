@@ -39,6 +39,8 @@ import qualified Language.JavaScript.Parser.AST as AST
      ':'    { ColonToken {} }
      '||'   { OrToken {} }
      '&&'   { AndToken {} }
+     '??'   { NullishCoalescingToken {} }
+     '?.'   { OptionalChainingToken {} }
      '|'    { BitwiseOrToken {} }
      '^'    { BitwiseXorToken {} }
      '&'    { BitwiseAndToken {} }
@@ -137,6 +139,7 @@ import qualified Language.JavaScript.Parser.AST as AST
      'decimal'    { DecimalToken {} }
      'hexinteger' { HexIntegerToken {} }
      'octal'      { OctalToken {} }
+     'bigint'     { BigIntToken {} }
      'string'     { StringToken {} }
      'regex'      { RegExToken {} }
      'tmplnosub'  { NoSubstitutionTemplateToken {} }
@@ -205,6 +208,10 @@ Spread : '...' { mkJSAnnot $1 }
 
 Dot :: { AST.JSAnnot }
 Dot : '.' { mkJSAnnot $1 }
+
+OptionalChaining :: { AST.JSAnnot }
+OptionalChaining : '?.' { mkJSAnnot $1 }
+
 
 As :: { AST.JSAnnot }
 As : 'as' { mkJSAnnot $1 }
@@ -292,6 +299,9 @@ Or : '||' { AST.JSBinOpOr (mkJSAnnot $1) }
 
 And :: { AST.JSBinOp }
 And : '&&' { AST.JSBinOpAnd (mkJSAnnot $1) }
+
+NullishCoalescing :: { AST.JSBinOp }
+NullishCoalescing : '??' { AST.JSBinOpNullishCoalescing (mkJSAnnot $1) }
 
 BitOr :: { AST.JSBinOp }
 BitOr : '|' { AST.JSBinOpBitOr (mkJSAnnot $1) }
@@ -495,6 +505,7 @@ NumericLiteral :: { AST.JSExpression }
 NumericLiteral : 'decimal'    { AST.JSDecimal (mkJSAnnot $1) (tokenLiteral $1) }
                | 'hexinteger' { AST.JSHexInteger (mkJSAnnot $1) (tokenLiteral $1) }
                | 'octal'      { AST.JSOctal (mkJSAnnot $1) (tokenLiteral $1) }
+               | 'bigint'     { AST.JSBigIntLiteral (mkJSAnnot $1) (tokenLiteral $1) }
 
 StringLiteral :: { AST.JSExpression }
 StringLiteral : 'string'  { AST.JSStringLiteral (mkJSAnnot $1) (tokenLiteral $1) }
@@ -655,6 +666,8 @@ MemberExpression : PrimaryExpression   { $1 {- 'MemberExpression1' -} }
                  | FunctionExpression  { $1 {- 'MemberExpression2' -} }
                  | MemberExpression LSquare Expression RSquare { AST.JSMemberSquare $1 $2 $3 $4 {- 'MemberExpression3' -} }
                  | MemberExpression Dot IdentifierName         { AST.JSMemberDot $1 $2 $3       {- 'MemberExpression4' -} }
+                 | MemberExpression OptionalChaining IdentifierName { AST.JSOptionalMemberDot $1 $2 $3 {- 'MemberExpression5' -} }
+                 | MemberExpression '?.' '[' Expression ']' { AST.JSOptionalMemberSquare $1 (mkJSAnnot $2) $4 (mkJSAnnot $5) {- 'MemberExpression6' -} }
                  | MemberExpression TemplateLiteral            { mkJSTemplateLiteral (Just $1) $2 }
                  | Super LSquare Expression RSquare            { AST.JSMemberSquare $1 $2 $3 $4 }
                  | Super Dot IdentifierName                    { AST.JSMemberDot $1 $2 $3 }
@@ -687,8 +700,16 @@ CallExpression : MemberExpression Arguments
                     { AST.JSCallExpressionSquare $1 $2 $3 $4 {- 'CallExpression3' -} }
                | CallExpression Dot IdentifierName
                     { AST.JSCallExpressionDot $1 $2 $3 {- 'CallExpression4' -} }
+               | CallExpression OptionalChaining IdentifierName
+                    { AST.JSOptionalMemberDot $1 $2 $3 {- 'CallExpression5' -} }
+               | CallExpression '?.' '[' Expression ']'
+                    { AST.JSOptionalMemberSquare $1 (mkJSAnnot $2) $4 (mkJSAnnot $5) {- 'CallExpression6' -} }
+               | MemberExpression OptionalChaining Arguments
+                    { mkJSOptionalCallExpression $1 $2 $3 {- 'CallExpression7' -} }
+               | CallExpression OptionalChaining Arguments  
+                    { mkJSOptionalCallExpression $1 $2 $3 {- 'CallExpression8' -} }
                | CallExpression TemplateLiteral
-                    { mkJSTemplateLiteral (Just $1) $2 {- 'CallExpression5' -} }
+                    { mkJSTemplateLiteral (Just $1) $2 {- 'CallExpression9' -} }
 
 -- Arguments :                                                  See 11.2
 --        ()
@@ -891,19 +912,33 @@ LogicalAndExpressionNoIn :: { AST.JSExpression }
 LogicalAndExpressionNoIn : BitwiseOrExpressionNoIn { $1 {- 'LogicalAndExpression' -} }
                          | LogicalAndExpressionNoIn And BitwiseOrExpressionNoIn { AST.JSExpressionBinary {- '&&' -} $1 $2 $3 }
 
--- LogicalORExpression :                                                                 See 11.11
+-- NullishCoalescingExpression :                                                        See 12.5.4
 --        LogicalANDExpression
---        LogicalORExpression || LogicalANDExpression
+--        NullishCoalescingExpression ?? LogicalANDExpression
+NullishCoalescingExpression :: { AST.JSExpression }
+NullishCoalescingExpression : LogicalAndExpression { $1 {- 'NullishCoalescingExpression' -} }
+                            | NullishCoalescingExpression NullishCoalescing LogicalAndExpression { AST.JSExpressionBinary {- '??' -} $1 $2 $3 }
+
+-- LogicalORExpression :                                                                 See 11.11
+--        NullishCoalescingExpression
+--        LogicalORExpression || NullishCoalescingExpression
 LogicalOrExpression :: { AST.JSExpression }
-LogicalOrExpression : LogicalAndExpression { $1 {- 'LogicalOrExpression' -} }
-                    | LogicalOrExpression Or LogicalAndExpression { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
+LogicalOrExpression : NullishCoalescingExpression { $1 {- 'LogicalOrExpression' -} }
+                    | LogicalOrExpression Or NullishCoalescingExpression { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
+
+-- NullishCoalescingExpressionNoIn :                                                    See 12.5.4
+--        LogicalANDExpressionNoIn
+--        NullishCoalescingExpressionNoIn ?? LogicalANDExpressionNoIn
+NullishCoalescingExpressionNoIn :: { AST.JSExpression }
+NullishCoalescingExpressionNoIn : LogicalAndExpressionNoIn { $1 {- 'NullishCoalescingExpression' -} }
+                                | NullishCoalescingExpressionNoIn NullishCoalescing LogicalAndExpressionNoIn { AST.JSExpressionBinary {- '??' -} $1 $2 $3 }
 
 -- LogicalORExpressionNoIn :                                                             See 11.11
---        LogicalANDExpressionNoIn
---        LogicalORExpressionNoIn || LogicalANDExpressionNoIn
+--        NullishCoalescingExpressionNoIn
+--        LogicalORExpressionNoIn || NullishCoalescingExpressionNoIn
 LogicalOrExpressionNoIn :: { AST.JSExpression }
-LogicalOrExpressionNoIn : LogicalAndExpressionNoIn { $1 {- 'LogicalOrExpression' -} }
-                        | LogicalOrExpressionNoIn Or LogicalAndExpressionNoIn { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
+LogicalOrExpressionNoIn : NullishCoalescingExpressionNoIn { $1 {- 'LogicalOrExpression' -} }
+                        | LogicalOrExpressionNoIn Or NullishCoalescingExpressionNoIn { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
 
 -- ConditionalExpression :                                                               See 11.12
 --        LogicalORExpression
@@ -1532,6 +1567,9 @@ mkJSMemberExpression e (JSArguments l arglist r) = AST.JSMemberExpression e l ar
 
 mkJSMemberNew :: AST.JSAnnot -> AST.JSExpression -> JSArguments -> AST.JSExpression
 mkJSMemberNew a e (JSArguments l arglist r) = AST.JSMemberNew a e l arglist r
+
+mkJSOptionalCallExpression :: AST.JSExpression -> AST.JSAnnot -> JSArguments -> AST.JSExpression
+mkJSOptionalCallExpression e annot (JSArguments l arglist r) = AST.JSOptionalCallExpression e annot arglist r
 
 parseError :: Token -> Alex a
 parseError = alexError . show

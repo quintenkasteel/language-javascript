@@ -21,6 +21,7 @@ module Language.JavaScript.Parser.LexerUtils
     , decimalToken
     , hexIntegerToken
     , octalToken
+    , bigIntToken
     , stringToken
     ) where
 
@@ -49,6 +50,9 @@ hexIntegerToken loc str = HexIntegerToken loc str []
 
 octalToken :: TokenPosn -> String -> Token
 octalToken loc str = OctalToken loc str []
+
+bigIntToken :: TokenPosn -> String -> Token
+bigIntToken loc str = BigIntToken loc str []
 
 regExToken :: TokenPosn -> String -> Token
 regExToken loc str = RegExToken loc str []

@@ -291,6 +291,21 @@ tokens :-
     |        "0"
     | $non_zero_digit $digit*         { adapt (mkString decimalToken) }
 
+-- BigInt literals: numeric patterns followed by 'n'
+<reg,divide> ("0x"|"0X") $hex_digit+ "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0o"|"0O") $oct_digit+ "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0") $oct_digit+ "n" { adapt (mkString bigIntToken) }
+<reg,divide> "0"              "." $digit* ("e"|"E") ("+"|"-")? $digit+ "n"
+    | $non_zero_digit $digit* "." $digit* ("e"|"E") ("+"|"-")? $digit+ "n"
+    |                "." $digit+          ("e"|"E") ("+"|"-")? $digit+ "n"
+    |        "0"                          ("e"|"E") ("+"|"-")? $digit+ "n"
+    | $non_zero_digit $digit*             ("e"|"E") ("+"|"-")? $digit+ "n"
+    |        "0"              "." $digit* "n"
+    | $non_zero_digit $digit* "." $digit* "n"
+    |                "." $digit+ "n"
+    |        "0" "n"
+    | $non_zero_digit $digit* "n"         { adapt (mkString bigIntToken) }
+
 
 -- beginning of file
 <bof> {
@@ -308,6 +323,8 @@ tokens :-
 <reg,divide> {
     ";"     { adapt (symbolToken  SemiColonToken) }
     ","     { adapt (symbolToken  CommaToken) }
+    "??"    { adapt (symbolToken  NullishCoalescingToken) }
+    "?."    { adapt (symbolToken  OptionalChainingToken) }
     "?"     { adapt (symbolToken  HookToken) }
     ":"     { adapt (symbolToken  ColonToken) }
     "||"    { adapt (symbolToken  OrToken) }

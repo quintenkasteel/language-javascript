@@ -172,6 +172,7 @@ data JSExpression
     | JSLiteral !JSAnnot !String
     | JSHexInteger !JSAnnot !String
     | JSOctal !JSAnnot !String
+    | JSBigIntLiteral !JSAnnot !String
     | JSStringLiteral !JSAnnot !String
     | JSRegEx !JSAnnot !String
 
@@ -196,6 +197,9 @@ data JSExpression
     | JSMemberNew !JSAnnot !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot -- ^new, name, lb, args, rb
     | JSMemberSquare !JSExpression !JSAnnot !JSExpression !JSAnnot -- ^firstpart, lb, expr, rb
     | JSNewExpression !JSAnnot !JSExpression -- ^new, expr
+    | JSOptionalMemberDot !JSExpression !JSAnnot !JSExpression -- ^firstpart, ?., name
+    | JSOptionalMemberSquare !JSExpression !JSAnnot !JSExpression !JSAnnot -- ^firstpart, ?.[, expr, ]
+    | JSOptionalCallExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot -- ^expr, ?.(, args, )
     | JSObjectLiteral !JSAnnot !JSObjectPropertyList !JSAnnot -- ^lbrace contents rbrace
     | JSSpreadExpression !JSAnnot !JSExpression
     | JSTemplateLiteral !(Maybe JSExpression) !JSAnnot !String ![JSTemplatePart] -- ^optional tag, lquot, head, parts
@@ -229,6 +233,7 @@ data JSBinOp
     | JSBinOpNeq !JSAnnot
     | JSBinOpOf !JSAnnot
     | JSBinOpOr !JSAnnot
+    | JSBinOpNullishCoalescing !JSAnnot
     | JSBinOpPlus !JSAnnot
     | JSBinOpRsh !JSAnnot
     | JSBinOpStrictEq !JSAnnot
@@ -431,6 +436,7 @@ instance ShowStripped JSExpression where
     ss (JSGeneratorExpression _ _ n _lb pl _rb x3) = "JSGeneratorExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
     ss (JSHexInteger _ s) = "JSHexInteger " ++ singleQuote s
     ss (JSOctal _ s) = "JSOctal " ++ singleQuote s
+    ss (JSBigIntLiteral _ s) = "JSBigIntLiteral " ++ singleQuote s
     ss (JSIdentifier _ s) = "JSIdentifier " ++ singleQuote s
     ss (JSLiteral _ []) = "JSLiteral ''"
     ss (JSLiteral _ s) = "JSLiteral " ++ singleQuote s
@@ -439,6 +445,9 @@ instance ShowStripped JSExpression where
     ss (JSMemberNew _a n _ s _) = "JSMemberNew (" ++ ss n ++ ",JSArguments " ++ ss s ++ ")"
     ss (JSMemberSquare x1s _lb x2 _rb) = "JSMemberSquare (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
     ss (JSNewExpression _n e) = "JSNewExpression " ++ ss e
+    ss (JSOptionalMemberDot x1s _d x2) = "JSOptionalMemberDot (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
+    ss (JSOptionalMemberSquare x1s _lb x2 _rb) = "JSOptionalMemberSquare (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
+    ss (JSOptionalCallExpression ex _ xs _) = "JSOptionalCallExpression ("++ ss ex ++ ",JSArguments " ++ ss xs ++ ")"
     ss (JSObjectLiteral _lb xs _rb) = "JSObjectLiteral " ++ ss xs
     ss (JSRegEx _ s) = "JSRegEx " ++ singleQuote s
     ss (JSStringLiteral _ s) = "JSStringLiteral " ++ s
@@ -554,6 +563,7 @@ instance ShowStripped JSBinOp where
     ss (JSBinOpNeq _) = "'!='"
     ss (JSBinOpOf _) = "'of'"
     ss (JSBinOpOr _) = "'||'"
+    ss (JSBinOpNullishCoalescing _) = "'??'"
     ss (JSBinOpPlus _) = "'+'"
     ss (JSBinOpRsh _) = "'>>'"
     ss (JSBinOpStrictEq _) = "'==='"
@@ -662,6 +672,7 @@ deAnnot (JSBinOpMod _) = JSBinOpMod JSNoAnnot
 deAnnot (JSBinOpNeq _) = JSBinOpNeq JSNoAnnot
 deAnnot (JSBinOpOf _) = JSBinOpOf JSNoAnnot
 deAnnot (JSBinOpOr _) = JSBinOpOr JSNoAnnot
+deAnnot (JSBinOpNullishCoalescing _) = JSBinOpNullishCoalescing JSNoAnnot
 deAnnot (JSBinOpPlus _) = JSBinOpPlus JSNoAnnot
 deAnnot (JSBinOpRsh _) = JSBinOpRsh JSNoAnnot
 deAnnot (JSBinOpStrictEq _) = JSBinOpStrictEq JSNoAnnot
