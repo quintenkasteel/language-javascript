@@ -182,6 +182,10 @@ instance MinifyJS JSExpression where
     fix a (JSYieldExpression      _ x)                = JSYieldExpression a (fixSpace x)
     fix a (JSYieldFromExpression  _ _ x)              = JSYieldFromExpression a emptyAnnot (fixEmpty x)
     fix a (JSSpreadExpression     _ e)                = JSSpreadExpression a (fixEmpty e)
+    fix a (JSBigIntLiteral        _ s)                = JSBigIntLiteral a s
+    fix a (JSOptionalMemberDot    e _ p)              = JSOptionalMemberDot (fix a e) emptyAnnot (fixEmpty p)
+    fix a (JSOptionalMemberSquare e _ p _)            = JSOptionalMemberSquare (fix a e) emptyAnnot (fixEmpty p) emptyAnnot
+    fix a (JSOptionalCallExpression e _ args _)       = JSOptionalCallExpression (fix a e) emptyAnnot (fixEmpty args) emptyAnnot
 
 instance MinifyJS JSArrowParameterList where
     fix _ (JSUnparenthesizedArrowParameter p)         = JSUnparenthesizedArrowParameter (fixEmpty p)
@@ -255,6 +259,7 @@ instance MinifyJS JSBinOp where
     fix _ (JSBinOpStrictNeq  _) = JSBinOpStrictNeq emptyAnnot
     fix _ (JSBinOpTimes      _) = JSBinOpTimes emptyAnnot
     fix _ (JSBinOpUrsh       _) = JSBinOpUrsh emptyAnnot
+    fix _ (JSBinOpNullishCoalescing _) = JSBinOpNullishCoalescing emptyAnnot
 
 
 instance MinifyJS JSUnaryOp where

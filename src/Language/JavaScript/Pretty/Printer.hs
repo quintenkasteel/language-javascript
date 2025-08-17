@@ -100,6 +100,10 @@ instance RenderJS JSExpression where
     (|>) pacc (JSYieldExpression      y x)                    = pacc |> y |> "yield" |> x
     (|>) pacc (JSYieldFromExpression  y s x)                  = pacc |> y |> "yield" |> s |> "*" |> x
     (|>) pacc (JSSpreadExpression     a e)                    = pacc |> a |> "..." |> e
+    (|>) pacc (JSBigIntLiteral        annot s)                = pacc |> annot |> s
+    (|>) pacc (JSOptionalMemberDot    e a p)                  = pacc |> e |> a |> "?." |> p
+    (|>) pacc (JSOptionalMemberSquare e a1 p a2)              = pacc |> e |> a1 |> "?.[" |> p |> a2 |> "]"
+    (|>) pacc (JSOptionalCallExpression e a1 args a2)         = pacc |> e |> a1 |> "?.(" |> args |> a2 |> ")"
 
 instance RenderJS JSArrowParameterList where
     (|>) pacc (JSUnparenthesizedArrowParameter p)             = pacc |> p
@@ -173,6 +177,7 @@ instance RenderJS JSBinOp where
     (|>) pacc (JSBinOpStrictNeq  annot)  = pacc |> annot |> "!=="
     (|>) pacc (JSBinOpTimes      annot)  = pacc |> annot |> "*"
     (|>) pacc (JSBinOpUrsh       annot)  = pacc |> annot |> ">>>"
+    (|>) pacc (JSBinOpNullishCoalescing annot) = pacc |> annot |> "??"
 
 
 instance RenderJS JSUnaryOp where
