@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Test Quality Audit - Zero Tolerance Enforcement
+# Detects ALL lazy test patterns that agents must eliminate
+
+set -e
+
+AUDIT_FAILED=0
+TEST_DIR="${1:-test/}"
+
+echo "🔍 COMPREHENSIVE TEST QUALITY AUDIT"
+echo "=================================="
+echo "Directory: $TEST_DIR"
+echo "Standard: CLAUDE.md Zero Tolerance Policy"
+echo ""
+
+# Function to report violations and set failure flag
+report_violation() {
+    local category="$1"
+    local count="$2"
+    echo "❌ CRITICAL FAILURE: $category"
+    echo "   Found $count violations (MUST be 0)"
+    echo ""
+    AUDIT_FAILED=1
+}
+
+# Pattern 1: Lazy shouldBe with True/False
+echo "1. Checking for lazy shouldBe patterns..."
+LAZY_SHOULDBE_COUNT=$(grep -rn "shouldBe.*True\|shouldBe.*False\|shouldSatisfy.*const True\|shouldSatisfy.*const False" "$TEST_DIR" | wc -l)
+if [ "$LAZY_SHOULDBE_COUNT" -gt 0 ]; then
+    report_violation "Lazy shouldBe Patterns" "$LAZY_SHOULDBE_COUNT"
+    echo "   Examples found:"
+    grep -rn "shouldBe.*True\|shouldBe.*False\|shouldSatisfy.*const True\|shouldSatisfy.*const False" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    echo ""
+    echo "   REQUIRED FIX: Replace with exact value assertions:"
+    echo "   ❌ result \`shouldBe\` True"
+    echo "   ✅ result \`shouldBe\` expectedValue"
+    echo ""
+else
+    echo "   ✅ No lazy shouldBe patterns found"
+fi
+
+# Pattern 2: Mock functions
+echo "2. Checking for mock functions..."
+MOCK_COUNT=$(grep -rn "_ = True\|_ = False\|undefined" "$TEST_DIR" | wc -l)
+if [ "$MOCK_COUNT" -gt 0 ]; then
+    report_violation "Mock Functions" "$MOCK_COUNT"
+    echo "   Examples found:"
+    grep -rn "_ = True\|_ = False\|undefined" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    echo ""
+    echo "   REQUIRED FIX: Replace with real constructors"
+    echo ""
+else
+    echo "   ✅ No mock functions found"
+fi
+
+# Pattern 3: Reflexive equality tests
+echo "3. Checking for reflexive equality tests..."
+REFLEXIVE_COUNT=$(grep -rn "shouldBe.*\b\(\w\+\)\b.*\b\1\b" "$TEST_DIR" | wc -l)
+if [ "$REFLEXIVE_COUNT" -gt 0 ]; then
+    report_violation "Reflexive Equality Tests" "$REFLEXIVE_COUNT"
+    echo "   Examples found:"
+    grep -rn "shouldBe.*\b\(\w\+\)\b.*\b\1\b" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    echo ""
+    echo "   REQUIRED FIX: Test meaningful behavior:"
+    echo "   ❌ x \`shouldBe\` x"
+    echo "   ✅ parseExpression input \`shouldBe\` expectedAST"
+    echo ""
+else
+    echo "   ✅ No reflexive equality tests found"
+fi
+
+# Pattern 4: Empty/trivial descriptions and always-true conditions
+echo "4. Checking for trivial test patterns..."
+TRIVIAL_COUNT=$(grep -rn "shouldSatisfy.*not.*null\|shouldSatisfy.*length.*>.*0\|shouldSatisfy.*(const True)\|expectationFailure.*\"\"" "$TEST_DIR" | wc -l)
+if [ "$TRIVIAL_COUNT" -gt 0 ]; then
+    report_violation "Trivial Test Patterns" "$TRIVIAL_COUNT"
+    echo "   Examples found:"
+    grep -rn "shouldSatisfy.*not.*null\|shouldSatisfy.*length.*>.*0\|shouldSatisfy.*(const True)\|expectationFailure.*\"\"" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    echo ""
+    echo "   REQUIRED FIX: Use specific, meaningful assertions"
+    echo ""
+else
+    echo "   ✅ No trivial test patterns found"
+fi
+
+# Pattern 5: JavaScript parser specific - weak syntax testing
+echo "5. Checking for weak syntax testing..."
+WEAK_SYNTAX_COUNT=$(grep -rn "shouldSatisfy.*isRight\|shouldSatisfy.*isLeft" "$TEST_DIR" | wc -l)
+if [ "$WEAK_SYNTAX_COUNT" -gt 0 ]; then
+    echo "⚠️  WARNING: Weak syntax testing patterns found: $WEAK_SYNTAX_COUNT"
+    echo "   Consider using exact AST matching instead of just Right/Left:"
+    echo "   ❌ parseExpression input \`shouldSatisfy\` isRight"
+    echo "   ✅ parseExpression input \`shouldBe\` Right expectedAST"
+    echo ""
+else
+    echo "   ✅ No weak syntax testing patterns found"
+fi
+
+# Pattern 6: Missing specific error validation
+echo "6. Checking for specific error validation..."
+WEAK_ERROR_COUNT=$(grep -rn "shouldSatisfy.*isLeft\|expectationFailure.*\"Expected.*error\"" "$TEST_DIR" | wc -l)
+if [ "$WEAK_ERROR_COUNT" -gt 0 ]; then
+    echo "⚠️  INFO: Consider validating specific error messages: $WEAK_ERROR_COUNT occurrences"
+    echo "   Enhancement suggestion:"
+    echo "   ✅ case parseExpression invalidInput of"
+    echo "       Left (ParseError pos msg) -> msg \`shouldContain\` \"expected\""
+    echo ""
+else
+    echo "   ✅ Strong error validation patterns in use"
+fi
+
+# Summary
+echo "=================================="
+if [ "$AUDIT_FAILED" -eq 1 ]; then
+    echo "🚫 AUDIT FAILED - IMMEDIATE ACTION REQUIRED"
+    echo ""
+    echo "CRITICAL: Lazy test patterns detected!"
+    echo ""
+    echo "NO AGENT MAY REPORT 'DONE' UNTIL:"
+    echo "• ALL shouldBe True/False patterns eliminated"  
+    echo "• ALL mock functions replaced with real constructors"
+    echo "• ALL reflexive tests replaced with behavioral tests"
+    echo "• ALL trivial conditions replaced with exact assertions"
+    echo ""
+    echo "AGENTS MUST ITERATE until this audit shows 0 violations"
+    echo ""
+    exit 1
+else
+    echo "✅ AUDIT PASSED - All test quality requirements met"
+    echo ""
+    echo "🎉 Test suite meets CLAUDE.md standards:"
+    echo "• No lazy shouldBe patterns"
+    echo "• No mock functions" 
+    echo "• No reflexive equality tests"
+    echo "• No trivial test conditions"
+    echo "• All tests validate real, meaningful behavior"
+    echo ""
+fi
