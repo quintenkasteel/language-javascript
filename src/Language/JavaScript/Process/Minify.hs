@@ -380,6 +380,7 @@ instance MinifyJS JSObjectProperty where
     fix a (JSPropertyNameandValue n _ vs)       = JSPropertyNameandValue (fix a n) emptyAnnot (map fixEmpty vs)
     fix a (JSPropertyIdentRef     _ s)          = JSPropertyIdentRef a s
     fix a (JSObjectMethod         m)            = JSObjectMethod (fix a m)
+    fix a (JSObjectSpread         _ expr)       = JSObjectSpread a (fix emptyAnnot expr)
 
 instance MinifyJS JSMethodDefinition where
     fix a (JSMethodDefinition          n _ ps _ b)   = JSMethodDefinition                     (fix a n)    emptyAnnot (fixEmpty ps) emptyAnnot (fixEmpty b)
