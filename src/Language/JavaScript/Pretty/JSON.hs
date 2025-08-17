@@ -117,6 +117,7 @@ renderExpressionToJSON expr = case expr of
     AST.JSOptionalMemberSquare object lbracket property rbracket -> renderOptionalMemberSquare object lbracket property rbracket
     AST.JSCallExpression func annot args rannot -> renderCallExpression func annot args rannot
     AST.JSOptionalCallExpression func annot args rannot -> renderOptionalCallExpression func annot args rannot
+    AST.JSArrowExpression params annot body -> renderArrowExpression params annot body
     _ -> renderUnsupportedExpression
   where
     renderDecimalLiteral annot value = formatJSONObject
@@ -204,6 +205,12 @@ renderExpressionToJSON expr = case expr of
         , ("lannot", renderAnnotation annot)
         , ("arguments", renderArgumentsToJSON args)
         , ("rannot", renderAnnotation rannot)
+        ]
+    renderArrowExpression params annot body = formatJSONObject
+        [ ("type", "\"JSArrowExpression\"")
+        , ("parameters", renderArrowParametersToJSON params)
+        , ("annotation", renderAnnotation annot)
+        , ("body", renderConciseBodyToJSON body)
         ]
     renderUnsupportedExpression = formatJSONObject
         [ ("type", "\"JSExpression\"")
@@ -504,3 +511,34 @@ formatJSONObject pairs = "{" <> Text.intercalate "," (map formatPair pairs) <> "
 -- | Format a JSON array from a list of JSON values.
 formatJSONArray :: [Text] -> Text
 formatJSONArray values = "[" <> Text.intercalate "," values <> "]"
+
+-- | Convert arrow function parameters to JSON.
+renderArrowParametersToJSON :: AST.JSArrowParameterList -> Text
+renderArrowParametersToJSON params = case params of
+    AST.JSUnparenthesizedArrowParameter ident -> formatJSONObject
+        [ ("type", "\"JSUnparenthesizedArrowParameter\"")
+        , ("parameter", renderIdentToJSON ident)
+        ]
+    AST.JSParenthesizedArrowParameterList _ paramList _ -> formatJSONObject
+        [ ("type", "\"JSParenthesizedArrowParameterList\"")
+        , ("parameters", renderArgumentsToJSON paramList)
+        ]
+
+-- | Convert JSConciseBody to JSON.
+renderConciseBodyToJSON :: AST.JSConciseBody -> Text
+renderConciseBodyToJSON body = case body of
+    AST.JSConciseFunctionBody block -> formatJSONObject
+        [ ("type", "\"JSConciseFunctionBody\"")
+        , ("block", renderBlockToJSON block)
+        ]
+    AST.JSConciseExpressionBody expr -> formatJSONObject
+        [ ("type", "\"JSConciseExpressionBody\"")
+        , ("expression", renderExpressionToJSON expr)
+        ]
+
+-- | Convert JSBlock to JSON.
+renderBlockToJSON :: AST.JSBlock -> Text
+renderBlockToJSON (AST.JSBlock _ statements _) = formatJSONObject
+    [ ("type", "\"JSBlock\"")
+    , ("statements", formatJSONArray (map renderStatementToJSON statements))
+    ]
