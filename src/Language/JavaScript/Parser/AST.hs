@@ -113,8 +113,8 @@ data JSImportSpecifier
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSExportDeclaration
-    -- = JSExportAllFrom
-    = JSExportFrom JSExportClause JSFromClause !JSSemi -- ^exports, module, semi
+    = JSExportAllFrom !JSBinOp JSFromClause !JSSemi -- ^star, module, semi
+    | JSExportFrom JSExportClause JSFromClause !JSSemi -- ^exports, module, semi
     | JSExportLocals JSExportClause !JSSemi -- ^exports, autosemi
     | JSExport !JSStatement !JSSemi -- ^body, autosemi
     -- | JSExportDefault
@@ -507,6 +507,7 @@ instance ShowStripped JSImportSpecifier where
     ss (JSImportSpecifierAs x1 _ x2) = "JSImportSpecifierAs (" ++ ss x1 ++ "," ++ ss x2 ++ ")"
 
 instance ShowStripped JSExportDeclaration where
+    ss (JSExportAllFrom star from _) = "JSExportAllFrom (" ++ ss star ++ "," ++ ss from ++ ")"
     ss (JSExportFrom xs from _) = "JSExportFrom (" ++ ss xs ++ "," ++ ss from ++ ")"
     ss (JSExportLocals xs _) = "JSExportLocals (" ++ ss xs ++ ")"
     ss (JSExport x1 _) = "JSExport (" ++ ss x1 ++ ")"

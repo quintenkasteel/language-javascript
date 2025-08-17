@@ -1492,7 +1492,9 @@ ImportSpecifier : IdentifierName
 -- [ ]    export default ClassDeclaration[Default]
 -- [ ]    export default [lookahead ∉ { function, class }] AssignmentExpression[In] ;
 ExportDeclaration :: { AST.JSExportDeclaration }
-ExportDeclaration : ExportClause FromClause AutoSemi
+ExportDeclaration : Mul FromClause AutoSemi
+                         { AST.JSExportAllFrom $1 $2 $3  {- 'ExportDeclarationStar' -} }
+                  | ExportClause FromClause AutoSemi
                          { AST.JSExportFrom $1 $2 $3  {- 'ExportDeclaration1' -} }
                   | ExportClause AutoSemi
                          { AST.JSExportLocals $1 $2   {- 'ExportDeclaration2' -} }
