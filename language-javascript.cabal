@@ -37,6 +37,7 @@ Library
                    , bytestring       >= 0.9.1
                    , text             >= 1.2
                    , utf8-string      >= 0.3.7 && < 2
+                   , deepseq          >= 1.3
   if !impl(ghc>=8.0)
     build-depends:   semigroups       >= 0.16.1
 
@@ -77,9 +78,11 @@ Test-Suite testsuite
                  , utf8-string      >= 0.3.7 && < 2
                  , bytestring       >= 0.9.1
                  , blaze-builder    >= 0.2
+                 , deepseq          >= 1.3
                  , language-javascript
 
   Other-modules:    Test.Language.Javascript.ExpressionParser
+                    Test.Language.Javascript.Generic
                     Test.Language.Javascript.Lexer
                     Test.Language.Javascript.LiteralParser
                     Test.Language.Javascript.Minify
