@@ -65,6 +65,16 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "{[x]() {}}"   `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSMethodDefinition (JSPropertyComputed (JSIdentifier 'x')) () (JSBlock [])]))"
         testExpr "{*a(x,y) {yield y;}}" `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSGeneratorMethodDefinition (JSIdentifier 'a') (JSIdentifier 'x',JSIdentifier 'y') (JSBlock [JSYieldExpression (JSIdentifier 'y'),JSSemicolon])]))"
         testExpr "{*[x]({y},...z) {}}"  `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSGeneratorMethodDefinition (JSPropertyComputed (JSIdentifier 'x')) (JSObjectLiteral [JSPropertyIdentRef 'y'],JSSpreadExpression (JSIdentifier 'z')) (JSBlock [])]))"
+        
+    it "object spread" $ do
+        testExpr "{...obj}"             `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSObjectSpread (JSIdentifier 'obj')]))"
+        testExpr "{a: 1, ...obj}"       `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'a') [JSDecimal '1'],JSObjectSpread (JSIdentifier 'obj')]))"
+        testExpr "{...obj, b: 2}"       `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSObjectSpread (JSIdentifier 'obj'),JSPropertyNameandValue (JSIdentifier 'b') [JSDecimal '2']]))"
+        testExpr "{a: 1, ...obj, b: 2}" `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'a') [JSDecimal '1'],JSObjectSpread (JSIdentifier 'obj'),JSPropertyNameandValue (JSIdentifier 'b') [JSDecimal '2']]))"
+        testExpr "{...obj1, ...obj2}"   `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSObjectSpread (JSIdentifier 'obj1'),JSObjectSpread (JSIdentifier 'obj2')]))"
+        testExpr "{...getObject()}"     `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSObjectSpread (JSMemberExpression (JSIdentifier 'getObject',JSArguments ()))]))"
+        testExpr "{x, ...obj, y}"       `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSPropertyIdentRef 'x',JSObjectSpread (JSIdentifier 'obj'),JSPropertyIdentRef 'y']))"
+        testExpr "{...obj, method() {}}" `shouldBe` "Right (JSAstExpression (JSObjectLiteral [JSObjectSpread (JSIdentifier 'obj'),JSMethodDefinition (JSIdentifier 'method') () (JSBlock [])]))"
 
     it "unary expression" $ do
         testExpr "delete y" `shouldBe` "Right (JSAstExpression (JSUnaryExpression ('delete',JSIdentifier 'y')))"
