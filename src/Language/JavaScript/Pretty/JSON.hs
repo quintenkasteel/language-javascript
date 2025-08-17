@@ -357,6 +357,12 @@ renderExportDeclarationToJSON decl = case decl of
         , ("declaration", renderStatementToJSON statement)
         , ("semicolon", renderSemiColonToJSON semi)
         ]
+    AST.JSExportAllFrom star fromClause semi -> formatJSONObject
+        [ ("type", "\"ExportAllFromDeclaration\"")
+        , ("star", renderBinOpToJSON star)
+        , ("source", renderFromClauseToJSON fromClause)
+        , ("semicolon", renderSemiColonToJSON semi)
+        ]
 
 -- | Render export clause to JSON.
 renderExportClauseToJSON :: AST.JSExportClause -> Text
