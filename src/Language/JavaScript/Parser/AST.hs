@@ -24,6 +24,7 @@ module Language.JavaScript.Parser.AST
     , JSCommaList (..)
     , JSCommaTrailingList (..)
     , JSArrowParameterList (..)
+    , JSConciseBody (..)
     , JSTemplatePart (..)
     , JSClassHeritage (..)
     , JSClassElement (..)
@@ -189,7 +190,7 @@ data JSExpression
     | JSExpressionParen !JSAnnot !JSExpression !JSAnnot -- ^lb,expression,rb
     | JSExpressionPostfix !JSExpression !JSUnaryOp -- ^expression, operator
     | JSExpressionTernary !JSExpression !JSAnnot !JSExpression !JSAnnot !JSExpression -- ^cond, ?, trueval, :, falseval
-    | JSArrowExpression !JSArrowParameterList !JSAnnot !JSStatement -- ^parameter list,arrow,block`
+    | JSArrowExpression !JSArrowParameterList !JSAnnot !JSConciseBody -- ^parameter list,arrow,body`
     | JSFunctionExpression !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- ^fn,name,lb, parameter list,rb,block`
     | JSGeneratorExpression !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- ^fn,*,name,lb, parameter list,rb,block`
     | JSMemberDot !JSExpression !JSAnnot !JSExpression -- ^firstpart, dot, name
@@ -212,6 +213,11 @@ data JSExpression
 data JSArrowParameterList
     = JSUnparenthesizedArrowParameter !JSIdent
     | JSParenthesizedArrowParameterList !JSAnnot !(JSCommaList JSExpression) !JSAnnot
+    deriving (Data, Eq, Show, Typeable)
+
+data JSConciseBody
+    = JSConciseFunctionBody !JSBlock
+    | JSConciseExpressionBody !JSExpression
     deriving (Data, Eq, Show, Typeable)
 
 data JSBinOp
@@ -431,7 +437,7 @@ instance ShowStripped JSExpression where
     ss (JSExpressionParen _lp x _rp) = "JSExpressionParen (" ++ ss x ++ ")"
     ss (JSExpressionPostfix xs op) = "JSExpressionPostfix (" ++ ss op ++ "," ++ ss xs ++ ")"
     ss (JSExpressionTernary x1 _q x2 _c x3) = "JSExpressionTernary (" ++ ss x1 ++ "," ++ ss x2 ++ "," ++ ss x3 ++ ")"
-    ss (JSArrowExpression ps _ e) = "JSArrowExpression (" ++ ss ps ++ ") => " ++ ss e
+    ss (JSArrowExpression ps _ body) = "JSArrowExpression (" ++ ss ps ++ ") => " ++ ss body
     ss (JSFunctionExpression _ n _lb pl _rb x3) = "JSFunctionExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
     ss (JSGeneratorExpression _ _ n _lb pl _rb x3) = "JSGeneratorExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
     ss (JSHexInteger _ s) = "JSHexInteger " ++ singleQuote s
@@ -463,6 +469,10 @@ instance ShowStripped JSExpression where
 instance ShowStripped JSArrowParameterList where
     ss (JSUnparenthesizedArrowParameter x) = ss x
     ss (JSParenthesizedArrowParameterList _ xs _) = ss xs
+
+instance ShowStripped JSConciseBody where
+    ss (JSConciseFunctionBody block) = "JSConciseFunctionBody (" ++ ss block ++ ")"
+    ss (JSConciseExpressionBody expr) = "JSConciseExpressionBody (" ++ ss expr ++ ")"
 
 instance ShowStripped JSModuleItem where
     ss (JSModuleExportDeclaration _ x1) = "JSModuleExportDeclaration (" ++ ss x1 ++ ")"

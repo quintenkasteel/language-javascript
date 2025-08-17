@@ -1274,13 +1274,17 @@ FunctionExpression : ArrowFunctionExpression     { $1 {- 'ArrowFunctionExpressio
                    | NamedFunctionExpression     { $1 {- 'FunctionExpression2' -} }
 
 ArrowFunctionExpression :: { AST.JSExpression }
-ArrowFunctionExpression : ArrowParameterList Arrow StatementOrBlock
+ArrowFunctionExpression : ArrowParameterList Arrow ConciseBody
                            { AST.JSArrowExpression $1 $2 $3 }
 
 ArrowParameterList :: { AST.JSArrowParameterList }
 ArrowParameterList : PrimaryExpression {%^ toArrowParameterList $1 }
                    | LParen RParen
                       { AST.JSParenthesizedArrowParameterList $1 AST.JSLNil $2 }
+
+ConciseBody :: { AST.JSConciseBody }
+ConciseBody : Block                    { AST.JSConciseFunctionBody $1 }
+            | AssignmentExpression     { AST.JSConciseExpressionBody $1 }
 
 StatementOrBlock :: { AST.JSStatement }
 StatementOrBlock : Block MaybeSemi		{ blockToStatement $1 $2 }
