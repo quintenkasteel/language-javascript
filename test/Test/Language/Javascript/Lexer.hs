@@ -23,7 +23,7 @@ testLexer = describe "Lexer:" $ do
 
     it "invalid numbers" $ do
         testLex "089"       `shouldBe` "[DecimalToken 0,DecimalToken 89]"
-        testLex "0xGh"      `shouldBe` "[DecimalToken 0,IdentifierToken 'xGx']"
+        testLex "0xGh"      `shouldBe` "[DecimalToken 0,IdentifierToken 'xGh']"
 
     it "string" $ do
         testLex "'cat'"     `shouldBe` "[StringToken 'cat']"
@@ -72,6 +72,22 @@ testLexer = describe "Lexer:" $ do
     it "function" $ do
         testLex "async function\n"     `shouldBe` "[AsyncToken,WsToken,FunctionToken,WsToken]"
 
+    it "bigint literals" $ do
+        testLex "123n"      `shouldBe` "[BigIntToken 123n]"
+        testLex "0n"        `shouldBe` "[BigIntToken 0n]"
+        testLex "0x1234n"   `shouldBe` "[BigIntToken 0x1234n]"
+        testLex "0X1234n"   `shouldBe` "[BigIntToken 0X1234n]"
+        testLex "077n"      `shouldBe` "[BigIntToken 077n]"
+
+    it "optional chaining" $ do
+        testLex "obj?.prop"     `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,IdentifierToken 'prop']"
+        testLex "obj?.[key]"    `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,LeftBracketToken,IdentifierToken 'key',RightBracketToken]"
+        testLex "obj?.method()" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,IdentifierToken 'method',LeftParenToken,RightParenToken]"
+
+    it "nullish coalescing" $ do
+        testLex "x ?? y"        `shouldBe` "[IdentifierToken 'x',WsToken,NullishCoalescingToken,WsToken,IdentifierToken 'y']"
+        testLex "null??'default'" `shouldBe` "[NullToken,NullishCoalescingToken,StringToken 'default']"
+
 
 testLex :: String -> String
 testLex str =
@@ -85,13 +101,14 @@ testLex str =
     showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
     showToken (OctalToken _ lit _) = "OctalToken " ++ lit
     showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ lit
+    showToken (BigIntToken _ lit _) = "BigIntToken " ++ lit
     showToken token = takeWhile (/= ' ') $ show token
 
     stringEscape [] = []
     stringEscape (term:rest) =
         let escapeTerm [] = []
-            escapeTerm [_] = [term]
+            escapeTerm [x] = [x]
             escapeTerm (x:xs)
-                | term == x = "\\" ++ x : escapeTerm xs
+                | term == x = "\\" ++ [x] ++ escapeTerm xs
                 | otherwise = x : escapeTerm xs
         in term : escapeTerm rest

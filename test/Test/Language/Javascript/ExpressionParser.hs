@@ -88,6 +88,7 @@ testExpressionParser = describe "Parse expressions:" $ do
     it "binary expression" $ do
         testExpr "x||y"     `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('||',JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x&&y"     `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('&&',JSIdentifier 'x',JSIdentifier 'y')))"
+        testExpr "x??y"     `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x|y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('|',JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x^y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('^',JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x&y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('&',JSIdentifier 'x',JSIdentifier 'y')))"
@@ -194,6 +195,21 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "class Foo extends Bar { a(x,y) {} *b() {} }" `shouldBe` "Right (JSAstExpression (JSClassExpression 'Foo' (JSIdentifier 'Bar') [JSMethodDefinition (JSIdentifier 'a') (JSIdentifier 'x',JSIdentifier 'y') (JSBlock []),JSGeneratorMethodDefinition (JSIdentifier 'b') () (JSBlock [])]))"
         testExpr "class { static get [a]() {}; }" `shouldBe` "Right (JSAstExpression (JSClassExpression '' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorGet (JSPropertyComputed (JSIdentifier 'a')) () (JSBlock [])),JSClassSemi]))"
         testExpr "class Foo extends Bar { a(x,y) { super(x); } }" `shouldBe` "Right (JSAstExpression (JSClassExpression 'Foo' (JSIdentifier 'Bar') [JSMethodDefinition (JSIdentifier 'a') (JSIdentifier 'x',JSIdentifier 'y') (JSBlock [JSCallExpression (JSLiteral 'super',JSArguments (JSIdentifier 'x')),JSSemicolon])]))"
+
+    it "optional chaining" $ do
+        testExpr "obj?.prop"           `shouldBe` "Right (JSAstExpression (JSOptionalMemberDot (JSIdentifier 'obj',JSIdentifier 'prop')))"
+        testExpr "obj?.[key]"          `shouldBe` "Right (JSAstExpression (JSOptionalMemberSquare (JSIdentifier 'obj',JSIdentifier 'key')))"
+        testExpr "obj?.method()"       `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSOptionalMemberDot (JSIdentifier 'obj',JSIdentifier 'method'),JSArguments ())))"
+        testExpr "obj?.prop?.deep"     `shouldBe` "Right (JSAstExpression (JSOptionalMemberDot (JSOptionalMemberDot (JSIdentifier 'obj',JSIdentifier 'prop'),JSIdentifier 'deep')))"
+        testExpr "obj?.method?.(args)" `shouldBe` "Right (JSAstExpression (JSOptionalCallExpression (JSOptionalMemberDot (JSIdentifier 'obj',JSIdentifier 'method'),JSArguments (JSIdentifier 'args'))))"
+        testExpr "arr?.[0]?.value"     `shouldBe` "Right (JSAstExpression (JSOptionalMemberDot (JSOptionalMemberSquare (JSIdentifier 'arr',JSDecimal '0'),JSIdentifier 'value')))"
+
+    it "nullish coalescing precedence" $ do
+        testExpr "x ?? y || z"         `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('||',JSExpressionBinary ('??',JSIdentifier 'x',JSIdentifier 'y'),JSIdentifier 'z')))"
+        testExpr "x || y ?? z"         `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('||',JSIdentifier 'x',JSExpressionBinary ('??',JSIdentifier 'y',JSIdentifier 'z'))))"
+        testExpr "null ?? 'default'"   `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSLiteral 'null',JSStringLiteral 'default')))"
+        testExpr "undefined ?? 0"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSIdentifier 'undefined',JSDecimal '0')))"
+        testExpr "x ?? y ?? z"         `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSExpressionBinary ('??',JSIdentifier 'x',JSIdentifier 'y'),JSIdentifier 'z')))"
 
 
 testExpr :: String -> String

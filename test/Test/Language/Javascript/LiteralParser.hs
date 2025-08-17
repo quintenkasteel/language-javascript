@@ -41,6 +41,14 @@ testLiteralParser = describe "Parse literals:" $ do
     it "octal numbers" $ do
         testLiteral "070"       `shouldBe` "Right (JSAstLiteral (JSOctal '070'))"
         testLiteral "010234567" `shouldBe` "Right (JSAstLiteral (JSOctal '010234567'))"
+    it "bigint numbers" $ do
+        testLiteral "123n"      `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '123n'))"
+        testLiteral "0n"        `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0n'))"
+        testLiteral "9007199254740991n" `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '9007199254740991n'))"
+        testLiteral "0x1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0x1234n'))"
+        testLiteral "0X1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0X1234n'))"
+        testLiteral "0o777n"    `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0o777n'))"
+        testLiteral "077n"      `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '077n'))"
     it "strings" $ do
         testLiteral "'cat'"    `shouldBe` "Right (JSAstLiteral (JSStringLiteral 'cat'))"
         testLiteral "\"cat\""  `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"cat\"))"
