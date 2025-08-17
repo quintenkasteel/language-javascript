@@ -39,8 +39,10 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "[x,]"     `shouldBe` "Right (JSAstExpression (JSArrayLiteral [JSIdentifier 'x',JSComma]))"
         testExpr "[,,,]"    `shouldBe` "Right (JSAstExpression (JSArrayLiteral [JSComma,JSComma,JSComma]))"
         testExpr "[a,,]"    `shouldBe` "Right (JSAstExpression (JSArrayLiteral [JSIdentifier 'a',JSComma,JSComma]))"
-    it "operator precedence" $
+    it "operator precedence" $ do
         testExpr "2+3*4+5"  `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('+',JSExpressionBinary ('+',JSDecimal '2',JSExpressionBinary ('*',JSDecimal '3',JSDecimal '4')),JSDecimal '5')))"
+        testExpr "2*3**4"   `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('*',JSDecimal '2',JSExpressionBinary ('**',JSDecimal '3',JSDecimal '4'))))"
+        testExpr "2**3*4"   `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('*',JSExpressionBinary ('**',JSDecimal '2',JSDecimal '3'),JSDecimal '4')))"
     it "parentheses" $
         testExpr "(56)"     `shouldBe` "Right (JSAstExpression (JSExpressionParen (JSDecimal '56')))"
     it "string concatenation" $ do
@@ -121,6 +123,9 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "x-y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('-',JSIdentifier 'x',JSIdentifier 'y')))"
 
         testExpr "x*y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('*',JSIdentifier 'x',JSIdentifier 'y')))"
+        testExpr "x**y"     `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('**',JSIdentifier 'x',JSIdentifier 'y')))"
+        testExpr "x**y**z"  `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('**',JSIdentifier 'x',JSExpressionBinary ('**',JSIdentifier 'y',JSIdentifier 'z'))))"
+        testExpr "2**3**2"   `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('**',JSDecimal '2',JSExpressionBinary ('**',JSDecimal '3',JSDecimal '2'))))"
         testExpr "x/y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('/',JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x%y"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('%',JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x instanceof y" `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('instanceof',JSIdentifier 'x',JSIdentifier 'y')))"

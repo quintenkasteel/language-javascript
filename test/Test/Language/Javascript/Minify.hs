@@ -90,6 +90,7 @@ testMinifyExpr = describe "Minify expressions:" $ do
         minifyExpr " t === z " `shouldBe`  "t===z"
         minifyExpr " u !== z " `shouldBe`  "u!==z"
         minifyExpr " v * z " `shouldBe`  "v*z"
+        minifyExpr " x ** z " `shouldBe`  "x**z"
         minifyExpr " w >>> z " `shouldBe`  "w>>>z"
 
     it "ternary" $ do
