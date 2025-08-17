@@ -5,6 +5,7 @@ import Test.Hspec
 import Test.Hspec.Runner
 
 
+import Test.Language.Javascript.ASIEdgeCases
 import Test.Language.Javascript.ExpressionParser
 import Test.Language.Javascript.ExportStar
 import Test.Language.Javascript.Generic
@@ -28,6 +29,7 @@ main = do
 testAll :: Spec
 testAll = do
     testLexer
+    testASIEdgeCases
     testLiteralParser
     testExpressionParser
     testStatementParser

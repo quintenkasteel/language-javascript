@@ -88,10 +88,61 @@ testLexer = describe "Lexer:" $ do
         testLex "x ?? y"        `shouldBe` "[IdentifierToken 'x',WsToken,NullishCoalescingToken,WsToken,IdentifierToken 'y']"
         testLex "null??'default'" `shouldBe` "[NullToken,NullishCoalescingToken,StringToken 'default']"
 
+    it "automatic semicolon insertion with comments" $ do
+        -- Single-line comments with newlines trigger ASI
+        testLexASI "return // comment\n4"  `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,AutoSemiToken,DecimalToken 4]"
+        testLexASI "break // comment\nx"   `shouldBe` "[BreakToken,WsToken,CommentToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
+        testLexASI "continue // comment\n" `shouldBe` "[ContinueToken,WsToken,CommentToken,WsToken,AutoSemiToken]"
+        
+        -- Multi-line comments with newlines trigger ASI
+        testLexASI "return /* comment\n */ 4" `shouldBe` "[ReturnToken,WsToken,CommentToken,AutoSemiToken,WsToken,DecimalToken 4]"
+        testLexASI "break /* line1\nline2 */ x" `shouldBe` "[BreakToken,WsToken,CommentToken,AutoSemiToken,WsToken,IdentifierToken 'x']"
+        
+        -- Multi-line comments without newlines do NOT trigger ASI
+        testLexASI "return /* comment */ 4" `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,DecimalToken 4]"
+        testLexASI "break /* inline */ x" `shouldBe` "[BreakToken,WsToken,CommentToken,WsToken,IdentifierToken 'x']"
+        
+        -- Whitespace with newlines still triggers ASI (existing behavior)
+        testLexASI "return \n 4" `shouldBe` "[ReturnToken,WsToken,AutoSemiToken,DecimalToken 4]"
+        testLexASI "continue \n x" `shouldBe` "[ContinueToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
+        
+        -- Different line terminator types in comments
+        testLexASI "return // comment\r\n4" `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,AutoSemiToken,DecimalToken 4]"
+        testLexASI "break /* comment\r */ x" `shouldBe` "[BreakToken,WsToken,CommentToken,AutoSemiToken,WsToken,IdentifierToken 'x']"
+        
+        -- Comments after non-ASI tokens do not create AutoSemiToken
+        testLexASI "var // comment\n x" `shouldBe` "[VarToken,WsToken,CommentToken,WsToken,IdentifierToken 'x']"
+        testLexASI "function /* comment\n */ f" `shouldBe` "[FunctionToken,WsToken,CommentToken,WsToken,IdentifierToken 'f']"
+
 
 testLex :: String -> String
 testLex str =
     either id stringify $ alexTestTokeniser str
+  where
+    stringify xs = "[" ++ intercalate "," (map showToken xs) ++ "]"
+
+    showToken :: Token -> String
+    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
+    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
+    showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
+    showToken (OctalToken _ lit _) = "OctalToken " ++ lit
+    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ lit
+    showToken (BigIntToken _ lit _) = "BigIntToken " ++ lit
+    showToken token = takeWhile (/= ' ') $ show token
+
+    stringEscape [] = []
+    stringEscape (term:rest) =
+        let escapeTerm [] = []
+            escapeTerm [x] = [x]
+            escapeTerm (x:xs)
+                | term == x = "\\" ++ [x] ++ escapeTerm xs
+                | otherwise = x : escapeTerm xs
+        in term : escapeTerm rest
+
+-- Test function that uses ASI-enabled tokenizer
+testLexASI :: String -> String
+testLexASI str =
+    either id stringify $ alexTestTokeniserASI str
   where
     stringify xs = "[" ++ intercalate "," (map showToken xs) ++ "]"
 

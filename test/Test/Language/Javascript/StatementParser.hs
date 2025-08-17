@@ -83,6 +83,21 @@ testStatementParser = describe "Parse statements:" $ do
         testStmt "return 123;"  `shouldBe` "Right (JSAstStatement (JSReturn JSDecimal '123' JSSemicolon))"
         testStmt "{return}"     `shouldBe` "Right (JSAstStatement (JSStatementBlock [JSReturn ]))"
 
+    it "automatic semicolon insertion with comments" $ do
+        -- Return statements with comments and newlines should trigger ASI
+        testStmt "return // comment\n4"    `shouldBe` "Right (JSAstStatement (JSReturn JSDecimal '4' ))"
+        testStmt "return /* comment\n */4" `shouldBe` "Right (JSAstStatement (JSReturn JSDecimal '4' ))"
+        
+        -- Return statements with comments but no newlines should NOT trigger ASI
+        testStmt "return /* comment */ 4"  `shouldBe` "Right (JSAstStatement (JSReturn JSDecimal '4' ))"
+        
+        -- Break and continue statements with comments and newlines
+        testStmt "break // comment\n"      `shouldBe` "Right (JSAstStatement (JSBreak))"
+        testStmt "continue /* line\n */"   `shouldBe` "Right (JSAstStatement (JSContinue))"
+        
+        -- Whitespace newlines still work (existing behavior) - but this should parse error because 4 is leftover
+        testStmt "return \n"             `shouldBe` "Right (JSAstStatement (JSReturn ))"
+
     it "with" $
         testStmt "with (x) {};" `shouldBe` "Right (JSAstStatement (JSWith (JSIdentifier 'x') (JSStatementBlock [])))"
 

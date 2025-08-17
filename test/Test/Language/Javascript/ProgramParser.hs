@@ -7,6 +7,7 @@ module Test.Language.Javascript.ProgramParser
 import Control.Applicative ((<$>))
 #endif
 import Test.Hspec
+import Data.List (isPrefixOf)
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.Grammar7
@@ -84,6 +85,23 @@ testProgramParser = describe "Program parser:" $ do
         testProg "v = getValue(execute(n[0], x)) in getValue(execute(n[1], x));"   `shouldBe` "Right (JSAstProgram [JSOpAssign ('=',JSIdentifier 'v',JSExpressionBinary ('in',JSMemberExpression (JSIdentifier 'getValue',JSArguments (JSMemberExpression (JSIdentifier 'execute',JSArguments (JSMemberSquare (JSIdentifier 'n',JSDecimal '0'),JSIdentifier 'x')))),JSMemberExpression (JSIdentifier 'getValue',JSArguments (JSMemberExpression (JSIdentifier 'execute',JSArguments (JSMemberSquare (JSIdentifier 'n',JSDecimal '1'),JSIdentifier 'x')))))),JSSemicolon])"
         testProg "function Animal(name){if(!name)throw new Error('Must specify an animal name');this.name=name};Animal.prototype.toString=function(){return this.name};o=new Animal(\"bob\");o.toString()==\"bob\""
                                     `shouldBe` "Right (JSAstProgram [JSFunction 'Animal' (JSIdentifier 'name') (JSBlock [JSIf (JSUnaryExpression ('!',JSIdentifier 'name')) (JSThrow (JSMemberNew (JSIdentifier 'Error',JSArguments (JSStringLiteral 'Must specify an animal name')))),JSOpAssign ('=',JSMemberDot (JSLiteral 'this',JSIdentifier 'name'),JSIdentifier 'name')]),JSOpAssign ('=',JSMemberDot (JSMemberDot (JSIdentifier 'Animal',JSIdentifier 'prototype'),JSIdentifier 'toString'),JSFunctionExpression '' () (JSBlock [JSReturn JSMemberDot (JSLiteral 'this',JSIdentifier 'name') ])),JSSemicolon,JSOpAssign ('=',JSIdentifier 'o',JSMemberNew (JSIdentifier 'Animal',JSArguments (JSStringLiteral \"bob\"))),JSSemicolon,JSExpressionBinary ('==',JSMemberExpression (JSMemberDot (JSIdentifier 'o',JSIdentifier 'toString'),JSArguments ()),JSStringLiteral \"bob\")])"
+
+    it "automatic semicolon insertion with comments in functions" $ do
+        -- Function with return statement and comment + newline - should parse successfully
+        testProg "function f1() { return // hello\n 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f2() { return /* hello */ 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f3() { return /* hello\n */ 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f4() { return\n 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        
+        -- Functions with break/continue in loops - should parse successfully
+        testProg "function f() { while(true) { break // comment\n } }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f() { for(;;) { continue /* comment\n */ } }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        
+        -- Multiple statements with ASI - should parse successfully
+        testProg "function f() { return // first\n 1; return /* second\n */ 2 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        
+        -- Mixed ASI scenarios - should parse successfully
+        testProg "var x = 5; function f() { return // comment\n x + 1 } f()" `shouldSatisfy` ("Right" `isPrefixOf`)
 
 
 testProg :: String -> String
