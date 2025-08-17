@@ -6,6 +6,7 @@ import Test.Hspec.Runner
 
 
 import Test.Language.Javascript.ExpressionParser
+import Test.Language.Javascript.Generic
 import Test.Language.Javascript.Lexer
 import Test.Language.Javascript.LiteralParser
 import Test.Language.Javascript.Minify
@@ -36,3 +37,4 @@ testAll = do
     testMinifyStmt
     testMinifyProg
     testMinifyModule
+    testGenericNFData
