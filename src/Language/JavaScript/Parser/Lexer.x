@@ -15,6 +15,7 @@ module Language.JavaScript.Parser.Lexer
     , alexError
     , runAlex
     , alexTestTokeniser
+    , alexTestTokeniserASI
     , setInTemplate
     ) where
 
@@ -359,6 +360,7 @@ tokens :-
     "--"    { adapt (symbolToken  DecrementToken) }
     "+"     { adapt (symbolToken  PlusToken) }
     "-"     { adapt (symbolToken  MinusToken) }
+    "**"    { adapt (symbolToken  ExponentiationToken) }
     "*"     { adapt (symbolToken  MulToken) }
     "%"     { adapt (symbolToken  ModToken) }
     "!"     { adapt (symbolToken  NotToken) }
@@ -442,6 +444,56 @@ alexTestTokeniser input =
                             xs -> reverse xs
             _ -> loop (tok:acc)
 
+-- For testing with ASI (Automatic Semicolon Insertion) support
+-- This version includes comment tokens in the output for testing
+alexTestTokeniserASI :: String -> Either String [Token]
+alexTestTokeniserASI input =
+    runAlex input $ loop []
+  where
+    loop acc = do
+        tok <- lexToken
+        case tok of
+            EOFToken {} ->
+                return $ case acc of
+                            [] -> []
+                            (TailToken{}:xs) -> reverse xs
+                            xs -> reverse xs
+            CommentToken {} -> do
+                if shouldTriggerASI acc
+                    then maybeAutoSemiTest tok acc
+                    else loop (tok:acc)
+            WsToken {} -> do
+                if shouldTriggerASI acc
+                    then maybeAutoSemiTest tok acc  
+                    else loop (tok:acc)
+            _ -> do
+                setLastToken tok
+                loop (tok:acc)
+    
+    -- Test version that includes tokens in output stream
+    maybeAutoSemiTest (WsToken sp tl cmt) acc =
+        if hasNewlineTest tl
+            then loop (AutoSemiToken sp tl cmt : WsToken sp tl cmt : acc)
+            else loop (WsToken sp tl cmt : acc)
+    maybeAutoSemiTest (CommentToken sp tl cmt) acc =
+        if hasNewlineTest tl  
+            then loop (AutoSemiToken sp tl cmt : CommentToken sp tl cmt : acc)
+            else loop (CommentToken sp tl cmt : acc)
+    maybeAutoSemiTest tok acc = loop (tok:acc)
+    
+    -- Check for newlines including all JavaScript line terminators
+    hasNewlineTest :: String -> Bool
+    hasNewlineTest = any (`elem` ['\n', '\r', '\x2028', '\x2029'])
+    
+    -- Check if we should trigger ASI by looking for recent return/break/continue tokens
+    shouldTriggerASI :: [Token] -> Bool
+    shouldTriggerASI = any isASITrigger . take 5  -- Look at last 5 tokens
+      where
+        isASITrigger (ReturnToken {}) = True
+        isASITrigger (BreakToken {}) = True  
+        isASITrigger (ContinueToken {}) = True
+        isASITrigger _ = False
+
 -- This is called by the Happy parser.
 lexCont :: (Token -> Alex a) -> Alex a
 lexCont cont =
@@ -452,7 +504,12 @@ lexCont cont =
         case tok of
             CommentToken {} -> do
                 addComment tok
-                lexLoop
+                ltok <- getLastToken
+                case ltok of
+                    BreakToken {} -> maybeAutoSemi tok
+                    ContinueToken {} -> maybeAutoSemi tok
+                    ReturnToken {} -> maybeAutoSemi tok
+                    _otherwise -> lexLoop
             WsToken {} -> do
                 addComment tok
                 ltok <- getLastToken
@@ -467,13 +524,21 @@ lexCont cont =
                 setComment []
                 cont tok'
 
-    -- If the token is a WsToken and it contains a newline, convert it to an
-    -- AutoSemiToken and call the continuation, otherwise, just lexLoop.
+    -- If the token contains a newline, convert it to an AutoSemiToken and call 
+    -- the continuation, otherwise, just lexLoop. Now handles both WsToken and CommentToken.
     maybeAutoSemi (WsToken sp tl cmt) =
-        if any (== '\n') tl
+        if hasNewline tl
+            then cont $ AutoSemiToken sp tl cmt
+            else lexLoop
+    maybeAutoSemi (CommentToken sp tl cmt) =
+        if hasNewline tl
             then cont $ AutoSemiToken sp tl cmt
             else lexLoop
     maybeAutoSemi _ = lexLoop
+
+    -- Check for newlines including all JavaScript line terminators
+    hasNewline :: String -> Bool
+    hasNewline = any (`elem` ['\n', '\r', '\x2028', '\x2029'])
 
 
 toCommentAnnotation :: [Token] -> [CommentAnnotation]

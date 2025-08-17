@@ -72,6 +72,7 @@ import qualified Language.JavaScript.Parser.AST as AST
      '--'   { DecrementToken {} }
      '+'    { PlusToken {} }
      '-'    { MinusToken {} }
+     '**'   { ExponentiationToken {} }
      '*'    { MulToken {} }
      '/'    { DivToken {} }
      '%'    { ModToken {} }
@@ -245,6 +246,9 @@ Not : '!' { AST.JSUnaryOpNot (mkJSAnnot $1) }
 
 Mul :: { AST.JSBinOp }
 Mul : '*' { AST.JSBinOpTimes (mkJSAnnot $1) }
+
+Exp :: { AST.JSBinOp }
+Exp : '**' { AST.JSBinOpExponentiation (mkJSAnnot $1) }
 
 Div :: { AST.JSBinOp }
 Div : '/' { AST.JSBinOpDivide (mkJSAnnot $1) }
@@ -768,16 +772,23 @@ UnaryExpression : PostfixExpression         { $1 {- 'UnaryExpression' -} }
                 | Tilde     UnaryExpression { AST.JSUnaryExpression $1 $2 }
                 | Not       UnaryExpression { AST.JSUnaryExpression $1 $2 }
 
--- MultiplicativeExpression :                                   See 11.5
+-- ExponentiationExpression :                                  See ES2016
 --        UnaryExpression
---        MultiplicativeExpression * UnaryExpression
---        MultiplicativeExpression / UnaryExpression
---        MultiplicativeExpression % UnaryExpression
+--        UnaryExpression ** ExponentiationExpression
+ExponentiationExpression :: { AST.JSExpression }
+ExponentiationExpression : UnaryExpression                                       { $1 {- 'ExponentiationExpression' -} }
+                         | UnaryExpression Exp ExponentiationExpression          { AST.JSExpressionBinary {- '**' -} $1 $2 $3 }
+
+-- MultiplicativeExpression :                                   See 11.5
+--        ExponentiationExpression
+--        MultiplicativeExpression * ExponentiationExpression
+--        MultiplicativeExpression / ExponentiationExpression
+--        MultiplicativeExpression % ExponentiationExpression
 MultiplicativeExpression :: { AST.JSExpression }
-MultiplicativeExpression : UnaryExpression                              { $1 {- 'MultiplicativeExpression' -} }
-                         | MultiplicativeExpression Mul UnaryExpression { AST.JSExpressionBinary {- '*' -} $1 $2 $3 }
-                         | MultiplicativeExpression Div UnaryExpression { AST.JSExpressionBinary {- '/' -} $1 $2 $3 }
-                         | MultiplicativeExpression Mod UnaryExpression { AST.JSExpressionBinary {- '%' -} $1 $2 $3 }
+MultiplicativeExpression : ExponentiationExpression                                    { $1 {- 'MultiplicativeExpression' -} }
+                         | MultiplicativeExpression Mul ExponentiationExpression       { AST.JSExpressionBinary {- '*' -} $1 $2 $3 }
+                         | MultiplicativeExpression Div ExponentiationExpression       { AST.JSExpressionBinary {- '/' -} $1 $2 $3 }
+                         | MultiplicativeExpression Mod ExponentiationExpression       { AST.JSExpressionBinary {- '%' -} $1 $2 $3 }
 
 -- AdditiveExpression :                                        See 11.6
 --        MultiplicativeExpression
