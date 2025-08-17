@@ -6,6 +6,7 @@ import Test.Hspec.Runner
 
 
 import Test.Language.Javascript.ExpressionParser
+import Test.Language.Javascript.ExportStar
 import Test.Language.Javascript.Generic
 import Test.Language.Javascript.Lexer
 import Test.Language.Javascript.LiteralParser
@@ -32,6 +33,7 @@ testAll = do
     testStatementParser
     testProgramParser
     testModuleParser
+    testExportStar
     testRoundTrip
     testMinifyExpr
     testMinifyStmt

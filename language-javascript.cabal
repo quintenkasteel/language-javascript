@@ -82,6 +82,7 @@ Test-Suite testsuite
                  , language-javascript
 
   Other-modules:    Test.Language.Javascript.ExpressionParser
+                    Test.Language.Javascript.ExportStar
                     Test.Language.Javascript.Generic
                     Test.Language.Javascript.Lexer
                     Test.Language.Javascript.LiteralParser
