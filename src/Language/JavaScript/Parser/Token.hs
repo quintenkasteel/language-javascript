@@ -149,6 +149,7 @@ data Token
     | PlusToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | MinusToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | MulToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
+    | ExponentiationToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | DivToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | ModToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | NotToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }

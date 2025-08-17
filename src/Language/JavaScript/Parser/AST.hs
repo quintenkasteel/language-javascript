@@ -229,6 +229,7 @@ data JSBinOp
     | JSBinOpBitXor !JSAnnot
     | JSBinOpDivide !JSAnnot
     | JSBinOpEq !JSAnnot
+    | JSBinOpExponentiation !JSAnnot
     | JSBinOpGe !JSAnnot
     | JSBinOpGt !JSAnnot
     | JSBinOpIn !JSAnnot
@@ -566,6 +567,7 @@ instance ShowStripped JSBinOp where
     ss (JSBinOpBitXor _) = "'^'"
     ss (JSBinOpDivide _) = "'/'"
     ss (JSBinOpEq _) = "'=='"
+    ss (JSBinOpExponentiation _) = "'**'"
     ss (JSBinOpGe _) = "'>='"
     ss (JSBinOpGt _) = "'>'"
     ss (JSBinOpIn _) = "'in'"
@@ -675,6 +677,7 @@ deAnnot (JSBinOpBitOr _) = JSBinOpBitOr JSNoAnnot
 deAnnot (JSBinOpBitXor _) = JSBinOpBitXor JSNoAnnot
 deAnnot (JSBinOpDivide _) = JSBinOpDivide JSNoAnnot
 deAnnot (JSBinOpEq _) = JSBinOpEq JSNoAnnot
+deAnnot (JSBinOpExponentiation _) = JSBinOpExponentiation JSNoAnnot
 deAnnot (JSBinOpGe _) = JSBinOpGe JSNoAnnot
 deAnnot (JSBinOpGt _) = JSBinOpGt JSNoAnnot
 deAnnot (JSBinOpIn _) = JSBinOpIn JSNoAnnot
