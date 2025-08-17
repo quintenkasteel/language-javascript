@@ -622,6 +622,7 @@ PropertyAssignment :: { AST.JSObjectProperty }
 PropertyAssignment : PropertyName Colon AssignmentExpression { AST.JSPropertyNameandValue $1 $2 [$3] }
                    | IdentifierName { identifierToProperty $1 }
                    | MethodDefinition { AST.JSObjectMethod $1 }
+                   | SpreadExpression { spreadExpressionToProperty $1 }
 
 -- TODO: not clear if get/set are keywords, or just used in a specific context. Puzzling.
 MethodDefinition :: { AST.JSMethodDefinition }
@@ -1609,6 +1610,10 @@ propName x = error $ "Cannot convert '" ++ show x ++ "' to a JSPropertyName."
 identifierToProperty :: AST.JSExpression -> AST.JSObjectProperty
 identifierToProperty (AST.JSIdentifier a s) = AST.JSPropertyIdentRef a s
 identifierToProperty x = error $ "Cannot convert '" ++ show x ++ "' to a JSObjectProperty."
+
+spreadExpressionToProperty :: AST.JSExpression -> AST.JSObjectProperty
+spreadExpressionToProperty (AST.JSSpreadExpression a expr) = AST.JSObjectSpread a expr
+spreadExpressionToProperty x = error $ "Cannot convert '" ++ show x ++ "' to a JSObjectSpread."
 
 toArrowParameterList :: AST.JSExpression -> Token -> Alex AST.JSArrowParameterList
 toArrowParameterList (AST.JSIdentifier a s)          = const . return $ AST.JSUnparenthesizedArrowParameter (AST.JSIdentName a s)

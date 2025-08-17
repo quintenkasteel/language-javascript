@@ -308,6 +308,7 @@ data JSObjectProperty
     = JSPropertyNameandValue !JSPropertyName !JSAnnot ![JSExpression] -- ^name, colon, value
     | JSPropertyIdentRef !JSAnnot !String
     | JSObjectMethod !JSMethodDefinition
+    | JSObjectSpread !JSAnnot !JSExpression -- ^..., expression
     deriving (Data, Eq, Show, Typeable)
 
 data JSMethodDefinition
@@ -531,6 +532,7 @@ instance ShowStripped JSObjectProperty where
     ss (JSPropertyNameandValue x1 _colon x2s) = "JSPropertyNameandValue (" ++ ss x1 ++ ") " ++ ss x2s
     ss (JSPropertyIdentRef _ s) = "JSPropertyIdentRef " ++ singleQuote s
     ss (JSObjectMethod m) = ss m
+    ss (JSObjectSpread _ expr) = "JSObjectSpread (" ++ ss expr ++ ")"
 
 instance ShowStripped JSMethodDefinition where
     ss (JSMethodDefinition x1 _lb1 x2s _rb1 x3) = "JSMethodDefinition (" ++ ss x1 ++ ") " ++ ss x2s ++ " (" ++ ss x3 ++ ")"
