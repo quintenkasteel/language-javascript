@@ -59,6 +59,21 @@ testModuleParser = describe "Parse modules:" $ do
         test "export {} from 'mod'"
             `shouldBe`
             "Right (JSAstModule [JSModuleExportDeclaration (JSExportFrom (JSExportClause (()),JSFromClause ''mod''))])"
+        test "export * from 'mod'"
+            `shouldBe`
+            "Right (JSAstModule [JSModuleExportDeclaration (JSExportAllFrom ('*',JSFromClause ''mod''))])"
+        test "export * from 'mod';"
+            `shouldBe`
+            "Right (JSAstModule [JSModuleExportDeclaration (JSExportAllFrom ('*',JSFromClause ''mod''))])"
+        test "export * from \"module\""
+            `shouldBe`
+            "Right (JSAstModule [JSModuleExportDeclaration (JSExportAllFrom ('*',JSFromClause '\"module\"'))])"
+        test "export * from './relative/path'"
+            `shouldBe`
+            "Right (JSAstModule [JSModuleExportDeclaration (JSExportAllFrom ('*',JSFromClause ''./relative/path''))])"
+        test "export * from '../parent/module'"
+            `shouldBe`
+            "Right (JSAstModule [JSModuleExportDeclaration (JSExportAllFrom ('*',JSFromClause ''../parent/module''))])"
 
 
 test :: String -> String
