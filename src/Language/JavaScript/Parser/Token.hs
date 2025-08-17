@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, DeriveGeneric, DeriveAnyClass #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Language.Python.Common.Token
@@ -23,14 +23,16 @@ module Language.JavaScript.Parser.Token
     -- TokenClass (..),
     ) where
 
+import Control.DeepSeq (NFData)
 import Data.Data
+import GHC.Generics (Generic)
 import Language.JavaScript.Parser.SrcLocation
 
 data CommentAnnotation
     = CommentA TokenPosn String
     | WhiteSpace TokenPosn String
     | NoComment
-    deriving (Eq, Show, Typeable, Data, Read)
+    deriving (Eq, Generic, NFData, Show, Typeable, Data, Read)
 
 -- | Lexical tokens.
 -- Each may be annotated with any comment occurring between the prior token and this one
@@ -178,7 +180,7 @@ data Token
     | AsToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
     | TailToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  } -- ^ Stuff between last JS and EOF
     | EOFToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }  -- ^ End of file
-    deriving (Eq, Show, Typeable)
+    deriving (Eq, Generic, NFData, Show, Typeable)
 
 
 -- | Produce a string from a token containing detailed information. Mainly intended for debugging.

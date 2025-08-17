@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      : Language.JavaScript.ParseError
@@ -17,6 +18,8 @@ module Language.JavaScript.Parser.ParseError
 
 --import Language.JavaScript.Parser.Pretty
 -- import Control.Monad.Error.Class -- Control.Monad.Trans.Except
+import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
 import Language.JavaScript.Parser.Lexer
 import Language.JavaScript.Parser.SrcLocation (TokenPosn)
 -- import Language.JavaScript.Parser.Token (Token)
@@ -29,7 +32,7 @@ data ParseError
      -- ^ An error from the lexer. Character found where it should not be.
    | StrError String
      -- ^ A generic error containing a string message. No source location.
-   deriving (Eq, {- Ord,-} Show)
+   deriving (Eq, Generic, NFData, {- Ord,-} Show)
 
 class Error a where
     -- | Creates an exception without a message.
