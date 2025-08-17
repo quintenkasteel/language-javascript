@@ -55,6 +55,7 @@ Library
                        Language.JavaScript.Parser.Parser
                        Language.JavaScript.Parser.SrcLocation
                        Language.JavaScript.Pretty.Printer
+                       Language.JavaScript.Pretty.JSON
                        Language.JavaScript.Process.Minify
   Other-modules:       Language.JavaScript.Parser.LexerUtils
                        Language.JavaScript.Parser.ParseError
