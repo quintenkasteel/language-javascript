@@ -162,6 +162,16 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "(a,b=1) => a + b" `shouldBe` "Right (JSAstExpression (JSArrowExpression ((JSIdentifier 'a',JSOpAssign ('=',JSIdentifier 'b',JSDecimal '1'))) => JSConciseExpressionBody (JSExpressionBinary ('+',JSIdentifier 'a',JSIdentifier 'b'))))"
         testExpr "([a,b]) => a + b" `shouldBe` "Right (JSAstExpression (JSArrowExpression ((JSArrayLiteral [JSIdentifier 'a',JSComma,JSIdentifier 'b'])) => JSConciseExpressionBody (JSExpressionBinary ('+',JSIdentifier 'a',JSIdentifier 'b'))))"
 
+    it "trailing comma in function parameters" $ do
+        -- Test trailing commas in function expressions
+        testExpr "function(a,){}"   `shouldBe` "Right (JSAstExpression (JSFunctionExpression '' (JSIdentifier 'a') (JSBlock [])))"
+        testExpr "function(a,b,){}" `shouldBe` "Right (JSAstExpression (JSFunctionExpression '' (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [])))"
+        -- Test named functions with trailing commas
+        testExpr "function foo(x,){}" `shouldBe` "Right (JSAstExpression (JSFunctionExpression 'foo' (JSIdentifier 'x') (JSBlock [])))"
+        -- Test generator functions with trailing commas
+        testExpr "function*(a,){}" `shouldBe` "Right (JSAstExpression (JSGeneratorExpression '' (JSIdentifier 'a') (JSBlock [])))"
+        testExpr "function* gen(x,y,){}" `shouldBe` "Right (JSAstExpression (JSGeneratorExpression 'gen' (JSIdentifier 'x',JSIdentifier 'y') (JSBlock [])))"
+
     it "generator expression" $ do
         testExpr "function*(){}"        `shouldBe` "Right (JSAstExpression (JSGeneratorExpression '' () (JSBlock [])))"
         testExpr "function*(a){}"       `shouldBe` "Right (JSAstExpression (JSGeneratorExpression '' (JSIdentifier 'a') (JSBlock [])))"
@@ -185,6 +195,17 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "x().x"       `shouldBe` "Right (JSAstExpression (JSCallExpressionDot (JSMemberExpression (JSIdentifier 'x',JSArguments ()),JSIdentifier 'x')))"
         testExpr "x(a,b=2).x"  `shouldBe` "Right (JSAstExpression (JSCallExpressionDot (JSMemberExpression (JSIdentifier 'x',JSArguments (JSIdentifier 'a',JSOpAssign ('=',JSIdentifier 'b',JSDecimal '2'))),JSIdentifier 'x')))"
         testExpr "foo (56.8379100, 60.5806664)" `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSIdentifier 'foo',JSArguments (JSDecimal '56.8379100',JSDecimal '60.5806664'))))"
+        
+    it "trailing comma in function calls" $ do
+        testExpr "f(x,)"       `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSIdentifier 'f',JSArguments (JSIdentifier 'x'))))"
+        testExpr "f(a,b,)"     `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSIdentifier 'f',JSArguments (JSIdentifier 'a',JSIdentifier 'b'))))"
+        testExpr "Math.max(10, 20,)" `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier 'Math',JSIdentifier 'max'),JSArguments (JSDecimal '10',JSDecimal '20'))))"
+        -- Chained function calls with trailing commas
+        testExpr "f(x,)(y,)"   `shouldBe` "Right (JSAstExpression (JSCallExpression (JSMemberExpression (JSIdentifier 'f',JSArguments (JSIdentifier 'x')),JSArguments (JSIdentifier 'y'))))"
+        -- Complex expressions with trailing commas
+        testExpr "obj.method(a + b, c * d,)" `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier 'obj',JSIdentifier 'method'),JSArguments (JSExpressionBinary ('+',JSIdentifier 'a',JSIdentifier 'b'),JSExpressionBinary ('*',JSIdentifier 'c',JSIdentifier 'd')))))"
+        -- Single argument with trailing comma
+        testExpr "console.log('hello',)" `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier 'console',JSIdentifier 'log'),JSArguments (JSStringLiteral 'hello'))))"
 
     it "spread expression" $
         testExpr "... x"        `shouldBe` "Right (JSAstExpression (JSSpreadExpression (JSIdentifier 'x')))"
