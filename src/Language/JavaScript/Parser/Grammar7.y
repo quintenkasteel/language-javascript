@@ -634,10 +634,14 @@ MethodDefinition : PropertyName LParen RParen FunctionBody
                      { AST.JSMethodDefinition $1 $2 AST.JSLNil $3 $4 }
                  | PropertyName LParen FormalParameterList RParen FunctionBody
                      { AST.JSMethodDefinition $1 $2 $3 $4 $5 }
+                 | PropertyName LParen FormalParameterList Comma RParen FunctionBody
+                     { AST.JSMethodDefinition $1 $2 $3 $5 $6 }
                  | '*' PropertyName LParen RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 AST.JSLNil $4 $5 }
                  | '*' PropertyName LParen FormalParameterList RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 $4 $5 $6 }
+                 | '*' PropertyName LParen FormalParameterList Comma RParen FunctionBody
+                     { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 $4 $6 $7 }
                  -- Should be "get" in next, but is not a Token
                  | 'get' PropertyName LParen RParen FunctionBody
                      { AST.JSPropertyAccessor (AST.JSAccessorGet (mkJSAnnot $1)) $2 $3 AST.JSLNil $4 $5 }
@@ -719,9 +723,11 @@ CallExpression : MemberExpression Arguments
 -- Arguments :                                                  See 11.2
 --        ()
 --        ( ArgumentList )
+--        ( ArgumentList , )
 Arguments :: { JSArguments }
-Arguments : LParen RParen               { JSArguments $1 AST.JSLNil $2  {- 'Arguments1' -} }
-          | LParen ArgumentList RParen  { JSArguments $1 $2 $3			{- 'Arguments2' -} }
+Arguments : LParen RParen                      { JSArguments $1 AST.JSLNil $2  {- 'Arguments1' -} }
+          | LParen ArgumentList RParen         { JSArguments $1 $2 $3			{- 'Arguments2' -} }
+          | LParen ArgumentList Comma RParen   { JSArguments $1 $2 $4			{- 'Arguments3' -} }
 
 -- ArgumentList :                                               See 11.2
 --        AssignmentExpression
@@ -1313,12 +1319,16 @@ NamedFunctionExpression : Function Identifier LParen RParen FunctionBody
                             { AST.JSFunctionExpression $1 (identName $2) $3 AST.JSLNil $4 $5    {- 'NamedFunctionExpression1' -} }
                         | Function Identifier LParen FormalParameterList RParen FunctionBody
                             { AST.JSFunctionExpression $1 (identName $2) $3 $4 $5 $6            {- 'NamedFunctionExpression2' -} }
+                        | Function Identifier LParen FormalParameterList Comma RParen FunctionBody
+                            { AST.JSFunctionExpression $1 (identName $2) $3 $4 $6 $7            {- 'NamedFunctionExpression3' -} }
 
 LambdaExpression :: { AST.JSExpression }
 LambdaExpression : Function LParen RParen FunctionBody
                     { AST.JSFunctionExpression $1 AST.JSIdentNone $2 AST.JSLNil $3 $4	{- 'LambdaExpression1' -} }
                  | Function LParen FormalParameterList RParen FunctionBody
                     { AST.JSFunctionExpression $1 AST.JSIdentNone $2 $3 $4 $5           {- 'LambdaExpression2' -} }
+                 | Function LParen FormalParameterList Comma RParen FunctionBody
+                    { AST.JSFunctionExpression $1 AST.JSIdentNone $2 $3 $5 $6           {- 'LambdaExpression3' -} }
 
 -- GeneratorDeclaration :
 --         function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1336,12 +1346,16 @@ GeneratorExpression : NamedGeneratorExpression { $1 }
                         { AST.JSGeneratorExpression $1 (mkJSAnnot $2) AST.JSIdentNone $3 AST.JSLNil $4 $5 }
                     | Function '*' LParen FormalParameterList RParen FunctionBody
                         { AST.JSGeneratorExpression $1 (mkJSAnnot $2) AST.JSIdentNone $3 $4 $5 $6 }
+                    | Function '*' LParen FormalParameterList Comma RParen FunctionBody
+                        { AST.JSGeneratorExpression $1 (mkJSAnnot $2) AST.JSIdentNone $3 $4 $6 $7 }
 
 NamedGeneratorExpression :: { AST.JSExpression }
 NamedGeneratorExpression : Function '*' Identifier LParen RParen FunctionBody
                              { AST.JSGeneratorExpression $1 (mkJSAnnot $2) (identName $3) $4 AST.JSLNil $5 $6 }
                          | Function '*' Identifier LParen FormalParameterList RParen FunctionBody
                              { AST.JSGeneratorExpression $1 (mkJSAnnot $2) (identName $3) $4 $5 $6 $7 }
+                         | Function '*' Identifier LParen FormalParameterList Comma RParen FunctionBody
+                             { AST.JSGeneratorExpression $1 (mkJSAnnot $2) (identName $3) $4 $5 $7 $8 }
 
 -- YieldExpression :
 --         yield
