@@ -16,6 +16,7 @@ import Test.Language.Javascript.ModuleParser
 import Test.Language.Javascript.ProgramParser
 import Test.Language.Javascript.RoundTrip
 import Test.Language.Javascript.StatementParser
+import Test.Language.Javascript.Validator
 
 
 main :: IO ()
@@ -42,3 +43,4 @@ testAll = do
     testMinifyProg
     testMinifyModule
     testGenericNFData
+    testValidator
