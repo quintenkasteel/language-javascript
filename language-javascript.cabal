@@ -55,6 +55,7 @@ Library
                        Language.JavaScript.Parser.Lexer
                        Language.JavaScript.Parser.Parser
                        Language.JavaScript.Parser.SrcLocation
+                       Language.JavaScript.Parser.Validator
                        Language.JavaScript.Pretty.Printer
                        Language.JavaScript.Pretty.JSON
                        Language.JavaScript.Process.Minify
@@ -75,6 +76,7 @@ Test-Suite testsuite
                  , array            >= 0.3
                  , containers       >= 0.2
                  , mtl              >= 1.1
+                 , text             >= 1.2
                  , utf8-string      >= 0.3.7 && < 2
                  , bytestring       >= 0.9.1
                  , blaze-builder    >= 0.2
@@ -92,6 +94,7 @@ Test-Suite testsuite
                     Test.Language.Javascript.ProgramParser
                     Test.Language.Javascript.RoundTrip
                     Test.Language.Javascript.StatementParser
+                    Test.Language.Javascript.Validator
 
 source-repository head
   type:     git
