@@ -67,6 +67,94 @@ testStatementParser = describe "Parse statements:" $ do
         testStmt "var [a,b]=x"      `shouldBe` "Right (JSAstStatement (JSVariable (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'a',JSComma,JSIdentifier 'b']) [JSIdentifier 'x'])))"
         testStmt "const {a:b}=x"    `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'a') [JSIdentifier 'b']]) [JSIdentifier 'x'])))"
 
+    it "complex destructuring patterns (ES2015) - supported features" $ do
+        -- Basic array destructuring
+        testStmt "let [a, b] = arr;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'a',JSComma,JSIdentifier 'b']) [JSIdentifier 'arr'])))"
+        testStmt "const [first, second, third] = values;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'first',JSComma,JSIdentifier 'second',JSComma,JSIdentifier 'third']) [JSIdentifier 'values'])))"
+        
+        -- Basic object destructuring
+        testStmt "let {x, y} = point;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSObjectLiteral [JSPropertyIdentRef 'x',JSPropertyIdentRef 'y']) [JSIdentifier 'point'])))"
+        testStmt "const {name, age, city} = person;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyIdentRef 'name',JSPropertyIdentRef 'age',JSPropertyIdentRef 'city']) [JSIdentifier 'person'])))"
+        
+        -- Nested array destructuring
+        testStmt "let [a, [b, c]] = nested;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'a',JSComma,JSArrayLiteral [JSIdentifier 'b',JSComma,JSIdentifier 'c']]) [JSIdentifier 'nested'])))"
+        testStmt "const [x, [y, [z]]] = deepNested;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'x',JSComma,JSArrayLiteral [JSIdentifier 'y',JSComma,JSArrayLiteral [JSIdentifier 'z']]]) [JSIdentifier 'deepNested'])))"
+        
+        -- Nested object destructuring
+        testStmt "let {a: {b}} = obj;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'a') [JSObjectLiteral [JSPropertyIdentRef 'b']]]) [JSIdentifier 'obj'])))"
+        testStmt "const {user: {name, profile: {email}}} = data;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'user') [JSObjectLiteral [JSPropertyIdentRef 'name',JSPropertyNameandValue (JSIdentifier 'profile') [JSObjectLiteral [JSPropertyIdentRef 'email']]]]]) [JSIdentifier 'data'])))"
+        
+        -- Rest patterns in arrays
+        testStmt "let [first, ...rest] = array;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'first',JSComma,JSSpreadExpression (JSIdentifier 'rest')]) [JSIdentifier 'array'])))"
+        testStmt "const [head, ...tail] = list;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'head',JSComma,JSSpreadExpression (JSIdentifier 'tail')]) [JSIdentifier 'list'])))"
+        
+        -- Sparse arrays (holes)
+        testStmt "let [, , third] = sparse;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSComma,JSComma,JSIdentifier 'third']) [JSIdentifier 'sparse'])))"
+        testStmt "const [first, , , fourth] = spaced;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'first',JSComma,JSComma,JSComma,JSIdentifier 'fourth']) [JSIdentifier 'spaced'])))"
+        
+        -- Property renaming in objects
+        testStmt "let {prop: newName} = obj;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'prop') [JSIdentifier 'newName']]) [JSIdentifier 'obj'])))"
+        testStmt "const {x: newX, y: newY} = coordinates;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'x') [JSIdentifier 'newX'],JSPropertyNameandValue (JSIdentifier 'y') [JSIdentifier 'newY']]) [JSIdentifier 'coordinates'])))"
+        
+        -- Object rest patterns (spread syntax)
+        testStmt "let {a, ...rest} = obj;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSObjectLiteral [JSPropertyIdentRef 'a',JSObjectSpread (JSIdentifier 'rest')]) [JSIdentifier 'obj'])))"
+        testStmt "const {prop, ...others} = data;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyIdentRef 'prop',JSObjectSpread (JSIdentifier 'others')]) [JSIdentifier 'data'])))"
+
+    it "destructuring default values validation (ES2015) - actual parser capabilities" $ do
+        -- Test array default values (these work as assignment expressions)
+        parse "let [a = 1, b = 2] = array;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "const [x = 'default', y = null] = arr;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "const [first, second = 'fallback'] = values;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        
+        -- Test object default values - NOT SUPPORTED (confirmed to fail)
+        parse "const {prop = defaultValue} = obj;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "let {x = 1, y = 2} = point;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "const {a = 'hello', b = 42} = data;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        
+        -- Test mixed destructuring with defaults - NOT SUPPORTED
+        parse "const {a, b = 2, c: d = 3} = mixed;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "let {name, age = 25, city = 'Unknown'} = person;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        
+        -- Test complex mixed patterns - NOT SUPPORTED due to object defaults
+        parse "const [a = 1, {b = 2, c}] = complex;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "const {user: {name = 'Unknown', age = 0} = {}} = data;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        
+        -- Test function parameter destructuring - check both object and array
+        parse "function test({x = 1, y = 2} = {}) {}" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "function test2([a = 1, b = 2] = []) {}" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        
+        -- Test object rest patterns (these ARE supported via JSObjectSpread)
+        parse "let {a, ...rest} = obj;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "const {prop, ...others} = data;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        
+        -- Test property renaming with defaults - NOT SUPPORTED for defaults
+        parse "let {prop: newName = default} = obj;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        -- Test property renaming WITHOUT defaults (this should work)
+        parse "const {x: newX, y: newY} = coords;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+
+    it "comprehensive destructuring patterns with AST validation (ES2015) - supported features" $ do
+        -- Array destructuring with default values (parsed as assignment expressions)
+        testStmt "let [a = 1, b = 2] = arr;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSOpAssign ('=',JSIdentifier 'a',JSDecimal '1'),JSComma,JSOpAssign ('=',JSIdentifier 'b',JSDecimal '2')]) [JSIdentifier 'arr'])))"
+        testStmt "const [x = 'default', y = null, z] = values;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSOpAssign ('=',JSIdentifier 'x',JSStringLiteral 'default'),JSComma,JSOpAssign ('=',JSIdentifier 'y',JSLiteral 'null'),JSComma,JSIdentifier 'z']) [JSIdentifier 'values'])))"
+        
+        -- Mixed array patterns with and without defaults
+        testStmt "let [first, second = 'fallback', third] = data;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'first',JSComma,JSOpAssign ('=',JSIdentifier 'second',JSStringLiteral 'fallback'),JSComma,JSIdentifier 'third']) [JSIdentifier 'data'])))"
+        
+        -- Array rest patterns
+        testStmt "const [head, ...tail] = list;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'head',JSComma,JSSpreadExpression (JSIdentifier 'tail')]) [JSIdentifier 'list'])))"
+        
+        -- Property renaming without defaults
+        testStmt "const {prop: renamed, other: aliased} = obj;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'prop') [JSIdentifier 'renamed'],JSPropertyNameandValue (JSIdentifier 'other') [JSIdentifier 'aliased']]) [JSIdentifier 'obj'])))"
+        
+        -- Function parameters with array destructuring defaults
+        testStmt "function test([a = 1, b = 2] = []) {}" `shouldBe` "Right (JSAstStatement (JSFunction 'test' (JSOpAssign ('=',JSArrayLiteral [JSOpAssign ('=',JSIdentifier 'a',JSDecimal '1'),JSComma,JSOpAssign ('=',JSIdentifier 'b',JSDecimal '2')],JSArrayLiteral [])) (JSBlock [])))"
+        
+        -- Nested array destructuring
+        testStmt "let [x, [y, z]] = nested;" `shouldBe` "Right (JSAstStatement (JSLet (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'x',JSComma,JSArrayLiteral [JSIdentifier 'y',JSComma,JSIdentifier 'z']]) [JSIdentifier 'nested'])))"
+        
+        -- Complex nested array patterns with defaults
+        testStmt "const [a, [b = 42, c], d = 'default'] = complex;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSArrayLiteral [JSIdentifier 'a',JSComma,JSArrayLiteral [JSOpAssign ('=',JSIdentifier 'b',JSDecimal '42'),JSComma,JSIdentifier 'c'],JSComma,JSOpAssign ('=',JSIdentifier 'd',JSStringLiteral 'default')]) [JSIdentifier 'complex'])))"
+
     it "break" $ do
         testStmt "break;"       `shouldBe` "Right (JSAstStatement (JSBreak,JSSemicolon))"
         testStmt "break x;"     `shouldBe` "Right (JSAstStatement (JSBreak 'x',JSSemicolon))"
@@ -104,6 +192,13 @@ testStatementParser = describe "Parse statements:" $ do
     it "assign" $
         testStmt "var z = x[i] / y;"    `shouldBe` "Right (JSAstStatement (JSVariable (JSVarInitExpression (JSIdentifier 'z') [JSExpressionBinary ('/',JSMemberSquare (JSIdentifier 'x',JSIdentifier 'i'),JSIdentifier 'y')])))"
 
+    it "logical assignment statements" $ do
+        testStmt "x&&=true;"    `shouldBe` "Right (JSAstStatement (JSOpAssign ('&&=',JSIdentifier 'x',JSLiteral 'true'),JSSemicolon))"
+        testStmt "x||=false;"   `shouldBe` "Right (JSAstStatement (JSOpAssign ('||=',JSIdentifier 'x',JSLiteral 'false'),JSSemicolon))"
+        testStmt "x??=null;"    `shouldBe` "Right (JSAstStatement (JSOpAssign ('??=',JSIdentifier 'x',JSLiteral 'null'),JSSemicolon))"
+        testStmt "obj.prop&&=getValue();" `shouldBe` "Right (JSAstStatement (JSOpAssign ('&&=',JSMemberDot (JSIdentifier 'obj',JSIdentifier 'prop'),JSMemberExpression (JSIdentifier 'getValue',JSArguments ())),JSSemicolon))"
+        testStmt "cache[key]??=expensive();" `shouldBe` "Right (JSAstStatement (JSOpAssign ('??=',JSMemberSquare (JSIdentifier 'cache',JSIdentifier 'key'),JSMemberExpression (JSIdentifier 'expensive',JSArguments ())),JSSemicolon))"
+
     it "label" $
         testStmt "abc:x=1"      `shouldBe` "Right (JSAstStatement (JSLabelled (JSIdentifier 'abc') (JSOpAssign ('=',JSIdentifier 'x',JSDecimal '1'))))"
 
@@ -140,10 +235,66 @@ testStatementParser = describe "Parse statements:" $ do
         testStmt "function* x(a,b){}"    `shouldBe` "Right (JSAstStatement (JSGenerator 'x' (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [])))"
         testStmt "function* x(a,...b){}" `shouldBe` "Right (JSAstStatement (JSGenerator 'x' (JSIdentifier 'a',JSSpreadExpression (JSIdentifier 'b')) (JSBlock [])))"
 
+    it "async function" $ do
+        testStmt "async function x(){}"     `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' () (JSBlock [])))"
+        testStmt "async function x(a){}"    `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' (JSIdentifier 'a') (JSBlock [])))"
+        testStmt "async function x(a,b){}"  `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [])))"
+        testStmt "async function x(...a){}" `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' (JSSpreadExpression (JSIdentifier 'a')) (JSBlock [])))"
+        testStmt "async function x(a=1){}"  `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' (JSOpAssign ('=',JSIdentifier 'a',JSDecimal '1')) (JSBlock [])))"
+        testStmt "async function x([a]){}"  `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' (JSArrayLiteral [JSIdentifier 'a']) (JSBlock [])))"
+        testStmt "async function x({a}){}"  `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'x' (JSObjectLiteral [JSPropertyIdentRef 'a']) (JSBlock [])))"
+        testStmt "async function fetch() { return await response.json(); }" `shouldBe` "Right (JSAstStatement (JSAsyncFunction 'fetch' () (JSBlock [JSReturn JSAwaitExpresson JSMemberExpression (JSMemberDot (JSIdentifier 'response',JSIdentifier 'json'),JSArguments ()) JSSemicolon])))"
+
     it "class" $ do
         testStmt "class Foo extends Bar { a(x,y) {} *b() {} }" `shouldBe` "Right (JSAstStatement (JSClass 'Foo' (JSIdentifier 'Bar') [JSMethodDefinition (JSIdentifier 'a') (JSIdentifier 'x',JSIdentifier 'y') (JSBlock []),JSGeneratorMethodDefinition (JSIdentifier 'b') () (JSBlock [])]))"
         testStmt "class Foo { static get [a]() {}; }" `shouldBe` "Right (JSAstStatement (JSClass 'Foo' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorGet (JSPropertyComputed (JSIdentifier 'a')) () (JSBlock [])),JSClassSemi]))"
         testStmt "class Foo extends Bar { a(x,y) { super[x](y); } }" `shouldBe` "Right (JSAstStatement (JSClass 'Foo' (JSIdentifier 'Bar') [JSMethodDefinition (JSIdentifier 'a') (JSIdentifier 'x',JSIdentifier 'y') (JSBlock [JSMethodCall (JSMemberSquare (JSLiteral 'super',JSIdentifier 'x'),JSArguments (JSIdentifier 'y')),JSSemicolon])]))"
+
+    it "class private fields" $ do
+        testStmt "class Foo { #field = 42; }" `shouldBe` "Right (JSAstStatement (JSClass 'Foo' () [JSPrivateField '#field' (JSDecimal '42')]))"
+        testStmt "class Bar { #name; }" `shouldBe` "Right (JSAstStatement (JSClass 'Bar' () [JSPrivateField '#name']))"
+        testStmt "class Baz { #prop = \"value\"; #count = 0; }" `shouldBe` "Right (JSAstStatement (JSClass 'Baz' () [JSPrivateField '#prop' (JSStringLiteral \"value\"),JSPrivateField '#count' (JSDecimal '0')]))"
+
+    it "class private methods" $ do
+        testStmt "class Test { #method() { return 42; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Test' () [JSPrivateMethod '#method' () (JSBlock [JSReturn JSDecimal '42' JSSemicolon])]))"
+        testStmt "class Demo { #calc(x, y) { return x + y; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Demo' () [JSPrivateMethod '#calc' (JSIdentifier 'x',JSIdentifier 'y') (JSBlock [JSReturn JSExpressionBinary ('+',JSIdentifier 'x',JSIdentifier 'y') JSSemicolon])]))"
+
+    it "class private accessors" $ do
+        testStmt "class Widget { get #value() { return this._value; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Widget' () [JSPrivateAccessor JSAccessorGet '#value' () (JSBlock [JSReturn JSMemberDot (JSLiteral 'this',JSIdentifier '_value') JSSemicolon])]))"
+        testStmt "class Counter { set #count(val) { this._count = val; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Counter' () [JSPrivateAccessor JSAccessorSet '#count' (JSIdentifier 'val') (JSBlock [JSOpAssign ('=',JSMemberDot (JSLiteral 'this',JSIdentifier '_count'),JSIdentifier 'val'),JSSemicolon])]))"
+
+    it "static class methods (ES2015) - supported features" $ do
+        -- Basic static method
+        testStmt "class Test { static method() {} }" `shouldBe` "Right (JSAstStatement (JSClass 'Test' () [JSClassStaticMethod (JSMethodDefinition (JSIdentifier 'method') () (JSBlock []))]))"
+        -- Static method with parameters
+        testStmt "class Math { static add(a, b) { return a + b; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Math' () [JSClassStaticMethod (JSMethodDefinition (JSIdentifier 'add') (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [JSReturn JSExpressionBinary ('+',JSIdentifier 'a',JSIdentifier 'b') JSSemicolon]))]))"
+        -- Static generator method
+        testStmt "class Utils { static *range(n) { for(let i=0;i<n;i++) yield i; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Utils' () [JSClassStaticMethod (JSGeneratorMethodDefinition (JSIdentifier 'range') (JSIdentifier 'n') (JSBlock [JSForLet (JSVarInitExpression (JSIdentifier 'i') [JSDecimal '0']) (JSExpressionBinary ('<',JSIdentifier 'i',JSIdentifier 'n')) (JSExpressionPostfix ('++',JSIdentifier 'i')) (JSYieldExpression (JSIdentifier 'i'),JSSemicolon)]))]))"
+
+    it "static class accessors (ES2015) - supported features" $ do
+        -- Static getter
+        testStmt "class Config { static get version() { return '1.0'; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Config' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorGet (JSIdentifier 'version') () (JSBlock [JSReturn JSStringLiteral '1.0' JSSemicolon]))]))"
+        -- Static setter
+        testStmt "class Logger { static set level(val) { this._level = val; } }" `shouldBe` "Right (JSAstStatement (JSClass 'Logger' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorSet (JSIdentifier 'level') (JSIdentifier 'val') (JSBlock [JSOpAssign ('=',JSMemberDot (JSLiteral 'this',JSIdentifier '_level'),JSIdentifier 'val'),JSSemicolon]))]))"
+        -- Static computed property getter
+        testStmt "class Foo { static get [symbol]() {} }" `shouldBe` "Right (JSAstStatement (JSClass 'Foo' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorGet (JSPropertyComputed (JSIdentifier 'symbol')) () (JSBlock []))]))"
+        -- Static computed property setter
+        testStmt "class Bar { static set [key](value) {} }" `shouldBe` "Right (JSAstStatement (JSClass 'Bar' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorSet (JSPropertyComputed (JSIdentifier 'key')) (JSIdentifier 'value') (JSBlock []))]))"
+
+    it "static class features - current limitations" $ do
+        -- Note: Static field declarations are not yet supported by the parser
+        -- These tests document the existing limitations for future implementation
+        parse "class Test { static field = 42; }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "class Demo { static x = 1, y = 2; }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "class Example { static #privateField = 'secret'; }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        
+        -- Note: Static initialization blocks are not yet supported
+        parse "class Init { static { console.log('initialization'); } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "class Complex { static { this.computed = this.a + this.b; } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        
+        -- Note: Static async methods are not yet supported
+        parse "class API { static async fetch() { return await response; } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "class Service { static async *generator() { yield await data; } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
 
 
 testStmt :: String -> String
