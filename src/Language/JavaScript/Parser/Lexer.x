@@ -237,6 +237,9 @@ tokens :-
 -- <reg,divide> @IDHead(@IDTail)*  { \loc len str -> keywordOrIdent (take len str) loc }
 <reg,divide> @IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> keywordOrIdent (take len str) (toTokenPosn loc) }
 
+-- Private identifier (#identifier)
+<reg,divide> "#"@IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> return $ PrivateNameToken (toTokenPosn loc) (take len str) [] }
+
 -- ECMA-262 : Section 7.8.4 String Literals
 -- StringLiteral = '"' ( {String Chars1} | '\' {Printable} )* '"'
 --                | '' ( {String Chars2} | '\' {Printable} )* ''
@@ -346,6 +349,9 @@ tokens :-
     "&="    { adapt (symbolToken  AndAssignToken) }
     "^="    { adapt (symbolToken  XorAssignToken) }
     "|="    { adapt (symbolToken  OrAssignToken) }
+    "&&="   { adapt (symbolToken  LogicalAndAssignToken) }
+    "||="   { adapt (symbolToken  LogicalOrAssignToken) }
+    "??="   { adapt (symbolToken  NullishAssignToken) }
     "="     { adapt (symbolToken  SimpleAssignToken) }
     "!=="   { adapt (symbolToken  StrictNeToken) }
     "!="    { adapt (symbolToken  NeToken) }

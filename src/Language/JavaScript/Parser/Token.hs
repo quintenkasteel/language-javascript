@@ -43,6 +43,7 @@ data Token
 
     -- Identifiers
     | IdentifierToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }    -- ^ Identifier.
+    | PrivateNameToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }    -- ^ Private identifier (#identifier).
 
     -- Javascript Literals
 
@@ -134,6 +135,9 @@ data Token
     | AndAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | XorAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | OrAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
+    | LogicalAndAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
+    | LogicalOrAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
+    | NullishAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | SimpleAssignToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | StrictNeToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | NeToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }

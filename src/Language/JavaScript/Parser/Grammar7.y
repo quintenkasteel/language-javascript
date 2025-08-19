@@ -58,6 +58,9 @@ import qualified Language.JavaScript.Parser.AST as AST
      '&='   { AndAssignToken {} }
      '^='   { XorAssignToken {} }
      '|='   { OrAssignToken {} }
+     '&&='  { LogicalAndAssignToken {} }
+     '||='  { LogicalOrAssignToken {} }
+     '??='  { NullishAssignToken {} }
      '='    { SimpleAssignToken {} }
      '!=='  { StrictNeToken {} }
      '!='   { NeToken {} }
@@ -137,6 +140,7 @@ import qualified Language.JavaScript.Parser.AST as AST
 
 
      'ident'      { IdentifierToken {} }
+     'private'    { PrivateNameToken {} }
      'decimal'    { DecimalToken {} }
      'hexinteger' { HexIntegerToken {} }
      'octal'      { OctalToken {} }
@@ -334,6 +338,9 @@ OpAssign : '*='     { AST.JSTimesAssign  (mkJSAnnot $1) }
          | '&='     { AST.JSBwAndAssign  (mkJSAnnot $1) }
          | '^='     { AST.JSBwXorAssign  (mkJSAnnot $1) }
          | '|='     { AST.JSBwOrAssign   (mkJSAnnot $1) }
+         | '&&='    { AST.JSLogicalAndAssign (mkJSAnnot $1) }
+         | '||='    { AST.JSLogicalOrAssign  (mkJSAnnot $1) }
+         | '??='    { AST.JSNullishAssign    (mkJSAnnot $1) }
 
 -- IdentifierName ::                                                        See 7.6
 --         IdentifierStart
@@ -535,6 +542,7 @@ PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) "thi
                   | GeneratorExpression      { $1 }
                   | TemplateLiteral          { mkJSTemplateLiteral Nothing $1 {- 'PrimaryExpression6' -} }
                   | LParen Expression RParen { AST.JSExpressionParen $1 $2 $3 }
+                  | ImportMeta               { $1 {- 'PrimaryExpression7' -} }
 
 -- Identifier ::                                                            See 7.6
 --         IdentifierName but not ReservedWord
@@ -551,6 +559,10 @@ Identifier : 'ident' { AST.JSIdentifier (mkJSAnnot $1) (tokenLiteral $1) }
 Yield :: { AST.JSAnnot }
 Yield : 'yield' { mkJSAnnot $1 }
 
+ImportMeta :: { AST.JSExpression }
+ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == "meta" 
+                                     then return (AST.JSImportMeta (mkJSAnnot $1) (mkJSAnnot $2))
+                                     else parseError $3 }
 
 SpreadExpression :: { AST.JSExpression }
 SpreadExpression : Spread AssignmentExpression  { AST.JSSpreadExpression $1 $2 {- 'SpreadExpression' -} }
@@ -1290,6 +1302,7 @@ FunctionExpression :: { AST.JSExpression }
 FunctionExpression : ArrowFunctionExpression     { $1 {- 'ArrowFunctionExpression' -} }
                    | LambdaExpression            { $1 {- 'FunctionExpression1' -} }
                    | NamedFunctionExpression     { $1 {- 'FunctionExpression2' -} }
+                   | AsyncFunctionExpression     { $1 {- 'AsyncFunctionExpression' -} }
 
 ArrowFunctionExpression :: { AST.JSExpression }
 ArrowFunctionExpression : ArrowParameterList Arrow ConciseBody
@@ -1329,6 +1342,23 @@ LambdaExpression : Function LParen RParen FunctionBody
                     { AST.JSFunctionExpression $1 AST.JSIdentNone $2 $3 $4 $5           {- 'LambdaExpression2' -} }
                  | Function LParen FormalParameterList Comma RParen FunctionBody
                     { AST.JSFunctionExpression $1 AST.JSIdentNone $2 $3 $5 $6           {- 'LambdaExpression3' -} }
+
+AsyncFunctionExpression :: { AST.JSExpression }
+AsyncFunctionExpression : Async Function LParen RParen FunctionBody
+                           { AST.JSAsyncFunctionExpression $1 $2 AST.JSIdentNone $3 AST.JSLNil $4 $5   {- 'AsyncFunctionExpression1' -} }
+                        | Async Function LParen FormalParameterList RParen FunctionBody
+                           { AST.JSAsyncFunctionExpression $1 $2 AST.JSIdentNone $3 $4 $5 $6           {- 'AsyncFunctionExpression2' -} }
+                        | Async Function LParen FormalParameterList Comma RParen FunctionBody
+                           { AST.JSAsyncFunctionExpression $1 $2 AST.JSIdentNone $3 $4 $6 $7           {- 'AsyncFunctionExpression3' -} }
+                        | AsyncNamedFunctionExpression     { $1 {- 'AsyncFunctionExpression4' -} }
+
+AsyncNamedFunctionExpression :: { AST.JSExpression }
+AsyncNamedFunctionExpression : Async Function Identifier LParen RParen FunctionBody
+                                { AST.JSAsyncFunctionExpression $1 $2 (identName $3) $4 AST.JSLNil $5 $6    {- 'AsyncNamedFunctionExpression1' -} }
+                             | Async Function Identifier LParen FormalParameterList RParen FunctionBody
+                                { AST.JSAsyncFunctionExpression $1 $2 (identName $3) $4 $5 $6 $7            {- 'AsyncNamedFunctionExpression2' -} }
+                             | Async Function Identifier LParen FormalParameterList Comma RParen FunctionBody
+                                { AST.JSAsyncFunctionExpression $1 $2 (identName $3) $4 $5 $7 $8            {- 'AsyncNamedFunctionExpression3' -} }
 
 -- GeneratorDeclaration :
 --         function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1417,9 +1447,27 @@ ClassBody :                        { [] }
 --         static MethodDefinition
 --         ;
 ClassElement :: { AST.JSClassElement }
-ClassElement : MethodDefinition        { AST.JSClassInstanceMethod $1 }
-             | Static MethodDefinition { AST.JSClassStaticMethod $1 $2 }
-             | Semi                    { AST.JSClassSemi $1 }
+ClassElement : MethodDefinition              { AST.JSClassInstanceMethod $1 }
+             | Static MethodDefinition       { AST.JSClassStaticMethod $1 $2 }
+             | Semi                          { AST.JSClassSemi $1 }
+             | PrivateField                  { $1 }
+             | PrivateMethod                 { $1 }
+             | PrivateAccessor               { $1 }
+
+-- Private field declarations: #field = value; or #field;
+PrivateField :: { AST.JSClassElement }
+PrivateField : 'private' '=' AssignmentExpression AutoSemi { AST.JSPrivateField (mkJSAnnot $1) (extractPrivateName $1) (mkJSAnnot $2) (Just $3) $4 }
+             | 'private' AutoSemi                         { AST.JSPrivateField (mkJSAnnot $1) (extractPrivateName $1) (mkJSAnnot $1) Nothing $2 }
+
+-- Private method definitions: #method() { }
+PrivateMethod :: { AST.JSClassElement }
+PrivateMethod : 'private' LParen RParen FunctionBody                     { AST.JSPrivateMethod (mkJSAnnot $1) (extractPrivateName $1) $2 AST.JSLNil $3 $4 }
+              | 'private' LParen FormalParameterList RParen FunctionBody { AST.JSPrivateMethod (mkJSAnnot $1) (extractPrivateName $1) $2 $3 $4 $5 }
+
+-- Private accessor methods: get #prop() { } or set #prop(value) { }
+PrivateAccessor :: { AST.JSClassElement }
+PrivateAccessor : 'get' 'private' LParen RParen FunctionBody                     { AST.JSPrivateAccessor (AST.JSAccessorGet (mkJSAnnot $1)) (mkJSAnnot $2) (extractPrivateName $2) $3 AST.JSLNil $4 $5 }
+                | 'set' 'private' LParen FormalParameterList RParen FunctionBody { AST.JSPrivateAccessor (AST.JSAccessorSet (mkJSAnnot $1)) (mkJSAnnot $2) (extractPrivateName $2) $3 $4 $5 $6 }
 
 -- Program :                                                                  See clause 14
 --        SourceElementsopt
@@ -1457,10 +1505,10 @@ ModuleItem : Import ImportDeclaration
                     { AST.JSModuleStatementListItem $1      {- 'ModuleItem2' -} }
 
 ImportDeclaration :: { AST.JSImportDeclaration }
-ImportDeclaration : ImportClause FromClause AutoSemi
-                          { AST.JSImportDeclaration $1 $2 $3 }
-                  | 'string' AutoSemi
-                          { AST.JSImportDeclarationBare (mkJSAnnot $1) (tokenLiteral $1) $2 }
+ImportDeclaration : ImportClause FromClause ImportAttributesOpt AutoSemi
+                          { AST.JSImportDeclaration $1 $2 $3 $4 }
+                  | 'string' ImportAttributesOpt AutoSemi
+                          { AST.JSImportDeclarationBare (mkJSAnnot $1) (tokenLiteral $1) $2 $3 }
 
 ImportClause :: { AST.JSImportClause }
 ImportClause : IdentifierName
@@ -1498,6 +1546,18 @@ ImportSpecifier : IdentifierName
                 | IdentifierName As IdentifierName
                     { AST.JSImportSpecifierAs (identName $1) $2 (identName $3) }
 
+ImportAttributesOpt :: { Maybe AST.JSImportAttributes }
+ImportAttributesOpt : {- empty -}                { Nothing }
+                    | 'with' LBrace ImportAttributeList RBrace  { Just (AST.JSImportAttributes $2 $3 $4) }
+
+ImportAttributeList :: { AST.JSCommaList AST.JSImportAttribute }
+ImportAttributeList : ImportAttribute               { AST.JSLOne $1 }
+                    | ImportAttributeList Comma ImportAttribute  { AST.JSLCons $1 $2 $3 }
+
+ImportAttribute :: { AST.JSImportAttribute }
+ImportAttribute : IdentifierName Colon 'string'
+                    { AST.JSImportAttribute (identName $1) $2 (AST.JSStringLiteral (mkJSAnnot $3) (tokenLiteral $3)) }
+
 -- ExportDeclaration :                                                        See 15.2.3
 -- [ ]    export * FromClause ;
 -- [x]    export ExportClause FromClause ;
@@ -1519,6 +1579,8 @@ ImportSpecifier : IdentifierName
 ExportDeclaration :: { AST.JSExportDeclaration }
 ExportDeclaration : Mul FromClause AutoSemi
                          { AST.JSExportAllFrom $1 $2 $3  {- 'ExportDeclarationStar' -} }
+                  | Mul As Identifier FromClause AutoSemi
+                         { AST.JSExportAllAsFrom $1 $2 (identName $3) $4 $5  {- 'ExportDeclarationStarAs' -} }
                   | ExportClause FromClause AutoSemi
                          { AST.JSExportFrom $1 $2 $3  {- 'ExportDeclaration1' -} }
                   | ExportClause AutoSemi
@@ -1581,6 +1643,7 @@ blockToStatement (AST.JSBlock a b c) s = AST.JSStatementBlock a b c s
 
 expressionToStatement :: AST.JSExpression -> AST.JSSemi -> AST.JSStatement
 expressionToStatement (AST.JSFunctionExpression a b@(AST.JSIdentName{}) c d e f) s = AST.JSFunction a b c d e f s
+expressionToStatement (AST.JSAsyncFunctionExpression a fn b@(AST.JSIdentName{}) c d e f) s = AST.JSAsyncFunction a fn b c d e f s
 expressionToStatement (AST.JSGeneratorExpression a b c@(AST.JSIdentName{}) d e f g) s = AST.JSGenerator a b c d e f g s
 expressionToStatement (AST.JSAssignExpression lhs op rhs) s = AST.JSAssignStatement lhs op rhs s
 expressionToStatement (AST.JSMemberExpression e l a r) s = AST.JSMethodCall e l a r s
@@ -1589,6 +1652,7 @@ expressionToStatement exp s = AST.JSExpressionStatement exp s
 
 expressionToAsyncFunction :: AST.JSAnnot -> AST.JSExpression -> AST.JSSemi -> AST.JSStatement
 expressionToAsyncFunction aa (AST.JSFunctionExpression a b@(AST.JSIdentName{}) c d e f) s = AST.JSAsyncFunction aa a b c d e f s
+expressionToAsyncFunction _aa (AST.JSAsyncFunctionExpression a fn b@(AST.JSIdentName{}) c d e f) s = AST.JSAsyncFunction a fn b c d e f s
 expressionToAsyncFunction _aa _exp _s = error "Bad async function."
 
 mkJSCallExpression :: AST.JSExpression -> JSArguments -> AST.JSExpression
@@ -1625,6 +1689,9 @@ mkUnary x = error $ "Invalid unary op : " ++ show x
 identName :: AST.JSExpression -> AST.JSIdent
 identName (AST.JSIdentifier a s) = AST.JSIdentName a s
 identName x = error $ "Cannot convert '" ++ show x ++ "' to a JSIdentName."
+
+extractPrivateName :: Token -> String
+extractPrivateName token = drop 1 (tokenLiteral token)  -- Remove the '#' prefix
 
 propName :: AST.JSExpression ->  AST.JSPropertyName
 propName (AST.JSIdentifier a s) = AST.JSPropertyIdent a s
