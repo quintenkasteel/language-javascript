@@ -79,6 +79,8 @@ import Language.JavaScript.Parser.AST
   , JSImportNameSpace(..)
   , JSImportsNamed(..)
   , JSImportSpecifier(..)
+  , JSImportAttributes(..)
+  , JSImportAttribute(..)
   , JSExportDeclaration(..)
   , JSExportClause(..)
   , JSExportSpecifier(..)
@@ -144,6 +146,7 @@ data ValidationError
   -- Module Errors
   | ExportOutsideModule !TokenPosn
   | ImportOutsideModule !TokenPosn
+  | ImportMetaOutsideModule !TokenPosn
   | DuplicateExport !Text !TokenPosn
   | DuplicateImport !Text !TokenPosn
   | InvalidExportDefault !TokenPosn
@@ -276,6 +279,7 @@ getErrorPosition err = case err of
   -- Module Errors
   ExportOutsideModule pos -> pos
   ImportOutsideModule pos -> pos
+  ImportMetaOutsideModule pos -> pos
   DuplicateExport _ pos -> pos
   
   -- Literal and Expression Errors
@@ -442,6 +446,8 @@ errorToStringSimple err = case err of
     "Export statement must be at module level " ++ showPos pos
   ImportOutsideModule pos -> 
     "Import statement must be at module level " ++ showPos pos
+  ImportMetaOutsideModule pos -> 
+    "import.meta can only be used in module context " ++ showPos pos
   DuplicateExport name pos -> 
     "Duplicate export '" ++ Text.unpack name ++ "' " ++ showPos pos
   DuplicateImport name pos -> 
@@ -849,6 +855,12 @@ validateExpression ctx expr = case expr of
        validateFunctionParameters ctx (fromCommaList params) ++
        validateBlock genCtx block
 
+  JSAsyncFunctionExpression _async _function name _lparen params _rparen block ->
+    let asyncCtx = ctx { contextInFunction = True, contextInAsync = True }
+    in validateOptionalFunctionName ctx name ++
+       validateFunctionParameters ctx (fromCommaList params) ++
+       validateBlock asyncCtx block
+
   JSMemberDot obj _dot prop ->
     validateExpression ctx obj ++
     validateExpression ctx prop ++
@@ -892,8 +904,9 @@ validateExpression ctx expr = case expr of
     concatMap (validateTemplatePart ctx) parts ++
     validateTemplateLiteral maybeTag parts
 
-  JSUnaryExpression _op expr ->
-    validateExpression ctx expr
+  JSUnaryExpression op expr ->
+    validateExpression ctx expr ++
+    validateUnaryExpression ctx op expr
 
   JSVarInitExpression expr init ->
     validateExpression ctx expr ++
@@ -904,6 +917,8 @@ validateExpression ctx expr = case expr of
 
   JSYieldFromExpression _yield _from expr ->
     validateYieldExpression ctx (Just expr)
+  JSImportMeta import_annot _dot ->
+    [ ImportMetaOutsideModule (extractAnnotationPos import_annot) | not (contextInModule ctx) ]
 
 -- | Validate module items with import/export semantics.
 validateModuleItem :: ValidationContext -> JSModuleItem -> [ValidationError]
@@ -1019,7 +1034,58 @@ validateFunctionParameters :: ValidationContext -> [JSExpression] -> [Validation
 validateFunctionParameters ctx params = 
   let paramNames = extractParameterNames params
       duplicates = findDuplicates paramNames
-  in map (\name -> DuplicateParameter name (TokenPn 0 0 0)) duplicates
+      duplicateErrors = map (\name -> DuplicateParameter name (TokenPn 0 0 0)) duplicates
+      defaultValueErrors = concatMap (validateParameterDefault ctx) params
+  in duplicateErrors ++ defaultValueErrors
+
+-- | Validate parameter default values for forbidden yield/await expressions.
+validateParameterDefault :: ValidationContext -> JSExpression -> [ValidationError]
+validateParameterDefault ctx param = case param of
+  JSVarInitExpression _ident (JSVarInit _eq defaultExpr) ->
+    validateExpressionInParameterDefault ctx defaultExpr
+  _ -> []
+
+-- | Validate expression in parameter default context (forbids yield/await).
+validateExpressionInParameterDefault :: ValidationContext -> JSExpression -> [ValidationError]
+validateExpressionInParameterDefault ctx expr = case expr of
+  JSYieldExpression _yield _ ->
+    [YieldInParameterDefault (extractExpressionPosition expr)]
+  JSAwaitExpression _await _ ->
+    [AwaitInParameterDefault (extractExpressionPosition expr)]
+  -- Recursively check nested expressions
+  JSExpressionBinary left _op right ->
+    validateExpressionInParameterDefault ctx left ++
+    validateExpressionInParameterDefault ctx right
+  JSExpressionTernary cond _q consequent _c alternate ->
+    validateExpressionInParameterDefault ctx cond ++
+    validateExpressionInParameterDefault ctx consequent ++
+    validateExpressionInParameterDefault ctx alternate
+  JSCallExpression func _lp args _rp ->
+    validateExpressionInParameterDefault ctx func ++
+    concatMap (validateExpressionInParameterDefault ctx) (fromCommaList args)
+  JSMemberDot obj _dot _prop ->
+    validateExpressionInParameterDefault ctx obj
+  JSMemberSquare obj _lb index _rb ->
+    validateExpressionInParameterDefault ctx obj ++
+    validateExpressionInParameterDefault ctx index
+  JSExpressionParen _lp innerExpr _rp ->
+    validateExpressionInParameterDefault ctx innerExpr
+  JSUnaryExpression _op operand ->
+    validateExpressionInParameterDefault ctx operand
+  JSExpressionPostfix target _op ->
+    validateExpressionInParameterDefault ctx target
+  -- Base cases - literals, identifiers, etc. are fine
+  _ -> []
+
+-- | Extract position from expression for error reporting.
+extractExpressionPosition :: JSExpression -> TokenPosn
+extractExpressionPosition expr = case expr of
+  JSYieldExpression (JSAnnot pos _) _ -> pos
+  JSAwaitExpression (JSAnnot pos _) _ -> pos
+  JSIdentifier (JSAnnot pos _) _ -> pos
+  JSDecimal (JSAnnot pos _) _ -> pos
+  JSStringLiteral (JSAnnot pos _) _ -> pos
+  _ -> TokenPn 0 0 0  -- Default position if we can't extract
 
 -- | Extract parameter names from function parameters.
 extractParameterNames :: [JSExpression] -> [Text]
@@ -1045,6 +1111,14 @@ validateBindingNames :: ValidationContext -> [Text] -> [ValidationError]
 validateBindingNames _ctx names =
   let duplicates = findDuplicates names
   in map (\name -> DuplicateBinding name (TokenPn 0 0 0)) duplicates
+
+-- | Validate unary expressions for strict mode violations.
+validateUnaryExpression :: ValidationContext -> JSUnaryOp -> JSExpression -> [ValidationError]
+validateUnaryExpression ctx (JSUnaryOpDelete annot) expr
+  | contextStrictMode ctx == StrictModeOn = case expr of
+      JSIdentifier _ _ -> [DeleteOfUnqualifiedInStrict (extractAnnotationPos annot)]
+      _ -> []
+validateUnaryExpression _ctx _op _expr = []
 
 -- | Validate identifier in strict mode context.
 validateIdentifier :: ValidationContext -> String -> [ValidationError]
@@ -1629,11 +1703,18 @@ validateDestructuringObject expr = case expr of
 
 validateImportDeclaration :: ValidationContext -> JSImportDeclaration -> [ValidationError]
 validateImportDeclaration ctx importDecl = case importDecl of
-  JSImportDeclaration clause _ _ -> validateImportClause ctx clause
-  JSImportDeclarationBare _ _ _ -> []
+  JSImportDeclaration clause _ attrs _ -> validateImportClause ctx clause ++ maybe [] (validateImportAttributes ctx) attrs
+  JSImportDeclarationBare _ _ attrs _ -> maybe [] (validateImportAttributes ctx) attrs
   where
     validateImportClause :: ValidationContext -> JSImportClause -> [ValidationError]
     validateImportClause _ _ = [] -- Import clause validation handled by import name extraction
+
+validateImportAttributes :: ValidationContext -> JSImportAttributes -> [ValidationError]
+validateImportAttributes _ctx (JSImportAttributes _ attrs _) = 
+    concatMap validateImportAttribute (fromCommaList attrs)
+  where
+    validateImportAttribute :: JSImportAttribute -> [ValidationError]
+    validateImportAttribute (JSImportAttribute _key _ _value) = []
 
 validateExportDeclaration :: ValidationContext -> JSExportDeclaration -> [ValidationError]
 validateExportDeclaration ctx exportDecl = case exportDecl of
@@ -1641,6 +1722,7 @@ validateExportDeclaration ctx exportDecl = case exportDecl of
   JSExportFrom _ _ _ -> []
   JSExportLocals _ _ -> []
   JSExportAllFrom _ _ _ -> []
+  JSExportAllAsFrom _ _ _ _ _ -> []
 
 validateNoDuplicateFunctionDeclarations :: [JSStatement] -> [ValidationError]
 validateNoDuplicateFunctionDeclarations stmts = 
@@ -1725,6 +1807,7 @@ extractExpressionPos expr = case expr of
   JSExpressionTernary cond _ _ _ _ -> extractExpressionPos cond
   JSFunctionExpression annot _ _ _ _ _ -> extractAnnotationPos annot
   JSGeneratorExpression annot _ _ _ _ _ _ -> extractAnnotationPos annot
+  JSAsyncFunctionExpression annot _ _ _ _ _ _ -> extractAnnotationPos annot
   JSMemberDot obj _ _ -> extractExpressionPos obj
   JSMemberExpression expr' _ _ _ -> extractExpressionPos expr'
   JSMemberNew annot _ _ _ _ -> extractAnnotationPos annot
@@ -1736,6 +1819,7 @@ extractExpressionPos expr = case expr of
   JSVarInitExpression lhs _ -> extractExpressionPos lhs
   JSYieldExpression annot _ -> extractAnnotationPos annot
   JSYieldFromExpression annot _ _ -> extractAnnotationPos annot
+  JSImportMeta annot _ -> extractAnnotationPos annot
   JSSpreadExpression annot _ -> extractAnnotationPos annot
   JSOptionalMemberDot obj _ _ -> extractExpressionPos obj
   JSOptionalMemberSquare obj _ _ _ -> extractExpressionPos obj
