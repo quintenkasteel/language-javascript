@@ -49,7 +49,7 @@ import Control.DeepSeq (NFData)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.List (group, isSuffixOf, nub, sort)
-import Data.Maybe (isJust, fromMaybe, catMaybes)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Char (isDigit)
 import GHC.Generics (Generic)
 
@@ -158,6 +158,18 @@ data ValidationError
   | InvalidBigIntLiteral !Text !TokenPosn
   | InvalidEscapeSequence !Text !TokenPosn
   | UnterminatedTemplateLiteral !TokenPosn
+  
+  -- Private Field Errors
+  | PrivateFieldOutsideClass !Text !TokenPosn
+  | PrivateMethodOutsideClass !Text !TokenPosn
+  | PrivateAccessorOutsideClass !Text !TokenPosn
+
+  -- Malformed Syntax Recovery Errors
+  | UnclosedBracket !Text !TokenPosn
+  | UnclosedParenthesis !Text !TokenPosn
+  | IncompleteExpression !Text !TokenPosn
+  | InvalidDestructuringPattern !Text !TokenPosn
+  | MalformedTemplateLiteral !Text !TokenPosn
   
   -- Syntax Context Errors
   | LabelNotFound !Text !TokenPosn
@@ -289,6 +301,18 @@ getErrorPosition err = case err of
   InvalidBigIntLiteral _ pos -> pos
   InvalidEscapeSequence _ pos -> pos
   UnterminatedTemplateLiteral pos -> pos
+  
+  -- Private Field Errors
+  PrivateFieldOutsideClass _ pos -> pos
+  PrivateMethodOutsideClass _ pos -> pos
+  PrivateAccessorOutsideClass _ pos -> pos
+  
+  -- Malformed Syntax Recovery Errors
+  UnclosedBracket _ pos -> pos
+  UnclosedParenthesis _ pos -> pos
+  IncompleteExpression _ pos -> pos
+  InvalidDestructuringPattern _ pos -> pos
+  MalformedTemplateLiteral _ pos -> pos
   
   -- Syntax Context Errors
   LabelNotFound _ pos -> pos
@@ -464,10 +488,30 @@ errorToStringSimple err = case err of
     "Invalid numeric literal: " ++ Text.unpack literal ++ " " ++ showPos pos
   InvalidBigIntLiteral literal pos -> 
     "Invalid BigInt literal: " ++ Text.unpack literal ++ " " ++ showPos pos
-  InvalidEscapeSequence sequence pos -> 
-    "Invalid escape sequence: " ++ Text.unpack sequence ++ " " ++ showPos pos
+  InvalidEscapeSequence escSeq pos -> 
+    "Invalid escape sequence: " ++ Text.unpack escSeq ++ " " ++ showPos pos
   UnterminatedTemplateLiteral pos -> 
     "Unterminated template literal " ++ showPos pos
+  
+  -- Private Field Errors
+  PrivateFieldOutsideClass fieldName pos -> 
+    "Private field '" ++ Text.unpack fieldName ++ "' can only be used within a class " ++ showPos pos
+  PrivateMethodOutsideClass methodName pos -> 
+    "Private method '" ++ Text.unpack methodName ++ "' can only be used within a class " ++ showPos pos
+  PrivateAccessorOutsideClass accessorName pos -> 
+    "Private accessor '" ++ Text.unpack accessorName ++ "' can only be used within a class " ++ showPos pos
+  
+  -- Malformed Syntax Recovery Errors  
+  UnclosedBracket bracket pos -> 
+    "Unclosed bracket '" ++ Text.unpack bracket ++ "' " ++ showPos pos
+  UnclosedParenthesis paren pos -> 
+    "Unclosed parenthesis '" ++ Text.unpack paren ++ "' " ++ showPos pos
+  IncompleteExpression expr pos -> 
+    "Incomplete expression '" ++ Text.unpack expr ++ "' " ++ showPos pos
+  InvalidDestructuringPattern pattern pos -> 
+    "Invalid destructuring pattern '" ++ Text.unpack pattern ++ "' " ++ showPos pos
+  MalformedTemplateLiteral template pos -> 
+    "Malformed template literal '" ++ Text.unpack template ++ "' " ++ showPos pos
   
   -- Syntax Context Errors
   LabelNotFound label pos -> 
@@ -963,9 +1007,6 @@ fromCommaTrailingList (JSCTLComma list _comma) = fromCommaList list
 fromCommaTrailingList (JSCTLNone list) = fromCommaList list
 
 -- | Check if Maybe value is Just (avoiding Data.Maybe.isJust import issue).
-isJust' :: Maybe a -> Bool  
-isJust' (Just _) = True
-isJust' Nothing = False
 
 -- | Check if class has heritage (extends clause).
 hasHeritage :: JSClassHeritage -> Bool
@@ -1036,7 +1077,23 @@ validateFunctionParameters ctx params =
       duplicates = findDuplicates paramNames
       duplicateErrors = map (\name -> DuplicateParameter name (TokenPn 0 0 0)) duplicates
       defaultValueErrors = concatMap (validateParameterDefault ctx) params
-  in duplicateErrors ++ defaultValueErrors
+      restParamErrors = validateRestParameters params
+  in duplicateErrors ++ defaultValueErrors ++ restParamErrors
+
+-- | Validate rest parameters constraints.
+validateRestParameters :: [JSExpression] -> [ValidationError]
+validateRestParameters params = 
+  let restParams = [(i, param) | (i, param) <- zip [0..] params, isRestParameter param]
+      multipleRestErrors = if length restParams > 1
+                           then [RestElementNotLast (TokenPn 0 0 0)] -- Multiple rest parameters
+                           else []
+      notLastErrors = [RestElementNotLast (extractExpressionPos param) 
+                      | (i, param) <- restParams, i /= length params - 1]
+  in multipleRestErrors ++ notLastErrors
+  where
+    isRestParameter :: JSExpression -> Bool
+    isRestParameter (JSSpreadExpression _ _) = True
+    isRestParameter _ = False
 
 -- | Validate parameter default values for forbidden yield/await expressions.
 validateParameterDefault :: ValidationContext -> JSExpression -> [ValidationError]
@@ -1127,6 +1184,14 @@ validateIdentifier ctx name
       [ReservedWordAsIdentifier (Text.pack name) (TokenPn 0 0 0)]
   | name `elem` futureReserved =
       [FutureReservedWord (Text.pack name) (TokenPn 0 0 0)]
+  | name == "super" = validateSuperUsage ctx
+  | otherwise = []
+
+-- | Validate super keyword usage context.
+validateSuperUsage :: ValidationContext -> [ValidationError]
+validateSuperUsage ctx
+  | not (contextInClass ctx) = [SuperOutsideClass (TokenPn 0 0 0)]
+  | not (contextInMethod ctx) && not (contextInConstructor ctx) = [SuperPropertyOutsideMethod (TokenPn 0 0 0)]
   | otherwise = []
 
 -- | Strict mode reserved words.
@@ -1358,7 +1423,29 @@ validateCallExpression ctx callee args =
 
 validateMemberExpression :: ValidationContext -> JSExpression -> JSExpression -> [ValidationError]
 validateMemberExpression ctx obj prop = 
-  validateExpression ctx obj ++ validateExpression ctx prop
+  validateExpression ctx obj ++ validateExpression ctx prop ++ 
+  validatePrivateFieldAccess ctx prop ++ validateNewTargetAccess ctx obj prop
+  where
+    validatePrivateFieldAccess :: ValidationContext -> JSExpression -> [ValidationError]
+    validatePrivateFieldAccess context propExpr = case propExpr of
+      JSIdentifier _annot name | isPrivateIdentifier name ->
+        if contextInClass context
+        then []
+        else [PrivateFieldOutsideClass (Text.pack name) (extractExpressionPos propExpr)]
+      _ -> []
+    
+    validateNewTargetAccess :: ValidationContext -> JSExpression -> JSExpression -> [ValidationError]
+    validateNewTargetAccess context objExpr propExpr = 
+      case (objExpr, propExpr) of
+        (JSIdentifier _ "new", JSIdentifier _ "target") ->
+          if contextInFunction context
+          then []
+          else [NewTargetOutsideFunction (extractExpressionPos propExpr)]
+        _ -> []
+    
+    isPrivateIdentifier :: String -> Bool
+    isPrivateIdentifier ('#':_) = True
+    isPrivateIdentifier _ = False
 
 validateObjectLiteral :: ValidationContext -> JSCommaTrailingList JSObjectProperty -> [ValidationError]
 validateObjectLiteral ctx props = 
@@ -1366,7 +1453,9 @@ validateObjectLiteral ctx props =
       propNames = map extractPropertyName propList
       duplicates = findDuplicates propNames
       propErrors = concatMap (validateObjectProperty ctx) propList
-      duplicateErrors = map (\name -> DuplicatePropertyInStrict name (TokenPn 0 0 0)) duplicates
+      duplicateErrors = if contextStrictMode ctx == StrictModeOn
+                          then map (\name -> DuplicatePropertyInStrict name (TokenPn 0 0 0)) duplicates
+                          else []
   in propErrors ++ duplicateErrors
   where
     extractPropertyName :: JSObjectProperty -> Text
@@ -1460,6 +1549,10 @@ validateClassElement ctx element = case element of
   JSClassInstanceMethod method -> validateMethodDefinition ctx method
   JSClassStaticMethod _static method -> validateMethodDefinition ctx method
   JSClassSemi _semi -> []
+  JSPrivateField _annot _name _eq init _semi -> 
+    maybe [] (validateExpression ctx) init
+  JSPrivateMethod _annot _name _lp _params _rp _block -> [] -- Private method validation handled elsewhere  
+  JSPrivateAccessor _accessor _annot _name _lp _params _rp _block -> [] -- Private accessor validation handled elsewhere
 
 validateClassElements :: [JSClassElement] -> [ValidationError]
 validateClassElements elements = 
@@ -1482,6 +1575,9 @@ validateClassElements elements =
           JSClassInstanceMethod method -> [getMethodName method]
           JSClassStaticMethod _ method -> [getMethodName method]
           JSClassSemi _ -> []
+          JSPrivateField _ name _ _ _ -> [Text.pack ("#" <> name)]
+          JSPrivateMethod _ name _ _ _ _ -> [Text.pack ("#" <> name)]
+          JSPrivateAccessor _ _ name _ _ _ _ -> [Text.pack ("#" <> name)]
         
         getMethodName :: JSMethodDefinition -> Text
         getMethodName method = case method of
@@ -1535,14 +1631,25 @@ validateClassElements elements =
 validateMethodDefinition :: ValidationContext -> JSMethodDefinition -> [ValidationError]
 validateMethodDefinition ctx method = case method of
   JSMethodDefinition propName _lparen params _rparen body ->
-    let methodCtx = ctx { contextInFunction = True }
+    let isConstructor = isConstructorProperty propName
+        methodCtx = ctx { 
+          contextInFunction = True, 
+          contextInMethod = True,
+          contextInConstructor = isConstructor 
+        }
     in validatePropertyName ctx propName ++
        validateFunctionParameters ctx (fromCommaList params) ++
        validateBlock methodCtx body ++
        validateMethodConstraints method
   
   JSGeneratorMethodDefinition _star propName _lparen params _rparen body ->
-    let genCtx = ctx { contextInFunction = True, contextInGenerator = True }
+    let isConstructor = isConstructorProperty propName
+        genCtx = ctx { 
+          contextInFunction = True, 
+          contextInGenerator = True,
+          contextInMethod = True,
+          contextInConstructor = isConstructor
+        }
     in validatePropertyName ctx propName ++
        validateFunctionParameters ctx (fromCommaList params) ++
        validateBlock genCtx body ++
@@ -1756,8 +1863,39 @@ validateNoDuplicateExports items =
       where
         extractExportName :: JSModuleItem -> [Text]
         extractExportName item = case item of
-          JSModuleExportDeclaration _ _ -> [] -- Would extract actual export names
+          JSModuleExportDeclaration _ exportDecl -> extractExportDeclNames exportDecl
           _ -> []
+        
+        extractExportDeclNames :: JSExportDeclaration -> [Text]
+        extractExportDeclNames exportDecl = case exportDecl of
+          JSExport stmt _ -> extractStatementBindings stmt
+          JSExportFrom _ _ _ -> [] -- Re-exports don't bind local names
+          JSExportLocals (JSExportClause _ specs _) _ -> extractExportSpecNames specs
+          JSExportAllFrom _ _ _ -> [] -- Namespace export
+          JSExportAllAsFrom _ _ _ _ _ -> [] -- Namespace export as name
+        
+        extractExportSpecNames :: JSCommaList JSExportSpecifier -> [Text]
+        extractExportSpecNames specs = concatMap extractSpecName (fromCommaList specs)
+          where
+            extractSpecName spec = case spec of
+              JSExportSpecifier (JSIdentName _ name) -> [Text.pack name]
+              JSExportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ asName) -> [Text.pack asName]
+              _ -> []
+        
+        extractStatementBindings :: JSStatement -> [Text]
+        extractStatementBindings stmt = case stmt of
+          JSFunction _ (JSIdentName _ name) _ _ _ _ _ -> [Text.pack name]
+          JSVariable _ vars _ -> extractVarBindings vars
+          JSClass _ (JSIdentName _ name) _ _ _ _ _ -> [Text.pack name]
+          _ -> []
+        
+        extractVarBindings :: JSCommaList JSExpression -> [Text]
+        extractVarBindings vars = concatMap extractVarBinding (fromCommaList vars)
+          where
+            extractVarBinding expr = case expr of
+              JSVarInitExpression (JSIdentifier _ name) _ -> [Text.pack name]
+              JSIdentifier _ name -> [Text.pack name]
+              _ -> []
 
 validateNoDuplicateImports :: [JSModuleItem] -> [ValidationError]
 validateNoDuplicateImports items = 
@@ -1770,8 +1908,39 @@ validateNoDuplicateImports items =
       where
         extractImportName :: JSModuleItem -> [Text]
         extractImportName item = case item of
-          JSModuleImportDeclaration _ _ -> [] -- Would extract actual import names
+          JSModuleImportDeclaration _ importDecl -> extractImportDeclNames importDecl
           _ -> []
+        
+        extractImportDeclNames :: JSImportDeclaration -> [Text]
+        extractImportDeclNames importDecl = case importDecl of
+          JSImportDeclaration clause _ _ _ -> extractImportClauseNames clause
+          JSImportDeclarationBare _ _ _ _ -> [] -- No bindings for bare imports
+        
+        extractImportClauseNames :: JSImportClause -> [Text]
+        extractImportClauseNames clause = case clause of
+          JSImportClauseDefault (JSIdentName _ name) -> [Text.pack name]
+          JSImportClauseDefault JSIdentNone -> []
+          JSImportClauseNameSpace (JSImportNameSpace _ _ (JSIdentName _ name)) -> [Text.pack name]
+          JSImportClauseNameSpace (JSImportNameSpace _ _ JSIdentNone) -> []
+          JSImportClauseNamed (JSImportsNamed _ specs _) -> extractImportSpecNames specs
+          JSImportClauseDefaultNamed (JSIdentName _ defName) _ (JSImportsNamed _ specs _) -> 
+            Text.pack defName : extractImportSpecNames specs
+          JSImportClauseDefaultNamed JSIdentNone _ (JSImportsNamed _ specs _) -> extractImportSpecNames specs
+          JSImportClauseDefaultNameSpace (JSIdentName _ defName) _ (JSImportNameSpace _ _ (JSIdentName _ nsName)) ->
+            [Text.pack defName, Text.pack nsName]
+          JSImportClauseDefaultNameSpace JSIdentNone _ (JSImportNameSpace _ _ (JSIdentName _ nsName)) ->
+            [Text.pack nsName]
+          JSImportClauseDefaultNameSpace (JSIdentName _ defName) _ (JSImportNameSpace _ _ JSIdentNone) ->
+            [Text.pack defName]
+          JSImportClauseDefaultNameSpace JSIdentNone _ (JSImportNameSpace _ _ JSIdentNone) -> []
+        
+        extractImportSpecNames :: JSCommaList JSImportSpecifier -> [Text]
+        extractImportSpecNames specs = concatMap extractImportSpecName (fromCommaList specs)
+          where
+            extractImportSpecName spec = case spec of
+              JSImportSpecifier (JSIdentName _ name) -> [Text.pack name]
+              JSImportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ asName) -> [Text.pack asName]
+              _ -> []
 
 -- Position extraction helpers
 
