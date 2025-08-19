@@ -87,6 +87,7 @@ instance RenderJS JSExpression where
     (|>) pacc (JSExpressionPostfix    xs op)                  = pacc |> xs |> op
     (|>) pacc (JSExpressionTernary    cond h v1 c v2)         = pacc |> cond |> h |> "?" |> v1 |> c |> ":" |> v2
     (|>) pacc (JSFunctionExpression   annot n lb x2s rb x3)   = pacc |> annot |> "function" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
+    (|>) pacc (JSAsyncFunctionExpression async function n lb x2s rb x3) = pacc |> async |> "async" |> function |> "function" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
     (|>) pacc (JSGeneratorExpression  annot s n lb x2s rb x3) = pacc |> annot |> "function" |> s |> "*" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
     (|>) pacc (JSMemberDot            xs dot n)               = pacc |> xs |> "." |> dot |> n
     (|>) pacc (JSMemberExpression     e lb a rb)              = pacc |> e |> lb |> "(" |> a |> rb |> ")"
@@ -99,6 +100,7 @@ instance RenderJS JSExpression where
     (|>) pacc (JSVarInitExpression    x1 x2)                  = pacc |> x1 |> x2
     (|>) pacc (JSYieldExpression      y x)                    = pacc |> y |> "yield" |> x
     (|>) pacc (JSYieldFromExpression  y s x)                  = pacc |> y |> "yield" |> s |> "*" |> x
+    (|>) pacc (JSImportMeta i d)                           = pacc |> i |> "import" |> d |> ".meta"
     (|>) pacc (JSSpreadExpression     a e)                    = pacc |> a |> "..." |> e
     (|>) pacc (JSBigIntLiteral        annot s)                = pacc |> annot |> s
     (|>) pacc (JSOptionalMemberDot    e a p)                  = pacc |> e |> a |> "?." |> p
@@ -211,6 +213,9 @@ instance RenderJS JSAssignOp where
     (|>) pacc (JSBwAndAssign  annot) = pacc |> annot |> "&="
     (|>) pacc (JSBwXorAssign  annot) = pacc |> annot |> "^="
     (|>) pacc (JSBwOrAssign   annot) = pacc |> annot |> "|="
+    (|>) pacc (JSLogicalAndAssign annot) = pacc |> annot |> "&&="
+    (|>) pacc (JSLogicalOrAssign  annot) = pacc |> annot |> "||="
+    (|>) pacc (JSNullishAssign    annot) = pacc |> annot |> "??="
 
 
 instance RenderJS JSSemi where
@@ -317,8 +322,8 @@ instance RenderJS [JSArrayElement] where
     (|>) = foldl' (|>)
 
 instance RenderJS JSImportDeclaration where
-    (|>) pacc (JSImportDeclaration imp from annot) = pacc |> imp |> from |> annot
-    (|>) pacc (JSImportDeclarationBare annot m s) = pacc |> annot |> m |> s
+    (|>) pacc (JSImportDeclaration imp from attrs annot) = pacc |> imp |> from |> attrs |> annot
+    (|>) pacc (JSImportDeclarationBare annot m attrs s) = pacc |> annot |> m |> attrs |> s
 
 instance RenderJS JSImportClause where
     (|>) pacc (JSImportClauseDefault x) = pacc |> x
@@ -340,8 +345,19 @@ instance RenderJS JSImportSpecifier where
     (|>) pacc (JSImportSpecifier x1) = pacc |> x1
     (|>) pacc (JSImportSpecifierAs x1 annot x2) = pacc |> x1 |> annot |> "as" |> x2
 
+instance RenderJS (Maybe JSImportAttributes) where
+    (|>) pacc Nothing = pacc
+    (|>) pacc (Just attrs) = pacc |> " with " |> attrs
+
+instance RenderJS JSImportAttributes where
+    (|>) pacc (JSImportAttributes lb attrs rb) = pacc |> lb |> "{" |> attrs |> rb |> "}"
+
+instance RenderJS JSImportAttribute where
+    (|>) pacc (JSImportAttribute key colon value) = pacc |> key |> colon |> ":" |> value
+
 instance RenderJS JSExportDeclaration where
     (|>) pacc (JSExportAllFrom star from semi) = pacc |> star |> from |> semi
+    (|>) pacc (JSExportAllAsFrom star as ident from semi) = pacc |> star |> as |> ident |> from |> semi
     (|>) pacc (JSExport x1 s) = pacc |> x1 |> s
     (|>) pacc (JSExportLocals xs semi) = pacc |> xs |> semi
     (|>) pacc (JSExportFrom xs from semi) = pacc |> xs |> from |> semi
@@ -392,5 +408,9 @@ instance RenderJS JSClassElement where
     (|>) pacc (JSClassInstanceMethod m) = pacc |> m
     (|>) pacc (JSClassStaticMethod a m) = pacc |> a |> "static" |> m
     (|>) pacc (JSClassSemi a)           = pacc |> a |> ";"
+    (|>) pacc (JSPrivateField a name _ Nothing s) = pacc |> a |> "#" |> name |> s
+    (|>) pacc (JSPrivateField a name eq (Just initializer) s) = pacc |> a |> "#" |> name |> eq |> "=" |> initializer |> s
+    (|>) pacc (JSPrivateMethod a name lp params rp block) = pacc |> a |> "#" |> name |> lp |> params |> rp |> block
+    (|>) pacc (JSPrivateAccessor accessor a name lp params rp block) = pacc |> accessor |> a |> "#" |> name |> lp |> params |> rp |> block
 
 -- EOF

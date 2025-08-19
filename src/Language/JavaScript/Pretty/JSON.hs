@@ -364,6 +364,14 @@ renderExportDeclarationToJSON decl = case decl of
         , ("source", renderFromClauseToJSON fromClause)
         , ("semicolon", renderSemiColonToJSON semi)
         ]
+    AST.JSExportAllAsFrom star as ident fromClause semi -> formatJSONObject
+        [ ("type", "\"ExportAllAsFromDeclaration\"")
+        , ("star", renderBinOpToJSON star)
+        , ("as", renderAnnotation as)
+        , ("identifier", renderIdentToJSON ident)
+        , ("source", renderFromClauseToJSON fromClause)
+        , ("semicolon", renderSemiColonToJSON semi)
+        ]
 
 -- | Render export clause to JSON.
 renderExportClauseToJSON :: AST.JSExportClause -> Text
@@ -413,18 +421,40 @@ renderSemiColonToJSON semi = case semi of
 -- | Render import declaration to JSON.
 renderImportDeclarationToJSON :: AST.JSImportDeclaration -> Text
 renderImportDeclarationToJSON decl = case decl of
-    AST.JSImportDeclaration clause fromClause semi -> formatJSONObject
+    AST.JSImportDeclaration clause fromClause attrs semi -> formatJSONObject $
         [ ("type", "\"ImportDeclaration\"")
         , ("clause", renderImportClauseToJSON clause)
         , ("source", renderFromClauseToJSON fromClause)
         , ("semicolon", renderSemiColonToJSON semi)
-        ]
-    AST.JSImportDeclarationBare ann moduleName semi -> formatJSONObject
+        ] ++ case attrs of
+            Just attributes -> [("attributes", renderImportAttributesToJSON attributes)]
+            Nothing -> []
+    AST.JSImportDeclarationBare ann moduleName attrs semi -> formatJSONObject $
         [ ("type", "\"ImportBareDeclaration\"")
         , ("annotation", renderAnnotation ann)
         , ("module", "\"" <> Text.pack moduleName <> "\"")
         , ("semicolon", renderSemiColonToJSON semi)
-        ]
+        ] ++ case attrs of
+            Just attributes -> [("attributes", renderImportAttributesToJSON attributes)]
+            Nothing -> []
+
+-- | Render import attributes to JSON.
+renderImportAttributesToJSON :: AST.JSImportAttributes -> Text
+renderImportAttributesToJSON (AST.JSImportAttributes lbrace attrs rbrace) = formatJSONObject
+    [ ("type", "\"ImportAttributes\"")
+    , ("openBrace", renderAnnotation lbrace)
+    , ("attributes", formatJSONArray (map renderImportAttributeToJSON (extractCommaListExpressions attrs)))
+    , ("closeBrace", renderAnnotation rbrace)
+    ]
+
+-- | Render import attribute to JSON.
+renderImportAttributeToJSON :: AST.JSImportAttribute -> Text
+renderImportAttributeToJSON (AST.JSImportAttribute key colon value) = formatJSONObject
+    [ ("type", "\"ImportAttribute\"")
+    , ("key", renderIdentToJSON key)
+    , ("colon", renderAnnotation colon)
+    , ("value", renderExpressionToJSON value)
+    ]
 
 -- | Render from clause to JSON.
 renderFromClauseToJSON :: AST.JSFromClause -> Text

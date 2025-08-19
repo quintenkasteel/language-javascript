@@ -169,6 +169,7 @@ instance MinifyJS JSExpression where
     fix a (JSExpressionPostfix    e op)               = JSExpressionPostfix (fix a e) (fixEmpty op)
     fix a (JSExpressionTernary    cond _ v1 _ v2)     = JSExpressionTernary (fix a cond) emptyAnnot (fixEmpty v1) emptyAnnot (fixEmpty v2)
     fix a (JSFunctionExpression   _ n _ x2s _ x3)     = JSFunctionExpression a (fixSpace n) emptyAnnot (fixEmpty x2s) emptyAnnot (fixEmpty x3)
+    fix a (JSAsyncFunctionExpression _ _ n _ x2s _ x3) = JSAsyncFunctionExpression a emptyAnnot (fixSpace n) emptyAnnot (fixEmpty x2s) emptyAnnot (fixEmpty x3)
     fix a (JSGeneratorExpression  _ _ n _ x2s _ x3)   = JSGeneratorExpression a emptyAnnot (fixEmpty n) emptyAnnot (fixEmpty x2s) emptyAnnot (fixEmpty x3)
     fix a (JSMemberDot            xs _ n)             = JSMemberDot (fix a xs) emptyAnnot (fixEmpty n)
     fix a (JSMemberExpression     e _ args _)         = JSMemberExpression (fix a e) emptyAnnot (fixEmpty args) emptyAnnot
@@ -181,6 +182,7 @@ instance MinifyJS JSExpression where
     fix a (JSVarInitExpression    x1 x2)              = JSVarInitExpression (fix a x1) (fixEmpty x2)
     fix a (JSYieldExpression      _ x)                = JSYieldExpression a (fixSpace x)
     fix a (JSYieldFromExpression  _ _ x)              = JSYieldFromExpression a emptyAnnot (fixEmpty x)
+    fix a (JSImportMeta _ _)                          = JSImportMeta a emptyAnnot
     fix a (JSSpreadExpression     _ e)                = JSSpreadExpression a (fixEmpty e)
     fix a (JSBigIntLiteral        _ s)                = JSBigIntLiteral a s
     fix a (JSOptionalMemberDot    e _ p)              = JSOptionalMemberDot (fix a e) emptyAnnot (fixEmpty p)
@@ -299,6 +301,9 @@ instance MinifyJS JSAssignOp where
     fix a (JSBwAndAssign  _) = JSBwAndAssign a
     fix a (JSBwXorAssign  _) = JSBwXorAssign a
     fix a (JSBwOrAssign   _) = JSBwOrAssign a
+    fix a (JSLogicalAndAssign _) = JSLogicalAndAssign a
+    fix a (JSLogicalOrAssign  _) = JSLogicalOrAssign a
+    fix a (JSNullishAssign    _) = JSNullishAssign a
 
 instance MinifyJS JSModuleItem where
     fix _ (JSModuleImportDeclaration _ x1) = JSModuleImportDeclaration emptyAnnot (fixEmpty x1)
@@ -306,7 +311,7 @@ instance MinifyJS JSModuleItem where
     fix a (JSModuleStatementListItem s) = JSModuleStatementListItem (fixStmt a noSemi s)
 
 instance MinifyJS JSImportDeclaration where
-    fix _ (JSImportDeclaration imps from _) = JSImportDeclaration (fixEmpty imps) (fix annot from) noSemi
+    fix _ (JSImportDeclaration imps from attrs _) = JSImportDeclaration (fixEmpty imps) (fix annot from) (fixEmpty attrs) noSemi
         where
         annot = case imps of
                     JSImportClauseDefault {} -> spaceAnnot
@@ -314,7 +319,7 @@ instance MinifyJS JSImportDeclaration where
                     JSImportClauseNamed {} -> emptyAnnot
                     JSImportClauseDefaultNameSpace {} -> spaceAnnot
                     JSImportClauseDefaultNamed {} -> emptyAnnot
-    fix a (JSImportDeclarationBare _ m _) = JSImportDeclarationBare a m noSemi
+    fix a (JSImportDeclarationBare _ m attrs _) = JSImportDeclarationBare a m (fixEmpty attrs) noSemi
 
 instance MinifyJS JSImportClause where
     fix _ (JSImportClauseDefault n) = JSImportClauseDefault (fixSpace n)
@@ -336,8 +341,19 @@ instance MinifyJS JSImportSpecifier where
     fix _ (JSImportSpecifier x1) = JSImportSpecifier (fixEmpty x1)
     fix _ (JSImportSpecifierAs x1 _ x2) = JSImportSpecifierAs (fixEmpty x1) spaceAnnot (fixSpace x2)
 
+instance MinifyJS (Maybe JSImportAttributes) where
+    fix _ Nothing = Nothing
+    fix _ (Just attrs) = Just (fixEmpty attrs)
+
+instance MinifyJS JSImportAttributes where
+    fix _ (JSImportAttributes _ attrs _) = JSImportAttributes emptyAnnot (fixEmpty attrs) emptyAnnot
+
+instance MinifyJS JSImportAttribute where
+    fix _ (JSImportAttribute key _ value) = JSImportAttribute (fixEmpty key) emptyAnnot (fixEmpty value)
+
 instance MinifyJS JSExportDeclaration where
     fix a (JSExportAllFrom star from _) = JSExportAllFrom (fix a star) (fix a from) noSemi
+    fix a (JSExportAllAsFrom star _as ident from _) = JSExportAllAsFrom (fix a star) emptyAnnot (fix a ident) (fix a from) noSemi
     fix a (JSExportFrom x1 from _) = JSExportFrom (fix a x1) (fix a from) noSemi
     fix _ (JSExportLocals x1 _) = JSExportLocals (fix emptyAnnot x1) noSemi
     fix _ (JSExport x1 _) = JSExport (fixStmt spaceAnnot noSemi x1) noSemi
@@ -444,6 +460,10 @@ instance MinifyJS [JSClassElement] where
     fix a (JSClassInstanceMethod m:t) = JSClassInstanceMethod (fix a m) : fixEmpty t
     fix a (JSClassStaticMethod _ m:t) = JSClassStaticMethod a (fixSpace m) : fixEmpty t
     fix a (JSClassSemi _:t) = fix a t
+    fix a (JSPrivateField _ name _ Nothing _:t) = JSPrivateField a name a Nothing semi : fixEmpty t
+    fix a (JSPrivateField _ name _ (Just initializer) _:t) = JSPrivateField a name a (Just (fixSpace initializer)) semi : fixEmpty t
+    fix a (JSPrivateMethod _ name _ params _ block:t) = JSPrivateMethod a name a (fixEmpty params) a (fixSpace block) : fixEmpty t
+    fix a (JSPrivateAccessor accessor _ name _ params _ block:t) = JSPrivateAccessor (fixSpace accessor) a name a (fixEmpty params) a (fixSpace block) : fixEmpty t
 
 
 spaceAnnot :: JSAnnot
