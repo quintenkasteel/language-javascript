@@ -525,6 +525,7 @@ testValidator = describe "AST Validator Tests" $ do
                 (JSImportDeclaration
                   (JSImportClauseDefault (JSIdentName noAnnot "React"))
                   (JSFromClause noAnnot noAnnot "react")
+                  Nothing
                   auto)
             , JSModuleStatementListItem
                 (JSFunction noAnnot
@@ -629,3 +630,939 @@ testValidator = describe "AST Validator Tests" $ do
             ]
             noAnnot
       validate regexProgram `shouldSatisfy` isRight
+
+  describe "control flow context validation (HIGH priority)" $ do
+    describe "yield in parameter defaults" $ do
+      it "rejects yield in function parameter defaults" $ do
+        let invalidProgram = JSAstProgram
+              [ JSFunction noAnnot
+                  (JSIdentName noAnnot "test")
+                  noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "x")
+                    (JSVarInit noAnnot (JSYieldExpression noAnnot (Just (JSDecimal noAnnot "1"))))))
+                  noAnnot
+                  (JSBlock noAnnot [] noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors -> 
+            any (\err -> case err of
+              YieldInParameterDefault _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected YieldInParameterDefault error"
+      
+      it "rejects yield in generator parameter defaults" $ do
+        let invalidProgram = JSAstProgram
+              [ JSGenerator noAnnot noAnnot
+                  (JSIdentName noAnnot "test")
+                  noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "x")
+                    (JSVarInit noAnnot (JSYieldExpression noAnnot (Just (JSDecimal noAnnot "1"))))))
+                  noAnnot
+                  (JSBlock noAnnot [] noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              YieldInParameterDefault _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected YieldInParameterDefault error"
+
+    describe "await in parameter defaults" $ do
+      it "rejects await in function parameter defaults" $ do
+        let invalidProgram = JSAstProgram
+              [ JSFunction noAnnot
+                  (JSIdentName noAnnot "test")
+                  noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "x")
+                    (JSVarInit noAnnot (JSAwaitExpression noAnnot (JSCallExpression
+                      (JSIdentifier noAnnot "fetch")
+                      noAnnot
+                      (JSLOne (JSStringLiteral noAnnot "url"))
+                      noAnnot)))))
+                  noAnnot
+                  (JSBlock noAnnot [] noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              AwaitInParameterDefault _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected AwaitInParameterDefault error"
+      
+      it "rejects await in async function parameter defaults" $ do
+        let invalidProgram = JSAstProgram
+              [ JSAsyncFunction noAnnot noAnnot
+                  (JSIdentName noAnnot "test")
+                  noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "x")
+                    (JSVarInit noAnnot (JSAwaitExpression noAnnot (JSCallExpression
+                      (JSIdentifier noAnnot "fetch")
+                      noAnnot
+                      (JSLOne (JSStringLiteral noAnnot "url"))
+                      noAnnot)))))
+                  noAnnot
+                  (JSBlock noAnnot [] noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              AwaitInParameterDefault _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected AwaitInParameterDefault error"
+
+    describe "labeled break validation" $ do
+      it "rejects break with non-existent label" $ do
+        let invalidProgram = JSAstProgram
+              [ JSWhile noAnnot noAnnot
+                  (JSLiteral noAnnot "true")
+                  noAnnot
+                  (JSStatementBlock noAnnot
+                    [ JSBreak noAnnot (JSIdentName noAnnot "nonexistent") auto
+                    ]
+                    noAnnot auto)
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              LabelNotFound "nonexistent" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected LabelNotFound error"
+      
+      it "accepts break with valid label to labeled statement" $ do
+        let validProgram = JSAstProgram
+              [ JSLabelled (JSIdentName noAnnot "outer") noAnnot
+                  (JSWhile noAnnot noAnnot 
+                    (JSLiteral noAnnot "true") 
+                    noAnnot
+                    (JSStatementBlock noAnnot
+                      [ JSBreak noAnnot (JSIdentName noAnnot "outer") auto
+                      ]
+                      noAnnot auto))
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+      
+      it "rejects break outside switch context with label" $ do
+        let invalidProgram = JSAstProgram
+              [ JSLabelled (JSIdentName noAnnot "label") noAnnot
+                  (JSExpressionStatement (JSDecimal noAnnot "42") auto)
+              , JSBreak noAnnot (JSIdentName noAnnot "label") auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              BreakOutsideSwitch _ -> True
+              LabelNotFound _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected BreakOutsideSwitch or LabelNotFound error"
+
+    describe "labeled continue validation" $ do
+      it "rejects continue with non-existent label" $ do
+        let invalidProgram = JSAstProgram
+              [ JSWhile noAnnot noAnnot
+                  (JSLiteral noAnnot "true")
+                  noAnnot
+                  (JSStatementBlock noAnnot
+                    [ JSContinue noAnnot (JSIdentName noAnnot "nonexistent") auto
+                    ]
+                    noAnnot auto)
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              LabelNotFound "nonexistent" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected LabelNotFound error"
+      
+      it "accepts continue with valid label to labeled loop" $ do
+        let validProgram = JSAstProgram
+              [ JSLabelled (JSIdentName noAnnot "outer") noAnnot
+                  (JSWhile noAnnot noAnnot 
+                    (JSLiteral noAnnot "true") 
+                    noAnnot
+                    (JSStatementBlock noAnnot
+                      [ JSContinue noAnnot (JSIdentName noAnnot "outer") auto
+                      ]
+                      noAnnot auto))
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "duplicate label validation" $ do
+      it "rejects duplicate labels" $ do
+        let invalidProgram = JSAstProgram
+              [ JSLabelled (JSIdentName noAnnot "label") noAnnot
+                  (JSLabelled (JSIdentName noAnnot "label") noAnnot
+                    (JSExpressionStatement (JSDecimal noAnnot "42") auto))
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              DuplicateLabel "label" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected DuplicateLabel error"
+
+  describe "assignment target validation (HIGH priority)" $ do
+    describe "invalid destructuring targets" $ do
+      it "rejects literal as destructuring array target" $ do
+        let invalidProgram = JSAstProgram
+              [ JSAssignStatement
+                  (JSDecimal noAnnot "42")
+                  (JSAssign noAnnot)
+                  (JSArrayLiteral noAnnot 
+                    [ JSArrayElement (JSIdentifier noAnnot "a")
+                    , JSArrayComma noAnnot
+                    , JSArrayElement (JSIdentifier noAnnot "b")
+                    ] noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidDestructuringTarget _ _ -> True
+              InvalidAssignmentTarget _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidDestructuringTarget or InvalidAssignmentTarget error"
+      
+      it "rejects literal as destructuring object target" $ do
+        let invalidProgram = JSAstProgram
+              [ JSAssignStatement
+                  (JSStringLiteral noAnnot "hello")
+                  (JSAssign noAnnot)
+                  (JSObjectLiteral noAnnot 
+                    (JSCTLNone (JSLOne (JSPropertyNameandValue 
+                      (JSPropertyIdent noAnnot "x") 
+                      noAnnot 
+                      [JSIdentifier noAnnot "value"])))
+                    noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidDestructuringTarget _ _ -> True
+              InvalidAssignmentTarget _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidDestructuringTarget or InvalidAssignmentTarget error"
+
+    describe "for-in loop LHS validation" $ do
+      it "rejects literal in for-in LHS" $ do
+        let invalidProgram = JSAstProgram
+              [ JSForIn noAnnot noAnnot
+                  (JSDecimal noAnnot "42")
+                  (JSBinOpIn noAnnot)
+                  (JSIdentifier noAnnot "obj")
+                  noAnnot
+                  (JSEmptyStatement noAnnot)
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidLHSInForIn _ _ -> True
+              InvalidAssignmentTarget _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidLHSInForIn or InvalidAssignmentTarget error"
+      
+      it "rejects string literal in for-in LHS" $ do
+        let invalidProgram = JSAstProgram
+              [ JSForIn noAnnot noAnnot
+                  (JSStringLiteral noAnnot "invalid")
+                  (JSBinOpIn noAnnot)
+                  (JSIdentifier noAnnot "obj")
+                  noAnnot
+                  (JSEmptyStatement noAnnot)
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidLHSInForIn _ _ -> True
+              InvalidAssignmentTarget _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidLHSInForIn or InvalidAssignmentTarget error"
+      
+      it "accepts valid identifier in for-in LHS" $ do
+        let validProgram = JSAstProgram
+              [ JSForIn noAnnot noAnnot
+                  (JSIdentifier noAnnot "key")
+                  (JSBinOpIn noAnnot)
+                  (JSIdentifier noAnnot "obj")
+                  noAnnot
+                  (JSEmptyStatement noAnnot)
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "for-of loop LHS validation" $ do
+      it "rejects literal in for-of LHS" $ do
+        let invalidProgram = JSAstProgram
+              [ JSForOf noAnnot noAnnot
+                  (JSDecimal noAnnot "42")
+                  (JSBinOpOf noAnnot)
+                  (JSIdentifier noAnnot "array")
+                  noAnnot
+                  (JSEmptyStatement noAnnot)
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidLHSInForOf _ _ -> True
+              InvalidAssignmentTarget _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidLHSInForOf or InvalidAssignmentTarget error"
+      
+      it "rejects function call in for-of LHS" $ do
+        let invalidProgram = JSAstProgram
+              [ JSForOf noAnnot noAnnot
+                  (JSCallExpression
+                    (JSIdentifier noAnnot "func")
+                    noAnnot
+                    JSLNil
+                    noAnnot)
+                  (JSBinOpOf noAnnot)
+                  (JSIdentifier noAnnot "array")
+                  noAnnot
+                  (JSEmptyStatement noAnnot)
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidLHSInForOf _ _ -> True
+              InvalidAssignmentTarget _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidLHSInForOf or InvalidAssignmentTarget error"
+      
+      it "accepts valid identifier in for-of LHS" $ do
+        let validProgram = JSAstProgram
+              [ JSForOf noAnnot noAnnot
+                  (JSIdentifier noAnnot "item")
+                  (JSBinOpOf noAnnot)
+                  (JSIdentifier noAnnot "array")
+                  noAnnot
+                  (JSEmptyStatement noAnnot)
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "complex destructuring validation" $ do
+      it "validates simple array destructuring patterns" $ do
+        let validProgram = JSAstProgram
+              [ JSVariable noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSArrayLiteral noAnnot 
+                      [ JSArrayElement (JSIdentifier noAnnot "a")
+                      , JSArrayComma noAnnot
+                      , JSArrayElement (JSIdentifier noAnnot "b")
+                      ] noAnnot)
+                    (JSVarInit noAnnot (JSArrayLiteral noAnnot 
+                      [ JSArrayElement (JSDecimal noAnnot "1")
+                      , JSArrayComma noAnnot
+                      , JSArrayElement (JSDecimal noAnnot "2")
+                      ] noAnnot))))
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+      
+      it "validates simple object destructuring patterns" $ do
+        let validProgram = JSAstProgram
+              [ JSVariable noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSObjectLiteral noAnnot 
+                      (JSCTLNone (JSLOne (JSPropertyNameandValue
+                        (JSPropertyIdent noAnnot "x")
+                        noAnnot
+                        [JSIdentifier noAnnot "a"])))
+                      noAnnot)
+                    (JSVarInit noAnnot (JSObjectLiteral noAnnot
+                      (JSCTLNone (JSLOne (JSPropertyNameandValue
+                        (JSPropertyIdent noAnnot "x")
+                        noAnnot
+                        [JSDecimal noAnnot "1"])))
+                      noAnnot))))
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+  describe "class constructor validation (HIGH priority)" $ do
+    describe "multiple constructor errors" $ do
+      it "rejects class with multiple constructors" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "constructor")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  , JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "constructor")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              MultipleConstructors _ -> True
+              DuplicateMethodName "constructor" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected MultipleConstructors or DuplicateMethodName error"
+      
+      it "accepts class with single constructor" $ do
+        let validProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "constructor")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "constructor generator errors" $ do
+      it "rejects generator constructor" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSGeneratorMethodDefinition 
+                        noAnnot
+                        (JSPropertyIdent noAnnot "constructor")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              ConstructorWithGenerator _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected ConstructorWithGenerator error"
+      
+      it "accepts regular generator method (not constructor)" $ do
+        let validProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSGeneratorMethodDefinition 
+                        noAnnot
+                        (JSPropertyIdent noAnnot "method")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "static constructor errors" $ do
+      it "rejects static constructor" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassStaticMethod noAnnot
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "constructor")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              StaticConstructor _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected StaticConstructor error"
+      
+      it "accepts static method (not constructor)" $ do
+        let validProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassStaticMethod noAnnot
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "method")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "duplicate method name validation" $ do
+      it "rejects class with duplicate method names" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "method")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  , JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "method")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              DuplicateMethodName "method" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected DuplicateMethodName error"
+      
+      it "accepts class with different method names" $ do
+        let validProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "method1")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  , JSClassInstanceMethod 
+                      (JSMethodDefinition 
+                        (JSPropertyIdent noAnnot "method2")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+    describe "getter and setter validation" $ do
+      it "rejects getter with parameters" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSPropertyAccessor 
+                        (JSAccessorGet noAnnot)
+                        (JSPropertyIdent noAnnot "prop")
+                        noAnnot
+                        (JSLOne (JSIdentifier noAnnot "x"))
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              GetterWithParameters _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected GetterWithParameters error"
+      
+      it "rejects setter without parameters" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSPropertyAccessor 
+                        (JSAccessorSet noAnnot)
+                        (JSPropertyIdent noAnnot "prop")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              SetterWithoutParameter _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected SetterWithoutParameter error"
+      
+      it "rejects setter with multiple parameters" $ do
+        let invalidProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSPropertyAccessor 
+                        (JSAccessorSet noAnnot)
+                        (JSPropertyIdent noAnnot "prop")
+                        noAnnot
+                        (JSLCons
+                          (JSLOne (JSIdentifier noAnnot "x"))
+                          noAnnot
+                          (JSIdentifier noAnnot "y"))
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              SetterWithMultipleParameters _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected SetterWithMultipleParameters error"
+      
+      it "accepts valid getter and setter" $ do
+        let validProgram = JSAstProgram
+              [ JSClass noAnnot
+                  (JSIdentName noAnnot "TestClass")
+                  JSExtendsNone
+                  noAnnot
+                  [ JSClassInstanceMethod 
+                      (JSPropertyAccessor 
+                        (JSAccessorGet noAnnot)
+                        (JSPropertyIdent noAnnot "x")
+                        noAnnot
+                        JSLNil
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  , JSClassInstanceMethod 
+                      (JSPropertyAccessor 
+                        (JSAccessorSet noAnnot)
+                        (JSPropertyIdent noAnnot "y")
+                        noAnnot
+                        (JSLOne (JSIdentifier noAnnot "value"))
+                        noAnnot
+                        (JSBlock noAnnot [] noAnnot))
+                  ]
+                  noAnnot
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+
+  describe "strict mode validation (HIGH priority)" $ do
+    describe "octal literal errors" $ do
+      it "rejects octal literals in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSExpressionStatement (JSOctal noAnnot "0123") auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidOctalInStrict _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidOctalInStrict error"
+      
+      it "accepts octal literals outside strict mode" $ do
+        let validProgram = JSAstProgram
+              [ JSExpressionStatement (JSOctal noAnnot "0123") auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+    
+    describe "delete identifier errors" $ do  
+      it "rejects delete of unqualified identifier in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSExpressionStatement 
+                  (JSUnaryExpression (JSUnaryOpDelete noAnnot) (JSIdentifier noAnnot "x"))
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              DeleteOfUnqualifiedInStrict _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected DeleteOfUnqualifiedInStrict error"
+      
+      it "accepts delete of property in strict mode" $ do
+        let validProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSExpressionStatement 
+                  (JSUnaryExpression (JSUnaryOpDelete noAnnot) 
+                    (JSMemberDot (JSIdentifier noAnnot "obj") noAnnot (JSIdentifier noAnnot "prop")))
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+    
+    describe "duplicate object property errors" $ do
+      it "rejects duplicate object properties in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSExpressionStatement 
+                  (JSObjectLiteral noAnnot
+                    (JSCTLNone (JSLCons
+                      (JSLOne (JSPropertyNameandValue 
+                        (JSPropertyIdent noAnnot "prop")
+                        noAnnot
+                        [JSDecimal noAnnot "1"]))
+                      noAnnot
+                      (JSPropertyNameandValue 
+                        (JSPropertyIdent noAnnot "prop")
+                        noAnnot
+                        [JSDecimal noAnnot "2"])))
+                    noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              DuplicatePropertyInStrict _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected DuplicatePropertyInStrict error"
+      
+      it "accepts unique object properties in strict mode" $ do
+        let validProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSExpressionStatement 
+                  (JSObjectLiteral noAnnot
+                    (JSCTLNone (JSLCons
+                      (JSLOne (JSPropertyNameandValue 
+                        (JSPropertyIdent noAnnot "prop1")
+                        noAnnot
+                        [JSDecimal noAnnot "1"]))
+                      noAnnot
+                      (JSPropertyNameandValue 
+                        (JSPropertyIdent noAnnot "prop2")
+                        noAnnot
+                        [JSDecimal noAnnot "2"])))
+                    noAnnot)
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+    
+    describe "reserved word errors" $ do
+      it "rejects 'arguments' as identifier in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSVariable noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "arguments")
+                    (JSVarInit noAnnot (JSDecimal noAnnot "42"))))
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              ReservedWordAsIdentifier "arguments" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected ReservedWordAsIdentifier error"
+      
+      it "rejects 'eval' as identifier in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSVariable noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "eval")
+                    (JSVarInit noAnnot (JSDecimal noAnnot "42"))))
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              ReservedWordAsIdentifier "eval" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected ReservedWordAsIdentifier error"
+      
+      it "rejects future reserved words in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSVariable noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "implements")
+                    (JSVarInit noAnnot (JSDecimal noAnnot "42"))))
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              FutureReservedWord "implements" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected FutureReservedWord error"
+      
+      it "accepts standard identifiers in strict mode" $ do
+        let validProgram = JSAstProgram
+              [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+              , JSVariable noAnnot
+                  (JSLOne (JSVarInitExpression
+                    (JSIdentifier noAnnot "validName")
+                    (JSVarInit noAnnot (JSDecimal noAnnot "42"))))
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+    
+    describe "duplicate parameter errors" $ do
+      it "rejects duplicate function parameters in strict mode" $ do
+        let invalidProgram = JSAstProgram
+              [ JSFunction noAnnot
+                  (JSIdentName noAnnot "test")
+                  noAnnot
+                  (JSLCons
+                    (JSLOne (JSIdentifier noAnnot "x"))
+                    noAnnot
+                    (JSIdentifier noAnnot "x"))
+                  noAnnot
+                  (JSBlock noAnnot 
+                    [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+                    ]
+                    noAnnot)
+                  auto
+              ]
+              noAnnot
+        case validate invalidProgram of
+          Left errors ->
+            any (\err -> case err of
+              DuplicateParameter "x" _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected DuplicateParameter error"
+      
+      it "accepts unique function parameters in strict mode" $ do
+        let validProgram = JSAstProgram
+              [ JSFunction noAnnot
+                  (JSIdentName noAnnot "test")
+                  noAnnot
+                  (JSLCons
+                    (JSLOne (JSIdentifier noAnnot "x"))
+                    noAnnot
+                    (JSIdentifier noAnnot "y"))
+                  noAnnot
+                  (JSBlock noAnnot 
+                    [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
+                    ]
+                    noAnnot)
+                  auto
+              ]
+              noAnnot
+        validate validProgram `shouldSatisfy` isRight
+    
+    describe "module strict mode" $ do
+      it "treats ES6 modules as automatically strict" $ do
+        let moduleProgram = JSAstModule
+              [ JSModuleExportDeclaration noAnnot
+                  (JSExportFrom 
+                    (JSExportClause noAnnot JSLNil noAnnot)
+                    (JSFromClause noAnnot noAnnot "./module")
+                    auto)
+              , JSModuleStatementListItem 
+                  (JSExpressionStatement (JSOctal noAnnot "0123") auto)
+              ]
+              noAnnot
+        case validate moduleProgram of
+          Left errors ->
+            any (\err -> case err of
+              InvalidOctalInStrict _ _ -> True
+              _ -> False) errors `shouldBe` True
+          _ -> expectationFailure "Expected InvalidOctalInStrict error in module"
+      
+      it "validates import/export in module context" $ do
+        let validModule = JSAstModule
+              [ JSModuleImportDeclaration noAnnot
+                  (JSImportDeclarationBare
+                    noAnnot
+                    "react"
+                    Nothing
+                    auto)
+              , JSModuleExportDeclaration noAnnot
+                  (JSExportFrom 
+                    (JSExportClause noAnnot JSLNil noAnnot)
+                    (JSFromClause noAnnot noAnnot "./module")
+                    auto)
+              ]
+              noAnnot
+        validate validModule `shouldSatisfy` isRight
