@@ -48,6 +48,16 @@ testLiteralParser = describe "Parse literals:" $ do
         testLiteral "0x1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0x1234n'))"
         testLiteral "0X1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0X1234n'))"
         testLiteral "0o777n"    `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0o777n'))"
+
+    it "numeric separators (ES2021) - current parser behavior" $ do
+        -- Note: Current parser does not support numeric separators as single tokens
+        -- They are parsed as separate identifier tokens following numbers
+        -- These tests document the existing behavior for regression testing
+        parse "1_000" "test"      `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "1_000_000" "test"  `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "0xFF_EC_DE" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "3.14_15" "test"    `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        parse "123n_suffix" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
         testLiteral "077n"      `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '077n'))"
     it "strings" $ do
         testLiteral "'cat'"    `shouldBe` "Right (JSAstLiteral (JSStringLiteral 'cat'))"

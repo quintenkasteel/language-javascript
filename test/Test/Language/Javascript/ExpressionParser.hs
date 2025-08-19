@@ -141,8 +141,46 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "x>>=1"        `shouldBe` "Right (JSAstExpression (JSOpAssign ('>>=',JSIdentifier 'x',JSDecimal '1')))"
         testExpr "x>>>=1"       `shouldBe` "Right (JSAstExpression (JSOpAssign ('>>>=',JSIdentifier 'x',JSDecimal '1')))"
         testExpr "x&=1"         `shouldBe` "Right (JSAstExpression (JSOpAssign ('&=',JSIdentifier 'x',JSDecimal '1')))"
+
+    it "destructuring assignment expressions (ES2015) - supported features" $ do
+        -- Array destructuring assignment
+        testExpr "[a, b] = arr" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSIdentifier 'a',JSComma,JSIdentifier 'b'],JSIdentifier 'arr')))"
+        testExpr "[x, y, z] = coordinates" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSIdentifier 'x',JSComma,JSIdentifier 'y',JSComma,JSIdentifier 'z'],JSIdentifier 'coordinates')))"
+        
+        -- Object destructuring assignment
+        testExpr "{a, b} = obj" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSObjectLiteral [JSPropertyIdentRef 'a',JSPropertyIdentRef 'b'],JSIdentifier 'obj')))"
+        testExpr "{name, age} = person" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSObjectLiteral [JSPropertyIdentRef 'name',JSPropertyIdentRef 'age'],JSIdentifier 'person')))"
+        
+        -- Nested destructuring assignment
+        testExpr "[a, [b, c]] = nested" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSIdentifier 'a',JSComma,JSArrayLiteral [JSIdentifier 'b',JSComma,JSIdentifier 'c']],JSIdentifier 'nested')))"
+        testExpr "{a: {b}} = deep" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'a') [JSObjectLiteral [JSPropertyIdentRef 'b']]],JSIdentifier 'deep')))"
+        
+        -- Rest pattern assignment
+        testExpr "[first, ...rest] = array" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSIdentifier 'first',JSComma,JSSpreadExpression (JSIdentifier 'rest')],JSIdentifier 'array')))"
+        
+        -- Sparse array assignment
+        testExpr "[, , third] = sparse" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSComma,JSComma,JSIdentifier 'third'],JSIdentifier 'sparse')))"
+        
+        -- Property renaming assignment
+        testExpr "{prop: newName} = obj" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSObjectLiteral [JSPropertyNameandValue (JSIdentifier 'prop') [JSIdentifier 'newName']],JSIdentifier 'obj')))"
+        
+        -- Array destructuring with default values (parsed as assignment expressions)
+        testExpr "[a = 1, b = 2] = arr" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSOpAssign ('=',JSIdentifier 'a',JSDecimal '1'),JSComma,JSOpAssign ('=',JSIdentifier 'b',JSDecimal '2')],JSIdentifier 'arr')))"
+        testExpr "[x = 'default', y] = values" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSOpAssign ('=',JSIdentifier 'x',JSStringLiteral 'default'),JSComma,JSIdentifier 'y'],JSIdentifier 'values')))"
+        
+        -- Mixed array destructuring with defaults and rest
+        testExpr "[first, second = 42, ...rest] = data" `shouldBe` "Right (JSAstExpression (JSOpAssign ('=',JSArrayLiteral [JSIdentifier 'first',JSComma,JSOpAssign ('=',JSIdentifier 'second',JSDecimal '42'),JSComma,JSSpreadExpression (JSIdentifier 'rest')],JSIdentifier 'data')))"
         testExpr "x^=1"         `shouldBe` "Right (JSAstExpression (JSOpAssign ('^=',JSIdentifier 'x',JSDecimal '1')))"
         testExpr "x|=1"         `shouldBe` "Right (JSAstExpression (JSOpAssign ('|=',JSIdentifier 'x',JSDecimal '1')))"
+
+    it "logical assignment operators" $ do
+        testExpr "x&&=true"     `shouldBe` "Right (JSAstExpression (JSOpAssign ('&&=',JSIdentifier 'x',JSLiteral 'true')))"
+        testExpr "x||=false"    `shouldBe` "Right (JSAstExpression (JSOpAssign ('||=',JSIdentifier 'x',JSLiteral 'false')))"
+        testExpr "x??=null"     `shouldBe` "Right (JSAstExpression (JSOpAssign ('??=',JSIdentifier 'x',JSLiteral 'null')))"
+        testExpr "obj.prop&&=value" `shouldBe` "Right (JSAstExpression (JSOpAssign ('&&=',JSMemberDot (JSIdentifier 'obj',JSIdentifier 'prop'),JSIdentifier 'value')))"
+        testExpr "arr[0]||=defaultValue" `shouldBe` "Right (JSAstExpression (JSOpAssign ('||=',JSMemberSquare (JSIdentifier 'arr',JSDecimal '0'),JSIdentifier 'defaultValue')))"
+        testExpr "config.timeout??=5000" `shouldBe` "Right (JSAstExpression (JSOpAssign ('??=',JSMemberDot (JSIdentifier 'config',JSIdentifier 'timeout'),JSDecimal '5000')))"
+        testExpr "a&&=b&&=c"    `shouldBe` "Right (JSAstExpression (JSOpAssign ('&&=',JSIdentifier 'a',JSOpAssign ('&&=',JSIdentifier 'b',JSIdentifier 'c'))))"
 
     it "function expression" $ do
         testExpr "function(){}"     `shouldBe` "Right (JSAstExpression (JSFunctionExpression '' () (JSBlock [])))"
@@ -182,6 +220,23 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "function*f(a,b){}"    `shouldBe` "Right (JSAstExpression (JSGeneratorExpression 'f' (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [])))"
         testExpr "function*f(a,...b){}" `shouldBe` "Right (JSAstExpression (JSGeneratorExpression 'f' (JSIdentifier 'a',JSSpreadExpression (JSIdentifier 'b')) (JSBlock [])))"
 
+    it "await expression" $ do
+        testExpr "await fetch('/api')"              `shouldBe` "Right (JSAstExpression (JSAwaitExpresson JSMemberExpression (JSIdentifier 'fetch',JSArguments (JSStringLiteral '/api'))))"
+        testExpr "await Promise.resolve(42)"        `shouldBe` "Right (JSAstExpression (JSAwaitExpresson JSMemberExpression (JSMemberDot (JSIdentifier 'Promise',JSIdentifier 'resolve'),JSArguments (JSDecimal '42'))))"
+        testExpr "await (x + y)"                    `shouldBe` "Right (JSAstExpression (JSAwaitExpresson JSExpressionParen (JSExpressionBinary ('+',JSIdentifier 'x',JSIdentifier 'y'))))"
+        testExpr "await x.then(y => y * 2)"         `shouldBe` "Right (JSAstExpression (JSAwaitExpresson JSMemberExpression (JSMemberDot (JSIdentifier 'x',JSIdentifier 'then'),JSArguments (JSArrowExpression (JSIdentifier 'y') => JSConciseExpressionBody (JSExpressionBinary ('*',JSIdentifier 'y',JSDecimal '2'))))))"
+        testExpr "await response.json()"            `shouldBe` "Right (JSAstExpression (JSAwaitExpresson JSMemberExpression (JSMemberDot (JSIdentifier 'response',JSIdentifier 'json'),JSArguments ())))"
+        testExpr "await new Promise(resolve => resolve(1))" `shouldBe` "Right (JSAstExpression (JSAwaitExpresson JSMemberNew (JSIdentifier 'Promise',JSArguments (JSArrowExpression (JSIdentifier 'resolve') => JSConciseExpressionBody (JSMemberExpression (JSIdentifier 'resolve',JSArguments (JSDecimal '1')))))))"
+
+    it "async function expression" $ do
+        testExpr "async function foo() {}"              `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression 'foo' () (JSBlock [])))"
+        testExpr "async function foo(a) {}"             `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression 'foo' (JSIdentifier 'a') (JSBlock [])))"
+        testExpr "async function foo(a, b) {}"          `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression 'foo' (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [])))"
+        testExpr "async function() {}"                  `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression '' () (JSBlock [])))"
+        testExpr "async function(x) { return await x; }" `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression '' (JSIdentifier 'x') (JSBlock [JSReturn JSAwaitExpresson JSIdentifier 'x' JSSemicolon])))"
+        testExpr "async function fetch() { return await response.json(); }" `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression 'fetch' () (JSBlock [JSReturn JSAwaitExpresson JSMemberExpression (JSMemberDot (JSIdentifier 'response',JSIdentifier 'json'),JSArguments ()) JSSemicolon])))"
+        testExpr "async function handler(req, res) { const data = await db.query(); res.send(data); }" `shouldBe` "Right (JSAstExpression (JSAsyncFunctionExpression 'handler' (JSIdentifier 'req',JSIdentifier 'res') (JSBlock [JSConstant (JSVarInitExpression (JSIdentifier 'data') [JSAwaitExpresson JSMemberExpression (JSMemberDot (JSIdentifier 'db',JSIdentifier 'query'),JSArguments ())]),JSMethodCall (JSMemberDot (JSIdentifier 'res',JSIdentifier 'send'),JSArguments (JSIdentifier 'data')),JSSemicolon])))"
+
     it "member expression" $ do
         testExpr "x[y]"         `shouldBe` "Right (JSAstExpression (JSMemberSquare (JSIdentifier 'x',JSIdentifier 'y')))"
         testExpr "x[y][z]"      `shouldBe` "Right (JSAstExpression (JSMemberSquare (JSMemberSquare (JSIdentifier 'x',JSIdentifier 'y'),JSIdentifier 'z')))"
@@ -206,6 +261,16 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "obj.method(a + b, c * d,)" `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier 'obj',JSIdentifier 'method'),JSArguments (JSExpressionBinary ('+',JSIdentifier 'a',JSIdentifier 'b'),JSExpressionBinary ('*',JSIdentifier 'c',JSIdentifier 'd')))))"
         -- Single argument with trailing comma
         testExpr "console.log('hello',)" `shouldBe` "Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier 'console',JSIdentifier 'log'),JSArguments (JSStringLiteral 'hello'))))"
+
+    it "dynamic imports (ES2020) - current parser limitations" $ do
+        -- Note: Current parser does not support dynamic import() expressions
+        -- import() is currently parsed as import statements, not expressions
+        -- These tests document the existing behavior for future implementation
+        parse "import('./module.js')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "const mod = import('module')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "import(moduleSpecifier)" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "import('./utils.js').then(m => m.helper())" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        parse "await import('./async-module.js')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
 
     it "spread expression" $
         testExpr "... x"        `shouldBe` "Right (JSAstExpression (JSSpreadExpression (JSIdentifier 'x')))"
@@ -246,6 +311,20 @@ testExpressionParser = describe "Parse expressions:" $ do
         testExpr "null ?? 'default'"   `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSLiteral 'null',JSStringLiteral 'default')))"
         testExpr "undefined ?? 0"      `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSIdentifier 'undefined',JSDecimal '0')))"
         testExpr "x ?? y ?? z"         `shouldBe` "Right (JSAstExpression (JSExpressionBinary ('??',JSExpressionBinary ('??',JSIdentifier 'x',JSIdentifier 'y'),JSIdentifier 'z')))"
+
+    it "static class expressions (ES2015) - supported features" $ do
+        -- Basic static method in class expression
+        testExpr "class { static method() {} }" `shouldBe` "Right (JSAstExpression (JSClassExpression '' () [JSClassStaticMethod (JSMethodDefinition (JSIdentifier 'method') () (JSBlock []))]))"
+        -- Named class expression with static methods
+        testExpr "class Calculator { static add(a, b) { return a + b; } }" `shouldBe` "Right (JSAstExpression (JSClassExpression 'Calculator' () [JSClassStaticMethod (JSMethodDefinition (JSIdentifier 'add') (JSIdentifier 'a',JSIdentifier 'b') (JSBlock [JSReturn JSExpressionBinary ('+',JSIdentifier 'a',JSIdentifier 'b') JSSemicolon]))]))"
+        -- Static getter in class expression  
+        testExpr "class { static get version() { return '2.0'; } }" `shouldBe` "Right (JSAstExpression (JSClassExpression '' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorGet (JSIdentifier 'version') () (JSBlock [JSReturn JSStringLiteral '2.0' JSSemicolon]))]))"
+        -- Static setter in class expression
+        testExpr "class { static set config(val) { this._config = val; } }" `shouldBe` "Right (JSAstExpression (JSClassExpression '' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorSet (JSIdentifier 'config') (JSIdentifier 'val') (JSBlock [JSOpAssign ('=',JSMemberDot (JSLiteral 'this',JSIdentifier '_config'),JSIdentifier 'val'),JSSemicolon]))]))"
+        -- Static computed property
+        testExpr "class { static [Symbol.iterator]() {} }" `shouldBe` "Right (JSAstExpression (JSClassExpression '' () [JSClassStaticMethod (JSMethodDefinition (JSPropertyComputed (JSMemberDot (JSIdentifier 'Symbol',JSIdentifier 'iterator'))) () (JSBlock []))]))"
+        -- Multiple static features
+        testExpr "class Util { static method() {} static get prop() {} }" `shouldBe` "Right (JSAstExpression (JSClassExpression 'Util' () [JSClassStaticMethod (JSMethodDefinition (JSIdentifier 'method') () (JSBlock [])),JSClassStaticMethod (JSPropertyAccessor JSAccessorGet (JSIdentifier 'prop') () (JSBlock []))]))"
 
 
 testExpr :: String -> String
