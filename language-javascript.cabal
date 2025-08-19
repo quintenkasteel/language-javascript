@@ -54,15 +54,15 @@ Library
                        Language.JavaScript.Parser.Grammar7
                        Language.JavaScript.Parser.Lexer
                        Language.JavaScript.Parser.Parser
+                       Language.JavaScript.Parser.ParseError
                        Language.JavaScript.Parser.SrcLocation
+                       Language.JavaScript.Parser.Token
                        Language.JavaScript.Parser.Validator
                        Language.JavaScript.Pretty.Printer
                        Language.JavaScript.Pretty.JSON
                        Language.JavaScript.Process.Minify
   Other-modules:       Language.JavaScript.Parser.LexerUtils
-                       Language.JavaScript.Parser.ParseError
                        Language.JavaScript.Parser.ParserMonad
-                       Language.JavaScript.Parser.Token
   ghc-options:         -Wall -fwarn-tabs
 
 Test-Suite testsuite
@@ -81,9 +81,15 @@ Test-Suite testsuite
                  , bytestring       >= 0.9.1
                  , blaze-builder    >= 0.2
                  , deepseq          >= 1.3
+                 , time             >= 1.4
                  , language-javascript
 
-  Other-modules:    Test.Language.Javascript.ASIEdgeCases
+  Other-modules:    Test.Language.Javascript.AdvancedLexerTest
+                    Test.Language.Javascript.ASIEdgeCases
+                    Test.Language.Javascript.ASTConstructorTest
+                    Test.Language.Javascript.ErrorRecoveryTest
+                    Test.Language.Javascript.ErrorQualityTest
+                    Test.Language.Javascript.ErrorRecoveryBench
                     Test.Language.Javascript.ExpressionParser
                     Test.Language.Javascript.ExportStar
                     Test.Language.Javascript.Generic
@@ -91,9 +97,13 @@ Test-Suite testsuite
                     Test.Language.Javascript.LiteralParser
                     Test.Language.Javascript.Minify
                     Test.Language.Javascript.ModuleParser
+                    Test.Language.Javascript.NumericLiteralEdgeCases
                     Test.Language.Javascript.ProgramParser
                     Test.Language.Javascript.RoundTrip
+                    Test.Language.Javascript.SrcLocationTest
                     Test.Language.Javascript.StatementParser
+                    Test.Language.Javascript.StringLiteralComplexity
+                    Test.Language.Javascript.UnicodeTest
                     Test.Language.Javascript.Validator
 
 source-repository head
