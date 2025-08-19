@@ -1,0 +1,39 @@
+Things to do
+
+Useful resource: http://sideshowbarker.github.com/es5-spec
+                 http://test262.ecmascript.org
+                 http://www.ecma-international.org/publications/standards/Ecma-262.htm
+
+2. Separate out the different versions of JavaScript.
+
+Necessary?  Depends what this tool is used for.  Current assumption is
+that it is fed well-formed JS, and generates an AST for further
+manipulation.
+
+3. Simplify the AST. *JSElement at the very least is redundant.
+
+4. Clarify the external interfaces required.
+
+5. Process comments. Some kinds of hooks exist, but they are essentially discarded.
+
+8. String literals for ed 5 - continuation chars etc.
+
+10. Sort out [no line terminator here] in PostfixExpression
+
+11. Export AST as JSON or XML
+
+  nicferrier Nic Ferrier
+  @paul_houle better tools come from the languages making their ast available,
+  as json or xml: gcc --astxml a.c
+
+12. Look at using the AST in WebBits
+    http://hackage.haskell.org/package/WebBits-0.15
+
+13. Numeric literals Infinity, NaN
+
+14. Look at http://jsshaper.org/
+
+15. Store number of rows/cols in a comment, to speed output
+
+EOF
+
