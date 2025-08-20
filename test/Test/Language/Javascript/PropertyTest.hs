@@ -1228,7 +1228,7 @@ isValidAST :: AST.JSAST -> Bool
 isValidAST (AST.JSAstProgram stmts _) = all isValidStatement stmts
 isValidAST (AST.JSAstStatement stmt _) = isValidStatement stmt
 isValidAST (AST.JSAstExpression expr _) = isValidExpression expr
-isValidAST (AST.JSAstLiteral _) = True
+isValidAST (AST.JSAstLiteral _ _) = True
 
 -- | Check if expression is valid
 isValidExpression :: AST.JSExpression -> Bool

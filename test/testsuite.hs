@@ -65,6 +65,7 @@ testAll = do
     testModuleParser
     testExportStar
     testRoundTrip
+    testES6RoundTrip
     testMinifyExpr
     testMinifyStmt
     testMinifyProg

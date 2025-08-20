@@ -1,5 +1,6 @@
 module Test.Language.Javascript.RoundTrip
     ( testRoundTrip
+    , testES6RoundTrip
     ) where
 
 import Test.Hspec
@@ -169,3 +170,70 @@ testRTModule = testRTWith readJsModule
 
 testRTWith :: (String -> AST.JSAST) -> String -> Expectation
 testRTWith f str = renderToString (f str) `shouldBe` str
+
+-- Additional ES6+ round-trip tests for comprehensive coverage
+testES6RoundTrip :: Spec
+testES6RoundTrip = describe "ES6+ Round-trip Coverage:" $ do
+    
+    it "class declarations and expressions" $ do
+        testRT "class A {}"
+        testRT "class A extends B {}"
+        testRT "class A { constructor() {} }"
+        testRT "class A { method() {} }"
+        testRT "class A { static method() {} }"
+        testRT "class A { get prop() { return 1; } }"
+        testRT "class A { set prop(x) { this.x = x; } }"
+        
+    it "async/await patterns" $ do
+        testRT "async function f() {}"
+        testRT "async function f() { return await x; }"
+        testRT "async () => {}"
+        testRT "async (x) => await x"
+        
+    it "destructuring assignments" $ do  
+        testRT "let {x, y} = obj;"
+        testRT "let [a, b] = arr;"
+        testRT "let {x: newX, y: newY} = obj;"
+        testRT "let [a, ...rest] = arr;"
+        testRT "let {x = 1} = obj;"
+        testRT "({x} = obj);"
+        testRT "[a, b] = [b, a];"
+        
+    it "optional chaining and nullish coalescing" $ do
+        testRT "obj?.prop"
+        testRT "obj?.method?.()"
+        testRT "obj?.[key]"
+        testRT "x ?? y"
+        testRT "x?.y ?? z"
+        
+    it "template literals with expressions" $ do
+        testRT "`Hello ${name}!`"
+        testRT "`Line 1\nLine 2`"
+        testRT "`Nested ${`inner ${x}`}`"
+        testRT "tag`template`"
+        testRT "tag`Hello ${name}!`"
+        
+    it "complex object and array patterns" $ do
+        testRT "{...obj, x: 1}"
+        testRT "[...arr, 1, 2]"
+        testRT "{[computed]: value}"
+        testRT "{method() { return 1; }}"
+        
+    it "module import/export variations" $ do
+        testRTModule "export default class A {}"
+        testRTModule "export default function f() {}"
+        testRTModule "export default 42;"
+        testRTModule "export {default as x} from 'mod';"
+        testRTModule "import x, {y, z as w} from 'mod';"
+        
+    it "generator and iterator patterns" $ do
+        testRT "function* gen() { yield* other(); }"
+        testRT "function* gen() { yield 1; yield 2; }"
+        testRT "(function* () { yield 1; })"
+        
+    it "complex expression combinations" $ do
+        testRT "a?.b?.c?.()?.[d] ?? e"
+        testRT "async () => await Promise.all([...items])"
+        testRT "class A extends (B ?? C) {}"
+        testRT "{...{...obj}}"
+        testRT "({...obj, method() { return super.method(); }})"

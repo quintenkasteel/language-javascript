@@ -620,7 +620,7 @@ isValidExpression expr = case expr of
   AST.JSHexInteger _ _ -> True
   AST.JSOctal _ _ -> True
   AST.JSExpressionBinary _ _ _ -> True
-  AST.JSExpressionTernary _ _ _ _ -> True
+  AST.JSExpressionTernary _ _ _ _ _ -> True
   AST.JSCallExpression _ _ _ _ -> True
   AST.JSMemberDot _ _ _ -> True
   AST.JSArrayLiteral _ _ _ -> True
@@ -634,7 +634,7 @@ isValidLiteral expr = case expr of
   AST.JSStringLiteral _ _ -> True
   AST.JSHexInteger _ _ -> True
   AST.JSOctal _ _ -> True
-  AST.JSLiteral _ -> True
+  AST.JSLiteral _ _ -> True
   _ -> False  -- Only literal expressions are valid
 
 diffUTCTime :: Int -> Int -> Double
