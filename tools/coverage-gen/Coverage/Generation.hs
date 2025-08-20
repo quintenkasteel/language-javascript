@@ -19,8 +19,14 @@
 module Coverage.Generation
   ( MLGenerator(..)
   , TestCase(..)
+  , TestExpectation(..)
   , GenerationConfig(..)
   , GenerationStrategy(..)
+  , MLConfig(..)
+  , MLModelType(..)
+  , NetworkConfig(..)
+  , ActivationType(..)
+  , OptimizerType(..)
   , createMLGenerator
   , generateTestCases
   , evaluateTestCase

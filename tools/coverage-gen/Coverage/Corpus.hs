@@ -20,7 +20,13 @@
 module Coverage.Corpus
   ( JavaScriptCorpus(..)
   , CorpusEntry(..)
+  , CorpusMetadata(..)
+  , EntryMetadata(..)
+  , LanguageLevel(..)
+  , CodeCategory(..)
+  , FeatureSet(..)
   , CodePattern(..)
+  , PatternType(..)
   , FeatureExtractor(..)
   , loadCorpus
   , extractPatterns
@@ -259,9 +265,9 @@ maxNesting content =
   where
     calculateNesting current maxSeen line =
       let opens = Text.count "{" line
-      let closes = Text.count "}" line
-      let newCurrent = current + opens - closes
-      let newMax = max maxSeen newCurrent
+          closes = Text.count "}" line
+          newCurrent = current + opens - closes
+          newMax = max maxSeen newCurrent
       in newMax
 
 -- | Detect JavaScript language level.

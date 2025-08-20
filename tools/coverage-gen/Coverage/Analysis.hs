@@ -18,6 +18,8 @@
 -- @since 1.0.0
 module Coverage.Analysis
   ( HpcReport(..)
+  , ModuleCoverage(..)
+  , OverallCoverage(..)
   , CoverageGap(..)
   , GapType(..)
   , parseHpcReport
