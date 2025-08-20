@@ -221,8 +221,9 @@ genJSAnnot = frequency
       return (TokenPn addr line col)
     genCommentList = listOf genCommentAnnotation
     genCommentAnnotation = oneof
-      [ Token.CommentA <$> genValidString
-      , Token.WhiteSpace <$> genWhitespace
+      [ Token.CommentA <$> genTokenPosn <*> genValidString
+      , Token.WhiteSpace <$> genTokenPosn <*> genWhitespace
+      , pure Token.NoComment
       ]
     genWhitespace = elements [" ", "\t", "\n", "\r\n"]
 
@@ -243,7 +244,7 @@ genJSSemi = oneof
 genJSIdent :: Gen JSIdent
 genJSIdent = oneof
   [ JSIdentName <$> genJSAnnot <*> genValidIdentifier
-  , JSIdentNone
+  , pure JSIdentNone
   ]
 
 -- | Generate arbitrary JavaScript AST roots.
@@ -546,7 +547,6 @@ genValidString = oneof
       , choose ('A', 'Z')
       , choose ('0', '9')
       , return ' '
-      , genEscapedChar quote
       ]
     genEscapedChar quote = oneof
       [ return "\\\\"
@@ -1155,7 +1155,7 @@ genNonBMPCharacters :: Gen String
 genNonBMPCharacters = return "const 💻 = 'computer';" -- Computer emoji
 
 genDeeplyNestedFunctions :: Gen String
-genDeeplyNestedFunctions = return (replicate 100 "function f() {" ++ replicate 100 '}')
+genDeeplyNestedFunctions = return (concat (replicate 100 "function f() {") ++ replicate 100 '}')
 
 genDeeplyNestedObjects :: Gen String
 genDeeplyNestedObjects = return ("{" ++ List.intercalate ": {" (replicate 50 "a") ++ replicate 50 '}')
@@ -1401,12 +1401,12 @@ shrinkJSExpression expr = case expr of
 -- | Shrink JavaScript statements for QuickCheck.
 shrinkJSStatement :: JSStatement -> [JSStatement]
 shrinkJSStatement stmt = case stmt of
-  JSStatementBlock _ stmts _ _ -> stmts ++ concatMap shrink stmts
-  JSIf _ _ cond _ thenStmt -> [thenStmt] ++ shrink cond ++ shrink thenStmt
+  JSStatementBlock _ stmts _ _ -> stmts ++ concatMap shrinkJSStatement stmts
+  JSIf _ _ cond _ thenStmt -> [thenStmt] ++ shrinkJSStatement thenStmt
   JSIfElse _ _ cond _ thenStmt _ elseStmt -> 
-    [thenStmt, elseStmt] ++ shrink cond ++ shrink thenStmt ++ shrink elseStmt
-  JSExpressionStatement expr _ -> shrink expr
-  JSReturn _ (Just expr) _ -> shrink expr
+    [thenStmt, elseStmt] ++ shrinkJSStatement thenStmt ++ shrinkJSStatement elseStmt
+  JSExpressionStatement expr _ -> []  -- Cannot shrink expression to statement
+  JSReturn _ (Just expr) _ -> []  -- Cannot shrink expression to statement 
   _ -> []
 
 -- | Shrink JavaScript AST for QuickCheck.
@@ -1541,3 +1541,6 @@ instance Arbitrary JSArrowParameterList where
 
 instance Arbitrary JSConciseBody where
   arbitrary = genJSConciseBody
+
+instance Arbitrary a => Arbitrary (JSCommaList a) where
+  arbitrary = genCommaList arbitrary

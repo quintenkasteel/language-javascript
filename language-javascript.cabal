@@ -126,6 +126,9 @@ Test-Suite testsuite
                     Test.Language.Javascript.FuzzingSuite
                     Test.Language.Javascript.FuzzTest
                     Test.Language.Javascript.CompatibilityTest
+                    Test.Language.Javascript.Generators
+                    Test.Language.Javascript.GeneratorsTest
+                    Test.Language.Javascript.NegativeTest
 
 -- Coverage-driven test generation tool
 Executable coverage-gen

@@ -5,7 +5,7 @@ import Test.Hspec
 import Test.Hspec.Runner
 
 
--- import Test.Language.Javascript.AdvancedJavaScriptFeatureTest  -- Temporarily disabled
+-- import Test.Language.Javascript.AdvancedJavaScriptFeatureTest  -- Disabled due to AST constructor changes
 import Test.Language.Javascript.AdvancedLexerTest
 import Test.Language.Javascript.ASIEdgeCases
 import Test.Language.Javascript.ASTConstructorTest
@@ -17,10 +17,11 @@ import Test.Language.Javascript.ES6ValidationSimpleTest
 import Test.Language.Javascript.ExpressionParser
 import Test.Language.Javascript.ExportStar
 import Test.Language.Javascript.Generic
--- import Test.Language.Javascript.GoldenTest
+import Test.Language.Javascript.GoldenTest
 import Test.Language.Javascript.Lexer
 import Test.Language.Javascript.LiteralParser
 import Test.Language.Javascript.Minify
+import Test.Language.Javascript.NegativeTest
 import Test.Language.Javascript.NumericLiteralEdgeCases
 import Test.Language.Javascript.ModuleParser
 import Test.Language.Javascript.ProgramParser
@@ -31,7 +32,7 @@ import Test.Language.Javascript.StringLiteralComplexity
 import Test.Language.Javascript.UnicodeTest
 import Test.Language.Javascript.Validator
 import Test.Language.Javascript.PropertyTest
--- import Test.Language.Javascript.GeneratorsTest
+import Test.Language.Javascript.GeneratorsTest
 import qualified Test.Language.Javascript.StrictModeValidationTest as StrictModeValidationTest
 import qualified Test.Language.Javascript.ModuleValidationTest as ModuleValidationTest
 import qualified Test.Language.Javascript.ControlFlowValidationTest as ControlFlowValidationTest
@@ -59,6 +60,7 @@ testAll = do
     testLiteralParser
     testStringLiteralComplexity
     testNumericLiteralEdgeCases
+    testNegativeCases
     testExpressionParser
     testStatementParser
     testProgramParser
@@ -73,7 +75,7 @@ testAll = do
     testGenericNFData
     testValidator
     testES6ValidationSimple
-    -- testAdvancedJavaScriptFeatures  -- Temporarily disabled due to AST construction syntax issues
+    -- testAdvancedJavaScriptFeatures  -- Disabled due to AST constructor changes
     testASTConstructors
     testSrcLocation
     testErrorRecovery
@@ -81,7 +83,7 @@ testAll = do
     testErrorQuality
     benchmarkErrorRecovery
     testPropertyInvariants
-    -- testGenerators
+    testGenerators
     StrictModeValidationTest.tests
     ModuleValidationTest.tests
     ControlFlowValidationTest.testControlFlowValidation
@@ -90,4 +92,4 @@ testAll = do
     -- PerformanceAdvancedTest.advancedPerformanceTests
     FuzzingSuite.testFuzzingSuite
     CompatibilityTest.testRealWorldCompatibility
-    -- goldenTests
+    goldenTests

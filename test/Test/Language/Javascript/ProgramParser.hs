@@ -88,20 +88,20 @@ testProgramParser = describe "Program parser:" $ do
 
     it "automatic semicolon insertion with comments in functions" $ do
         -- Function with return statement and comment + newline - should parse successfully
-        testProg "function f1() { return // hello\n 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
-        testProg "function f2() { return /* hello */ 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
-        testProg "function f3() { return /* hello\n */ 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
-        testProg "function f4() { return\n 4 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f1() { return // hello\n 4 }" `shouldSatisfy` isPrefixOf "Right"
+        testProg "function f2() { return /* hello */ 4 }" `shouldSatisfy` isPrefixOf "Right"
+        testProg "function f3() { return /* hello\n */ 4 }" `shouldSatisfy` isPrefixOf "Right"
+        testProg "function f4() { return\n 4 }" `shouldSatisfy` isPrefixOf "Right"
         
         -- Functions with break/continue in loops - should parse successfully
-        testProg "function f() { while(true) { break // comment\n } }" `shouldSatisfy` ("Right" `isPrefixOf`)
-        testProg "function f() { for(;;) { continue /* comment\n */ } }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f() { while(true) { break // comment\n } }" `shouldSatisfy` isPrefixOf "Right"
+        testProg "function f() { for(;;) { continue /* comment\n */ } }" `shouldSatisfy` isPrefixOf "Right"
         
         -- Multiple statements with ASI - should parse successfully
-        testProg "function f() { return // first\n 1; return /* second\n */ 2 }" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "function f() { return // first\n 1; return /* second\n */ 2 }" `shouldSatisfy` isPrefixOf "Right"
         
         -- Mixed ASI scenarios - should parse successfully
-        testProg "var x = 5; function f() { return // comment\n x + 1 } f()" `shouldSatisfy` ("Right" `isPrefixOf`)
+        testProg "var x = 5; function f() { return // comment\n x + 1 } f()" `shouldSatisfy` isPrefixOf "Right"
 
 
 testProg :: String -> String

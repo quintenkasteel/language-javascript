@@ -108,44 +108,64 @@ testModuleParser = describe "Parse modules:" $ do
 
     it "advanced module features (ES2020+) - supported and limitations" $ do
         -- Export * as namespace is now supported (ES2020)
-        parseModule "export * as ns from 'module';" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parseModule "export * as namespace from './utils';" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "export * as ns from 'module';" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse export * as: " ++ show err)
+        case parseModule "export * as namespace from './utils';" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse export * as: " ++ show err)
         
         -- Note: import.meta is now supported for property access
-        parse "import.meta.url" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "import.meta.resolve('./module')" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "console.log(import.meta)" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parse "import.meta.url" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse import.meta.url: " ++ show err)
+        case parse "import.meta.resolve('./module')" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse import.meta.resolve: " ++ show err)
+        case parse "console.log(import.meta)" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse console.log(import.meta): " ++ show err)
         
         -- Note: Dynamic import() expressions are not supported as expressions (already tested elsewhere)
-        parse "import('./module.js')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        case parse "import('./module.js')" "test" of
+            Left _ -> pure ()  -- Expected to fail
+            Right _ -> expectationFailure "Dynamic import() should not parse as expression"
         
         -- Note: Import assertions are not yet supported for dynamic imports
-        parse "import('./data.json', { assert: { type: 'json' } })" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        case parse "import('./data.json', { assert: { type: 'json' } })" "test" of
+            Left _ -> pure ()  -- Expected to fail
+            Right _ -> expectationFailure "Import assertions should not yet be supported"
 
     it "import.meta expressions (ES2020)" $ do
         -- Basic import.meta access
-        parse "import.meta;" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parse "import.meta;" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse import.meta: " ++ show err)
         
         -- import.meta.url property access
-        parseModule "const url = import.meta.url;" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "const url = import.meta.url;" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse import.meta.url: " ++ show err)
         
         -- import.meta.resolve() method calls
-        parseModule "const resolved = import.meta.resolve('./module.js');" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "const resolved = import.meta.resolve('./module.js');" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse import.meta.resolve: " ++ show err)
         
         -- import.meta in function calls
-        parseModule "console.log(import.meta.url, import.meta);" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "console.log(import.meta.url, import.meta);" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Should parse import.meta in function calls: " ++ show err)
         
         -- import.meta in conditional expressions
-        parseModule "const hasUrl = import.meta.url ? true : false;" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "const hasUrl = import.meta.url ? true : false;" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
         -- import.meta property access variations
-        parseModule "import.meta.env;" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import.meta.env;" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
         -- Verify one basic exact string match for import.meta
         test "import.meta;"
@@ -154,32 +174,40 @@ testModuleParser = describe "Parse modules:" $ do
 
     it "import attributes with 'with' clause (ES2021+)" $ do
         -- JSON imports with type attribute (functional test)
-        parseModule "import data from './data.json' with { type: 'json' };" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import data from './data.json' with { type: 'json' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
         -- Test that various import attributes parse successfully (functional tests)
-        parseModule "import * as styles from './styles.css' with { type: 'css' };" "test" 
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import * as styles from './styles.css' with { type: 'css' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
-        parseModule "import { config, settings } from './config.json' with { type: 'json' };" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import { config, settings } from './config.json' with { type: 'json' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
-        parseModule "import secure from './secure.json' with { type: 'json', integrity: 'sha256-abc123' };" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import secure from './secure.json' with { type: 'json', integrity: 'sha256-abc123' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
-        parseModule "import defaultExport, { namedExport } from './module.js' with { type: 'module' };" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import defaultExport, { namedExport } from './module.js' with { type: 'module' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
-        parseModule "import './polyfill.js' with { type: 'module' };" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import './polyfill.js' with { type: 'module' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
         -- Import without attributes (backwards compatibility) 
-        parseModule "import regular from './regular.js';" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import regular from './regular.js';" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
         
         -- Multiple attributes with various attribute types
-        parseModule "import wasm from './module.wasm' with { type: 'webassembly', encoding: 'binary' };" "test"
-            `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        case parseModule "import wasm from './module.wasm' with { type: 'webassembly', encoding: 'binary' };" "test" of
+            Right _ -> pure ()
+            Left err -> expectationFailure ("Parse should succeed: " ++ show err)
 
 
 test :: String -> String

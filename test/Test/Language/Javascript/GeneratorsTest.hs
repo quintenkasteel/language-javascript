@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | Test module for QuickCheck generators
@@ -39,9 +40,8 @@ testGenerators = describe "QuickCheck Generators" $ do
     it "generates valid JSAST instances" $ property $
       \ast -> isValidJSAST (ast :: JSAST)
     
-    it "generates non-empty identifier strings" $ property $
-      \ident -> not (null ident) ==> isValidIdentifierString ident
-      where isValidIdentifierString = all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$"))
+    it "generates valid identifier strings" $ property $ \(ident :: String) ->
+      not (null ident) ==> all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$")) ident
 
   describe "Complex structure generators" $ do
     it "generates JSObjectProperty instances" $ property $
@@ -55,9 +55,9 @@ isValidExpression :: JSExpression -> Bool
 isValidExpression expr = case expr of
   JSIdentifier _ _ -> True
   JSDecimal _ _ -> True
-  JSLiteral _ -> True
+  JSLiteral _ _ -> True
   JSExpressionBinary _ _ _ -> True
-  JSExpressionTernary _ _ _ _ -> True
+  JSExpressionTernary _ _ _ _ _ -> True
   JSCallExpression _ _ _ _ -> True
   JSMemberDot _ _ _ -> True
   JSArrayLiteral _ _ _ -> True
@@ -106,20 +106,20 @@ isValidStatement stmt = case stmt of
   JSConstant _ _ _ -> True
   JSContinue _ _ _ -> True
   JSDoWhile _ _ _ _ _ _ _ -> True
-  JSFor _ _ _ _ _ _ _ _ _ _ -> True
+  JSFor _ _ _ _ _ _ _ _ _ -> True
   JSForIn _ _ _ _ _ _ _ -> True
-  JSForVar _ _ _ _ _ _ _ _ _ _ _ -> True
-  JSFunction _ _ _ _ _ _ -> True
-  JSIf _ _ _ _ -> True
-  JSIfElse _ _ _ _ _ -> True
+  JSForVar _ _ _ _ _ _ _ _ _ _ -> True
+  JSFunction _ _ _ _ _ _ _ -> True
+  JSIf _ _ _ _ _ -> True
+  JSIfElse _ _ _ _ _ _ _ -> True
   JSLabelled _ _ _ -> True
   JSReturn _ _ _ -> True
-  JSSwitch _ _ _ _ _ _ _ -> True
+  JSSwitch _ _ _ _ _ _ _ _ -> True
   JSThrow _ _ _ -> True
-  JSTry _ _ _ -> True
+  JSTry _ _ _ _ -> True
   JSVariable _ _ _ -> True
-  JSWhile _ _ _ _ _ _ -> True
-  JSWith _ _ _ _ _ _ _ -> True
+  JSWhile _ _ _ _ _ -> True
+  JSWith _ _ _ _ _ _ -> True
   _ -> True  -- Accept all valid statements
 
 isValidBlock :: JSBlock -> Bool
@@ -128,17 +128,17 @@ isValidBlock (JSBlock _ _ _) = True
 isValidJSAST :: JSAST -> Bool
 isValidJSAST ast = case ast of
   JSAstProgram _ _ -> True
+  JSAstModule _ _ -> True
   JSAstStatement _ _ -> True
   JSAstExpression _ _ -> True
-  JSAstLiteral _ -> True
+  JSAstLiteral _ _ -> True
 
 isValidObjectProperty :: JSObjectProperty -> Bool
 isValidObjectProperty prop = case prop of
   JSPropertyNameandValue _ _ _ -> True
   JSPropertyIdentRef _ _ -> True
   JSObjectMethod _ -> True
-  JSObjectMethodSimple _ _ _ _ _ -> True
-  _ -> True  -- Accept all valid object properties
+  JSObjectSpread _ _ -> True
 
 isValidCommaList :: JSCommaList a -> Bool
 isValidCommaList JSLNil = True
