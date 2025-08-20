@@ -249,11 +249,11 @@ testPositionSerialization = describe "Position serialization" $ do
   
   it "shows positions in readable format" $ do
     let pos = TokenPn 100 5 10
-    show pos `shouldBe` "AlexPn 100 5 10"
+    show pos `shouldBe` "TokenPn 100 5 10"
     
   it "shows empty position correctly" $ do
     let posStr = show tokenPosnEmpty
-    posStr `shouldBe` "AlexPn 0 0 0"
+    posStr `shouldBe` "TokenPn 0 0 0"
     
   it "reads positions correctly" $ do
     let pos = TokenPn 100 5 10
@@ -272,11 +272,11 @@ testPositionShowInstances = describe "Show instances" $ do
   it "provides detailed position information" $ do
     let pos = TokenPn 100 5 10
     let posStr = formatPosition pos
-    posStr `shouldBe` "line 5, column 10, address 100"
+    posStr `shouldBe` "address 100, line 5, column 10"
     
   it "handles zero position gracefully" $ do
     let posStr = formatPosition tokenPosnEmpty
-    posStr `shouldBe` "line 0, column 0, address 0"
+    posStr `shouldBe` "address 0, line 0, column 0"
     
   it "formats positions for error messages" $ do
     let pos = TokenPn 100 5 10
