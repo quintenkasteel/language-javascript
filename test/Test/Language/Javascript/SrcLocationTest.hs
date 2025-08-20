@@ -249,13 +249,11 @@ testPositionSerialization = describe "Position serialization" $ do
   
   it "shows positions in readable format" $ do
     let pos = TokenPn 100 5 10
-    show pos `shouldContain` "100"
-    show pos `shouldContain` "5" 
-    show pos `shouldContain` "10"
+    show pos `shouldBe` "AlexPn 100 5 10"
     
   it "shows empty position correctly" $ do
     let posStr = show tokenPosnEmpty
-    posStr `shouldContain` "0"
+    posStr `shouldBe` "AlexPn 0 0 0"
     
   it "reads positions correctly" $ do
     let pos = TokenPn 100 5 10
@@ -274,14 +272,11 @@ testPositionShowInstances = describe "Show instances" $ do
   it "provides detailed position information" $ do
     let pos = TokenPn 100 5 10
     let posStr = formatPosition pos
-    posStr `shouldContain` "line 5"
-    posStr `shouldContain` "column 10"
-    posStr `shouldContain` "address 100"
+    posStr `shouldBe` "line 5, column 10, address 100"
     
   it "handles zero position gracefully" $ do
     let posStr = formatPosition tokenPosnEmpty
-    posStr `shouldContain` "line 0"
-    posStr `shouldContain` "column 0"
+    posStr `shouldBe` "line 0, column 0, address 0"
     
   it "formats positions for error messages" $ do
     let pos = TokenPn 100 5 10
@@ -353,12 +348,12 @@ testDataInstances = describe "Data instances" $ do
   it "supports Data operations" $ do
     let pos = TokenPn 100 5 10
     let constr = toConstr pos
-    show constr `shouldContain` "TokenPn"
+    show constr `shouldBe` "TokenPn"
     
   it "provides correct datatype information" $ do
     let pos = TokenPn 100 5 10
     let datatype = dataTypeOf pos
-    show datatype `shouldContain` "TokenPosn"
+    show datatype `shouldBe` "DataType {tycon = \"Language.JavaScript.Parser.SrcLocation.TokenPosn\", datarep = AlgRep [TokenPn]}"
 
 -- | Test position properties with QuickCheck
 testPositionProperties :: Spec
