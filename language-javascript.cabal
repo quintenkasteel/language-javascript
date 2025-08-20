@@ -73,6 +73,7 @@ Test-Suite testsuite
   build-depends: base, Cabal >= 1.9.2
                  , QuickCheck >= 2
                  , hspec
+                 , hspec-golden     >= 0.2
                  , criterion        >= 1.1
                  , weigh            >= 0.0.10
                  , temporary        >= 1.2
@@ -93,12 +94,14 @@ Test-Suite testsuite
                     Test.Language.Javascript.ASIEdgeCases
                     Test.Language.Javascript.ASTConstructorTest
                     Test.Language.Javascript.ErrorRecoveryTest
+                    Test.Language.Javascript.ErrorRecoveryAdvancedTest
                     Test.Language.Javascript.ErrorQualityTest
                     Test.Language.Javascript.ErrorRecoveryBench
                     Test.Language.Javascript.ES6ValidationSimpleTest
                     Test.Language.Javascript.ExpressionParser
                     Test.Language.Javascript.ExportStar
                     Test.Language.Javascript.Generic
+                    Test.Language.Javascript.GoldenTest
                     Test.Language.Javascript.Lexer
                     Test.Language.Javascript.LiteralParser
                     Test.Language.Javascript.Minify
@@ -116,6 +119,8 @@ Test-Suite testsuite
                     Test.Language.Javascript.StrictModeValidationTest
                     Test.Language.Javascript.ModuleValidationTest
                     Test.Language.Javascript.ControlFlowValidationTest
+                    Test.Language.Javascript.Generators
+                    Test.Language.Javascript.GeneratorsTest
 
 source-repository head
   type:     git
