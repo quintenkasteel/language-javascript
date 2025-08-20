@@ -296,7 +296,8 @@ genSizedStatement n = frequency
   , (2, genBlockStatement n)
   , (2, genIfStatement n)
   , (1, genForStatement n)
-  , (1, genWhileStatement n)
+  , (1, genActualWhileStatement n)
+  , (1, genDoWhileStatement n)
   , (1, genFunctionStatement n)
   , (1, genVariableStatement)
   , (1, genSwitchStatement n)
@@ -588,13 +589,11 @@ genCommaList genElement = oneof
 -- with proper comma separation and syntax.
 genJSObjectPropertyList :: Gen JSObjectPropertyList
 genJSObjectPropertyList = oneof
-  [ return JSLNil
-  , JSLOne <$> genJSObjectProperty
+  [ JSCTLNone <$> genCommaList genJSObjectProperty
   , do
-      first <- genJSObjectProperty
+      list <- genCommaList genJSObjectProperty
       comma <- genJSAnnot
-      rest <- genJSObjectProperty
-      return (JSLCons (JSLOne first) comma rest)
+      return (JSCTLComma list comma)
   ]
 
 -- ---------------------------------------------------------------------
@@ -796,15 +795,16 @@ genForStatement n = do
   stmt <- genSizedStatement (n `div` 2)
   return (JSFor forAnnot lparen init semi1 cond semi2 update rparen stmt)
 
--- | Generate while statements with size control.
-genWhileStatement :: Int -> Gen JSStatement
-genWhileStatement n = do
+-- | Generate do-while statements with size control.
+genDoWhileStatement :: Int -> Gen JSStatement
+genDoWhileStatement n = do
+  doAnnot <- genJSAnnot
+  stmt <- genSizedStatement (n `div` 2)
   whileAnnot <- genJSAnnot
   lparen <- genJSAnnot
   cond <- genSizedExpression (n `div` 2)
   rparen <- genJSAnnot
-  stmt <- genSizedStatement (n `div` 2)
-  return (JSDoWhile whileAnnot stmt whileAnnot lparen cond rparen JSSemiAuto)
+  return (JSDoWhile doAnnot stmt whileAnnot lparen cond rparen JSSemiAuto)
 
 -- | Generate function statements with size control.
 genFunctionStatement :: Int -> Gen JSStatement
@@ -908,8 +908,9 @@ genVariableStatement = do
     genJSIdentifier = JSIdentifier <$> genJSAnnot <*> genValidIdentifier
     genJSVarInit = do
       ident <- genJSIdentifier
-      init <- genJSVarInitializer
-      return (JSVarInitExpression ident init)
+      initAnnot <- genJSAnnot
+      expr <- genJSExpression
+      return (JSVarInitExpression ident (JSVarInit initAnnot expr))
 
 -- | Generate variable initializers.
 genJSVarInitializer :: Gen JSVarInitializer
@@ -921,9 +922,9 @@ genJSVarInitializer = oneof
       return (JSVarInit annot expr)
   ]
 
--- | Generate while statements.
-genWhileStatement :: Int -> Gen JSStatement
-genWhileStatement n = do
+-- | Generate while statements with size control.
+genActualWhileStatement :: Int -> Gen JSStatement
+genActualWhileStatement n = do
   whileAnnot <- genJSAnnot
   lparen <- genJSAnnot
   cond <- genSizedExpression (n `div` 2)
@@ -1216,37 +1217,26 @@ genJSObjectProperty :: Gen JSObjectProperty
 genJSObjectProperty = oneof
   [ genDataProperty
   , genMethodProperty
-  , genGetterProperty
-  , genSetterProperty
+  , genIdentRef
+  , genObjectSpread
   ]
   where
     genDataProperty = do
       name <- genJSPropertyName
       colon <- genJSAnnot
       value <- genJSExpression
-      return (JSPropertyNameandValue name colon value)
+      return (JSPropertyNameandValue name colon [value])
     genMethodProperty = do
-      name <- genJSPropertyName
+      methodDef <- genJSMethodDefinition
+      return (JSObjectMethod methodDef)
+    genIdentRef = do
       annot <- genJSAnnot
-      params <- genCommaList genIdentifierExpression
-      rparen <- genJSAnnot
-      block <- genJSBlock 2
-      return (JSMethodDefinition name annot params rparen block)
-    genGetterProperty = do
-      getAnnot <- genJSAnnot
-      name <- genJSPropertyName
-      lparen <- genJSAnnot
-      rparen <- genJSAnnot
-      block <- genJSBlock 2
-      return (JSPropertyAccessor JSAccessorGet getAnnot name lparen JSLNil rparen block)
-    genSetterProperty = do
-      setAnnot <- genJSAnnot
-      name <- genJSPropertyName
-      lparen <- genJSAnnot
-      param <- genIdentifierExpression
-      rparen <- genJSAnnot
-      block <- genJSBlock 2
-      return (JSPropertyAccessor JSAccessorSet setAnnot name lparen (JSLOne param) rparen block)
+      ident <- genValidIdentifier
+      return (JSPropertyIdentRef annot ident)
+    genObjectSpread = do
+      spread <- genJSAnnot
+      expr <- genJSExpression
+      return (JSObjectSpread spread expr)
 
 genJSPropertyName :: Gen JSPropertyName
 genJSPropertyName = oneof
@@ -1374,11 +1364,15 @@ instance Arbitrary JSObjectProperty where
   arbitrary = genJSObjectProperty
 
 instance Arbitrary JSMethodDefinition where
-  arbitrary = oneof
-    [ JSMethodDefinition <$> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
-    , JSGeneratorMethodDefinition <$> genJSAnnot <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
-    , JSPropertyAccessor <$> arbitrary <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
-    ]
+  arbitrary = genJSMethodDefinition
+
+-- | Generate method definitions.
+genJSMethodDefinition :: Gen JSMethodDefinition
+genJSMethodDefinition = oneof
+  [ JSMethodDefinition <$> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
+  , JSGeneratorMethodDefinition <$> genJSAnnot <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
+  , JSPropertyAccessor <$> arbitrary <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
+  ]
 
 instance Arbitrary JSModuleItem where
   arbitrary = genJSModuleItem
@@ -1436,3 +1430,114 @@ jsCommaListToList :: JSCommaList a -> [a]
 jsCommaListToList JSLNil = []
 jsCommaListToList (JSLOne x) = [x]
 jsCommaListToList (JSLCons list _ x) = jsCommaListToList list ++ [x]
+
+-- ---------------------------------------------------------------------
+-- Additional Missing Generators for Complete AST Coverage
+-- ---------------------------------------------------------------------
+
+-- | Generate JSCommaTrailingList for any element type.
+genJSCommaTrailingList :: Gen a -> Gen (JSCommaTrailingList a)
+genJSCommaTrailingList genElement = oneof
+  [ JSCTLNone <$> genCommaList genElement
+  , do
+      list <- genCommaList genElement
+      comma <- genJSAnnot
+      return (JSCTLComma list comma)
+  ]
+
+-- | Generate JSClassHeritage.
+genJSClassHeritage :: Gen JSClassHeritage
+genJSClassHeritage = oneof
+  [ return JSExtendsNone
+  , JSExtends <$> genJSAnnot <*> genJSExpression
+  ]
+
+-- | Generate JSClassElement.
+genJSClassElement :: Gen JSClassElement
+genJSClassElement = oneof
+  [ genJSInstanceMethod
+  , genJSStaticMethod
+  , genJSClassSemi
+  , genJSPrivateField
+  , genJSPrivateMethod
+  , genJSPrivateAccessor
+  ]
+  where
+    genJSInstanceMethod = do
+      method <- genJSMethodDefinition
+      return (JSClassInstanceMethod method)
+    genJSStaticMethod = do
+      static <- genJSAnnot
+      method <- genJSMethodDefinition
+      return (JSClassStaticMethod static method)
+    genJSClassSemi = do
+      semi <- genJSAnnot
+      return (JSClassSemi semi)
+    genJSPrivateField = do
+      hash <- genJSAnnot
+      name <- genValidIdentifier
+      eq <- genJSAnnot
+      init <- oneof [return Nothing, Just <$> genJSExpression]
+      semi <- genJSSemi
+      return (JSPrivateField hash name eq init semi)
+    genJSPrivateMethod = do
+      hash <- genJSAnnot
+      name <- genValidIdentifier
+      lparen <- genJSAnnot
+      params <- genCommaList genJSExpression
+      rparen <- genJSAnnot
+      block <- genJSBlock 2
+      return (JSPrivateMethod hash name lparen params rparen block)
+    genJSPrivateAccessor = do
+      accessor <- arbitrary
+      hash <- genJSAnnot
+      name <- genValidIdentifier
+      lparen <- genJSAnnot
+      params <- genCommaList genJSExpression
+      rparen <- genJSAnnot
+      block <- genJSBlock 2
+      return (JSPrivateAccessor accessor hash name lparen params rparen block)
+
+-- | Generate JSTemplatePart.
+genJSTemplatePart :: Gen JSTemplatePart
+genJSTemplatePart = do
+  expr <- genJSExpression
+  rb <- genJSAnnot
+  suffix <- genValidString
+  return (JSTemplatePart expr rb suffix)
+
+-- | Generate JSArrowParameterList.
+genJSArrowParameterList :: Gen JSArrowParameterList
+genJSArrowParameterList = oneof
+  [ JSUnparenthesizedArrowParameter <$> genJSIdent
+  , JSParenthesizedArrowParameterList <$> genJSAnnot <*> genCommaList genJSExpression <*> genJSAnnot
+  ]
+
+-- | Generate JSConciseBody.
+genJSConciseBody :: Gen JSConciseBody
+genJSConciseBody = oneof
+  [ JSConciseFunctionBody <$> genJSBlock 2
+  , JSConciseExpressionBody <$> genJSExpression
+  ]
+
+-- ---------------------------------------------------------------------
+-- Additional Arbitrary Instances for Complete Coverage
+-- ---------------------------------------------------------------------
+
+instance Arbitrary a => Arbitrary (JSCommaTrailingList a) where
+  arbitrary = genJSCommaTrailingList arbitrary
+
+instance Arbitrary JSClassHeritage where
+  arbitrary = genJSClassHeritage
+
+instance Arbitrary JSClassElement where
+  arbitrary = genJSClassElement
+
+instance Arbitrary JSTemplatePart where
+  arbitrary = genJSTemplatePart
+
+instance Arbitrary JSArrowParameterList where
+  arbitrary = genJSArrowParameterList
+
+instance Arbitrary JSConciseBody where
+  arbitrary = genJSConciseBody
