@@ -164,7 +164,7 @@ testRegressionFuzzing config = describe "Regression Fuzzing Tests" $ do
   validateKnownEdgeCases
   
   it "should not regress on performance" $ do
-    liftIO $ validatePerformanceBaseline config
+    validatePerformanceBaseline config
 
 -- ---------------------------------------------------------------------
 -- Individual Test Categories
@@ -351,9 +351,9 @@ validateKnownEdgeCases = describe "Known Edge Cases" $ do
   
   it "should handle Unicode edge cases" $ do
     let unicodeTests = 
-          [ "var \u03B1 = 42;"  -- Greek letter alpha
-          , "var \u{1F600} = 'emoji';"  -- Emoji
-          , "var x\u0301 = 1;"  -- Combining character
+          [ "var \\u03B1 = 42;"  -- Greek letter alpha
+          , "var \\u{1F600} = 'emoji';"  -- Emoji
+          , "var x\\u0301 = 1;"  -- Combining character
           ]
     results <- liftIO $ mapM (testInputSafety . Text.pack) unicodeTests
     all id results `shouldBe` True

@@ -35,7 +35,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (sortBy)
 import qualified Data.List as List
-import Control.Monad (unless)
+import Control.Monad (unless, foldM)
 import System.FilePath ((</>))
 import qualified System.FilePath as FilePath
 
@@ -85,11 +85,11 @@ data CoverageGap = CoverageGap
 parseHpcReport :: FilePath -> IO (Either Text HpcReport)
 parseHpcReport tixPath = do
   exists <- doesFileExist tixPath
-  unless exists $
-    pure (Left ("HPC file not found: " <> Text.pack tixPath))
-  
-  content <- Text.readFile tixPath
-  pure (parseTixContent content)
+  if not exists
+    then pure (Left ("HPC file not found: " <> Text.pack tixPath))
+    else do
+      content <- Text.readFile tixPath
+      pure (parseTixContent content)
   where
     doesFileExist = return . const True  -- Simplified for now
 

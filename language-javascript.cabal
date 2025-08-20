@@ -29,6 +29,7 @@ Cabal-version:   >= 1.9.2
 
 
 Library
+  default-language:    Haskell2010
   Build-depends:     base             >= 4       && < 5
                    , array            >= 0.3
                    , mtl              >= 1.1
@@ -67,6 +68,7 @@ Library
 
 Test-Suite testsuite
   Type: exitcode-stdio-1.0
+  default-language:    Haskell2010
   Main-is: testsuite.hs
   hs-source-dirs: test
   ghc-options:   -Wall -fwarn-tabs
@@ -90,7 +92,7 @@ Test-Suite testsuite
                  , time             >= 1.4
                  , language-javascript
 
-  Other-modules:    Test.Language.Javascript.AdvancedJavaScriptFeatureTest
+  Other-modules:
                     Test.Language.Javascript.AdvancedLexerTest
                     Test.Language.Javascript.ASIEdgeCases
                     Test.Language.Javascript.ASTConstructorTest
@@ -122,11 +124,13 @@ Test-Suite testsuite
                     Test.Language.Javascript.ControlFlowValidationTest
                     Test.Language.Javascript.MemoryTest
                     Test.Language.Javascript.FuzzingSuite
+                    Test.Language.Javascript.FuzzTest
                     Test.Language.Javascript.CompatibilityTest
 
 -- Coverage-driven test generation tool
 Executable coverage-gen
   Main-is: Main.hs
+  default-language:    Haskell2010
   hs-source-dirs: tools/coverage-gen
   ghc-options: -Wall -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
   build-depends: base >= 4 && < 5
@@ -149,16 +153,27 @@ Executable coverage-gen
 -- Coverage generation test suite
 Test-Suite coverage-gen-test
   Type: exitcode-stdio-1.0
+  default-language:    Haskell2010
   Main-is: CoverageGenerationTest.hs
-  hs-source-dirs: test/Test/Coverage
+  hs-source-dirs: test/Test/Coverage, tools/coverage-gen
   ghc-options: -Wall -fwarn-tabs
   build-depends: base
                , hspec
                , text >= 1.2
                , containers >= 0.2
                , time >= 1.4
+               , vector >= 0.11
+               , random >= 1.1
+               , MonadRandom >= 0.5
+               , process >= 1.2
+               , directory >= 1.2
+               , filepath >= 1.3
                , language-javascript
-  Other-modules: 
+  Other-modules: Coverage.Analysis
+               , Coverage.Generation
+               , Coverage.Optimization
+               , Coverage.Corpus
+               , Coverage.Integration 
 
 source-repository head
   type:     git

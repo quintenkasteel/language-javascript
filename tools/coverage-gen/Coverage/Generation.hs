@@ -35,8 +35,10 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
+import Control.Monad (foldM)
 import Control.Monad.Random (Rand, RandomGen)
 import qualified Control.Monad.Random as Random
+import Data.List (sortBy)
 import System.Random (StdGen)
 
 import Coverage.Analysis
@@ -301,7 +303,7 @@ generateMLTests generator mlConfig gaps = do
 generateHybridTests :: MLGenerator -> HybridConfig -> [CoverageGap] -> IO [TestCase]
 generateHybridTests generator hybridConfig gaps = do
   results <- mapM generateStrategyTests strategiesWithWeights
-  let weightedResults = concatMap (uncurry weightTests) results
+  let weightedResults = concatMap weightTests results
   pure (take maxTests weightedResults)
   where
     strategies = _hybridStrategies hybridConfig
@@ -364,7 +366,7 @@ reproducePopulation config parents = do
 -- | Crossover two test cases.
 crossoverTests :: GeneticConfig -> (TestCase, TestCase) -> IO TestCase
 crossoverTests _config (parent1, parent2) = do
-  crossoverPoint <- Random.randomRIO (0, 1.0)
+  crossoverPoint <- Random.randomRIO (0.0 :: Double, 1.0 :: Double)
   let input1 = _testInput parent1
   let input2 = _testInput parent2
   let crossedInput = if crossoverPoint < 0.5 then input1 else input2
@@ -388,7 +390,7 @@ mutateInput input = do
   pure (Text.pack mutatedChars)
   where
     mutateChar c = do
-      shouldMutate <- Random.randomRIO (0.0, 1.0)
+      shouldMutate <- Random.randomRIO (0.0 :: Double, 1.0 :: Double)
       if shouldMutate < 0.1
         then Random.uniform ['a'..'z']
         else pure c
@@ -455,12 +457,11 @@ calculateFitness :: TestCase -> IO Double
 calculateFitness testCase = do
   let input = _testInput testCase
   let targets = _testTargetGaps testCase
+  let complexityScore = min 0.3 (fromIntegral (Text.length input) / 100.0)
+  let targetScore = min 0.4 (fromIntegral (length targets) / 10.0)
+  let diversityScore = 0.3  -- Simplified for now
   
   pure (complexityScore + targetScore + diversityScore)
-  where
-    complexityScore = min 0.3 (fromIntegral (Text.length input) / 100.0)
-    targetScore = min 0.4 (fromIntegral (length targets) / 10.0)
-    diversityScore = 0.3  -- Simplified for now
 
 -- | Optimize generation strategy based on results.
 --

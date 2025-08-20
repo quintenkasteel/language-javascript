@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | Comprehensive real-world compatibility testing module for JavaScript Parser
@@ -50,7 +51,7 @@ module Test.Language.Javascript.CompatibilityTest
 
 import Test.Hspec
 import Test.QuickCheck
-import Control.Exception (try, SomeException)
+import Control.Exception (try, SomeException, evaluate)
 import Control.Monad (forM, forM_, when)
 import Data.List (isPrefixOf, sortOn)
 import Data.Time (getCurrentTime, diffUTCTime)
@@ -445,17 +446,17 @@ testVersionConsistency (pkg1, pkg2) = do
 testFrameworkSyntax :: FilePath -> IO CompatibilityResult
 testFrameworkSyntax filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "framework-test" of
+  case parse (Text.unpack content) "framework-test" of
     Right _ -> return $ CompatibilityResult 100.0 [] 0 0
     Left err -> return $ CompatibilityResult 0.0 [err] 0 0
 
 -- | Test framework round-trip compatibility
 testFrameworkRoundTrip :: Text.Text -> IO Bool
 testFrameworkRoundTrip code = do
-  case parseProgram (Text.unpack code) "roundtrip-test" of
+  case parse (Text.unpack code) "roundtrip-test" of
     Right ast -> do
       let rendered = renderToString ast
-      case parseProgram rendered "roundtrip-reparse" of
+      case parse rendered "roundtrip-reparse" of
         Right ast2 -> return $ astStructurallyEqual ast ast2
         Left _ -> return False
     Left _ -> return False
@@ -464,7 +465,7 @@ testFrameworkRoundTrip code = do
 testCommonJSCompatibility :: FilePath -> IO Bool
 testCommonJSCompatibility filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "commonjs-test" of
+  case parse (Text.unpack content) "commonjs-test" of
     Right ast -> return $ hasCommonJSPatterns ast
     Left _ -> return False
 
@@ -480,7 +481,7 @@ testES6ModuleCompatibility filePath = do
 testAMDCompatibility :: FilePath -> IO Bool
 testAMDCompatibility filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "amd-test" of
+  case parse (Text.unpack content) "amd-test" of
     Right ast -> return $ hasAMDPatterns ast
     Left _ -> return False
 
@@ -488,7 +489,7 @@ testAMDCompatibility filePath = do
 compareToBabelParser :: FilePath -> IO Double
 compareToBabelParser filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "babel-comparison" of
+  case parse (Text.unpack content) "babel-comparison" of
     Right ourAST -> do
       -- In real implementation, would call Babel parser via external process
       -- For now, return high equivalence for valid parses
@@ -499,7 +500,7 @@ compareToBabelParser filePath = do
 testBabelSemanticEquivalence :: FilePath -> IO Bool
 testBabelSemanticEquivalence filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "babel-semantic" of
+  case parse (Text.unpack content) "babel-semantic" of
     Right _ -> return True  -- Simplified - would compare with Babel in reality
     Left _ -> return False
 
@@ -507,7 +508,7 @@ testBabelSemanticEquivalence filePath = do
 testTSEmitCompatibility :: FilePath -> IO Double
 testTSEmitCompatibility filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "ts-emit" of
+  case parse (Text.unpack content) "ts-emit" of
     Right ast -> do
       let hasTypeScriptPatterns = checkTypeScriptEmitPatterns ast
       return $ if hasTypeScriptPatterns then 95.0 else 85.0
@@ -517,7 +518,7 @@ testTSEmitCompatibility filePath = do
 testStructuralEquivalence :: FilePath -> IO Bool
 testStructuralEquivalence filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "structural-test" of
+  case parse (Text.unpack content) "structural-test" of
     Right _ -> return True  -- Simplified implementation
     Left _ -> return False
 
@@ -525,7 +526,7 @@ testStructuralEquivalence filePath = do
 testCrossParserSemantics :: FilePath -> IO Bool
 testCrossParserSemantics filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "semantic-test" of
+  case parse (Text.unpack content) "semantic-test" of
     Right _ -> return True  -- Simplified implementation
     Left _ -> return False
 
@@ -533,7 +534,7 @@ testCrossParserSemantics filePath = do
 testExecutionSemantics :: FilePath -> IO Bool
 testExecutionSemantics filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "execution-test" of
+  case parse (Text.unpack content) "execution-test" of
     Right ast -> return $ preservesExecutionOrder ast
     Left _ -> return False
 
@@ -541,7 +542,7 @@ testExecutionSemantics filePath = do
 testScopePreservation :: FilePath -> IO Bool
 testScopePreservation filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "scope-test" of
+  case parse (Text.unpack content) "scope-test" of
     Right ast -> return $ preservesScopeStructure ast
     Left _ -> return False
 
@@ -550,7 +551,7 @@ benchmarkAgainstV8 :: FilePath -> IO PerformanceResult
 benchmarkAgainstV8 filePath = do
   content <- Text.readFile filePath
   startTime <- getCurrentTime
-  result <- try $ parseProgram (Text.unpack content) "v8-benchmark"
+  result <- try $ evaluate $ parse (Text.unpack content) "v8-benchmark"
   endTime <- getCurrentTime
   let parseTime = realToFrac (diffUTCTime endTime startTime) * 1000
       -- V8 baseline would be measured separately
@@ -568,7 +569,7 @@ testPerformanceScaling filePath = do
   times <- forM sizes $ \size -> do
     let truncated = Text.take size content
     startTime <- getCurrentTime
-    _ <- try $ parseProgram (Text.unpack truncated) "scaling-test"
+    _ <- try @SomeException $ evaluate $ parse (Text.unpack truncated) "scaling-test"
     endTime <- getCurrentTime
     return $ realToFrac (diffUTCTime endTime startTime)
   
@@ -581,7 +582,7 @@ benchmarkThroughput :: FilePath -> IO Double
 benchmarkThroughput filePath = do
   content <- Text.readFile filePath
   startTime <- getCurrentTime
-  result <- try $ parseProgram (Text.unpack content) "throughput-test"
+  result <- try $ evaluate $ parse (Text.unpack content) "throughput-test"
   endTime <- getCurrentTime
   let parseTime = realToFrac (diffUTCTime endTime startTime)
       charCount = fromIntegral $ Text.length content
@@ -595,7 +596,7 @@ benchmarkMemoryUsage :: FilePath -> IO Double
 benchmarkMemoryUsage filePath = do
   content <- Text.readFile filePath
   -- In real implementation, would measure actual memory usage
-  case parseProgram (Text.unpack content) "memory-test" of
+  case parse (Text.unpack content) "memory-test" of
     Right _ -> return 1.5  -- Estimated 1.5x memory ratio
     Left _ -> return 0
 
@@ -607,7 +608,7 @@ measureParsingThroughput = benchmarkThroughput
 testErrorReporting :: FilePath -> IO Bool
 testErrorReporting filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "error-test" of
+  case parse (Text.unpack content) "error-test" of
     Left err -> return $ isWellFormedError err
     Right _ -> return True  -- No error is also fine
 
@@ -615,7 +616,7 @@ testErrorReporting filePath = do
 testErrorMessageQualityImpl :: FilePath -> IO Double
 testErrorMessageQualityImpl filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "quality-test" of
+  case parse (Text.unpack content) "quality-test" of
     Left err -> return $ assessErrorQuality err
     Right _ -> return 100.0  -- No error case
 
@@ -624,7 +625,7 @@ testErrorRecovery :: FilePath -> IO Bool
 testErrorRecovery filePath = do
   content <- Text.readFile filePath
   -- Would test actual error recovery in real implementation
-  case parseProgram (Text.unpack content) "recovery-test" of
+  case parse (Text.unpack content) "recovery-test" of
     Left _ -> return True  -- Simplified - assumes recovery attempted
     Right _ -> return True
 
@@ -632,7 +633,7 @@ testErrorRecovery filePath = do
 testSyntaxErrorConsistencyImpl :: FilePath -> IO Double
 testSyntaxErrorConsistencyImpl filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "syntax-error-test" of
+  case parse (Text.unpack content) "syntax-error-test" of
     Left _ -> return 90.0  -- Assume 90% consistency with reference
     Right _ -> return 100.0
 
@@ -640,7 +641,7 @@ testSyntaxErrorConsistencyImpl filePath = do
 testErrorMessageActionability :: FilePath -> IO Bool
 testErrorMessageActionability filePath = do
   content <- Text.readFile filePath
-  case parseProgram (Text.unpack content) "actionable-test" of
+  case parse (Text.unpack content) "actionable-test" of
     Left err -> return $ hasActionableAdvice err
     Right _ -> return True
 
@@ -788,7 +789,7 @@ testJavaScriptFile filePath = do
     then return False
     else do
       content <- Text.readFile filePath
-      case parseProgram (Text.unpack content) filePath of
+      case parse (Text.unpack content) filePath of
         Right _ -> return True
         Left _ -> return False
 
