@@ -21,6 +21,11 @@ testLiteralParser = describe "Parse literals:" $ do
     it "hex numbers" $ do
         testLiteral "0x1234fF"  `shouldBe` "Right (JSAstLiteral (JSHexInteger '0x1234fF'))"
         testLiteral "0X1234fF"  `shouldBe` "Right (JSAstLiteral (JSHexInteger '0X1234fF'))"
+    it "binary numbers (ES2015)" $ do
+        testLiteral "0b1010"    `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0b1010'))"
+        testLiteral "0B1111"    `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0B1111'))"
+        testLiteral "0b0"       `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0b0'))"
+        testLiteral "0B101010"  `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0B101010'))"
     it "decimal numbers" $ do
         testLiteral "1.0e4"     `shouldBe` "Right (JSAstLiteral (JSDecimal '1.0e4'))"
         testLiteral "2.3E6"     `shouldBe` "Right (JSAstLiteral (JSDecimal '2.3E6'))"
@@ -41,12 +46,18 @@ testLiteralParser = describe "Parse literals:" $ do
     it "octal numbers" $ do
         testLiteral "070"       `shouldBe` "Right (JSAstLiteral (JSOctal '070'))"
         testLiteral "010234567" `shouldBe` "Right (JSAstLiteral (JSOctal '010234567'))"
+        -- Modern octal syntax (ES2015)
+        testLiteral "0o777"     `shouldBe` "Right (JSAstLiteral (JSOctal '0o777'))"
+        testLiteral "0O123"     `shouldBe` "Right (JSAstLiteral (JSOctal '0O123'))"
+        testLiteral "0o0"       `shouldBe` "Right (JSAstLiteral (JSOctal '0o0'))"
     it "bigint numbers" $ do
         testLiteral "123n"      `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '123n'))"
         testLiteral "0n"        `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0n'))"
         testLiteral "9007199254740991n" `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '9007199254740991n'))"
         testLiteral "0x1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0x1234n'))"
         testLiteral "0X1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0X1234n'))"
+        testLiteral "0b1010n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0b1010n'))"
+        testLiteral "0B1111n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0B1111n'))"
         testLiteral "0o777n"    `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0o777n'))"
 
     it "numeric separators (ES2021) - current parser behavior" $ do

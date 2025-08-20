@@ -143,6 +143,7 @@ import qualified Language.JavaScript.Parser.AST as AST
      'private'    { PrivateNameToken {} }
      'decimal'    { DecimalToken {} }
      'hexinteger' { HexIntegerToken {} }
+     'binaryinteger' { BinaryIntegerToken {} }
      'octal'      { OctalToken {} }
      'bigint'     { BigIntToken {} }
      'string'     { StringToken {} }
@@ -515,6 +516,7 @@ BooleanLiteral : 'true'  { AST.JSLiteral (mkJSAnnot $1) "true" }
 NumericLiteral :: { AST.JSExpression }
 NumericLiteral : 'decimal'    { AST.JSDecimal (mkJSAnnot $1) (tokenLiteral $1) }
                | 'hexinteger' { AST.JSHexInteger (mkJSAnnot $1) (tokenLiteral $1) }
+               | 'binaryinteger' { AST.JSBinaryInteger (mkJSAnnot $1) (tokenLiteral $1) }
                | 'octal'      { AST.JSOctal (mkJSAnnot $1) (tokenLiteral $1) }
                | 'bigint'     { AST.JSBigIntLiteral (mkJSAnnot $1) (tokenLiteral $1) }
 
@@ -1697,6 +1699,7 @@ propName :: AST.JSExpression ->  AST.JSPropertyName
 propName (AST.JSIdentifier a s) = AST.JSPropertyIdent a s
 propName (AST.JSDecimal a s) = AST.JSPropertyNumber a s
 propName (AST.JSHexInteger a s) = AST.JSPropertyNumber a s
+propName (AST.JSBinaryInteger a s) = AST.JSPropertyNumber a s
 propName (AST.JSOctal a s) = AST.JSPropertyNumber a s
 propName (AST.JSStringLiteral a s) = AST.JSPropertyString a s
 propName x = error $ "Cannot convert '" ++ show x ++ "' to a JSPropertyName."

@@ -818,6 +818,9 @@ validateExpression ctx expr = case expr of
   JSHexInteger _annot literal ->
     validateHexLiteral literal
 
+  JSBinaryInteger _annot literal ->
+    validateBinaryLiteral literal
+
   JSOctal _annot literal ->
     validateOctalLiteral ctx literal
 
@@ -1214,6 +1217,16 @@ validateNumericLiteral literal
 validateHexLiteral :: String -> [ValidationError]
 validateHexLiteral literal
   | "0x" `Text.isPrefixOf` Text.pack literal || "0X" `Text.isPrefixOf` Text.pack literal = []
+  | otherwise = [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
+
+-- | Validate binary literals (ES2015).
+validateBinaryLiteral :: String -> [ValidationError]
+validateBinaryLiteral literal
+  | "0b" `Text.isPrefixOf` Text.pack literal || "0B" `Text.isPrefixOf` Text.pack literal = 
+      let digits = Text.drop 2 (Text.pack literal)
+      in if Text.all (\c -> c == '0' || c == '1') digits
+         then []
+         else [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
   | otherwise = [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
 
 -- | Validate octal literals in strict mode.
@@ -1957,6 +1970,7 @@ extractExpressionPos expr = case expr of
   JSDecimal annot _ -> extractAnnotationPos annot
   JSLiteral annot _ -> extractAnnotationPos annot
   JSHexInteger annot _ -> extractAnnotationPos annot
+  JSBinaryInteger annot _ -> extractAnnotationPos annot
   JSOctal annot _ -> extractAnnotationPos annot
   JSStringLiteral annot _ -> extractAnnotationPos annot
   JSRegEx annot _ -> extractAnnotationPos annot

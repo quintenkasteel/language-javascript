@@ -20,6 +20,7 @@ module Language.JavaScript.Parser.LexerUtils
     , regExToken
     , decimalToken
     , hexIntegerToken
+    , binaryIntegerToken
     , octalToken
     , bigIntToken
     , stringToken
@@ -47,6 +48,9 @@ decimalToken loc str = DecimalToken loc str []
 
 hexIntegerToken :: TokenPosn -> String -> Token
 hexIntegerToken loc str = HexIntegerToken loc str []
+
+binaryIntegerToken :: TokenPosn -> String -> Token
+binaryIntegerToken loc str = BinaryIntegerToken loc str []
 
 octalToken :: TokenPosn -> String -> Token
 octalToken loc str = OctalToken loc str []

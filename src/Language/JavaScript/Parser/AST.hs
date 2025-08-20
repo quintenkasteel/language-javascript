@@ -1,5 +1,38 @@
 {-# LANGUAGE DeriveDataTypeable, DeriveGeneric, DeriveAnyClass, FlexibleInstances #-}
 
+-- | JavaScript Abstract Syntax Tree definitions and utilities.
+--
+-- This module defines the complete AST representation for JavaScript programs,
+-- supporting ECMAScript 5 features with ES6+ extensions including:
+--
+--   * All expression types (literals, binary ops, function calls, etc.)
+--   * Statement constructs (control flow, declarations, blocks)  
+--   * Module import/export declarations
+--   * Class definitions and method declarations
+--   * Template literals and destructuring patterns
+--   * Async/await and generator function support
+--   * Modern JavaScript features (BigInt, optional chaining, nullish coalescing)
+--
+-- The AST preserves source location information and comments through
+-- 'JSAnnot' annotations on every node, enabling accurate pretty-printing
+-- and source mapping.
+--
+-- ==== Examples
+--
+-- Parsing and working with expressions:
+--
+-- >>> parseExpression "42 + 1"
+-- Right (JSExpressionBinary (JSDecimal ...) (JSBinOpPlus ...) (JSDecimal ...))
+--
+-- >>> showStripped <$> parseExpression "x.foo()"
+-- Right "JSCallExpression (JSMemberDot (JSIdentifier 'x',JSIdentifier 'foo'),JSArguments [])"
+--
+-- Working with statements:
+--
+-- >>> parseStatement "if (x) return 42;"
+-- Right (JSIf ...)
+--
+-- @since 0.7.1.0
 module Language.JavaScript.Parser.AST
     ( JSExpression (..)
     , JSAnnot (..)
@@ -49,7 +82,7 @@ module Language.JavaScript.Parser.AST
 
 import Control.DeepSeq (NFData)
 import Data.Data
-import Data.List
+import qualified Data.List as List
 import GHC.Generics (Generic)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Parser.Token
@@ -185,6 +218,7 @@ data JSExpression
     | JSDecimal !JSAnnot !String
     | JSLiteral !JSAnnot !String
     | JSHexInteger !JSAnnot !String
+    | JSBinaryInteger !JSAnnot !String
     | JSOctal !JSAnnot !String
     | JSBigIntLiteral !JSAnnot !String
     | JSStringLiteral !JSAnnot !String
@@ -394,6 +428,18 @@ data JSClassElement
 -- | Show the AST elements stripped of their JSAnnot data.
 
 -- Strip out the location info
+-- | Convert AST to string representation stripped of position information.
+--
+-- Removes all 'JSAnnot' location data while preserving the logical structure
+-- of the JavaScript AST. Useful for testing and debugging when position 
+-- information is not relevant.
+--
+-- ==== Examples
+--
+-- >>> showStripped (JSAstProgram [JSEmptyStatement JSNoAnnot] JSNoAnnot)
+-- "JSAstProgram [JSEmptyStatement]"
+--
+-- @since 0.7.1.0
 showStripped :: JSAST -> String
 showStripped (JSAstProgram xs _) = "JSAstProgram " ++ ss xs
 showStripped (JSAstModule xs _) = "JSAstModule " ++ ss xs
@@ -465,6 +511,7 @@ instance ShowStripped JSExpression where
     ss (JSGeneratorExpression _ _ n _lb pl _rb x3) = "JSGeneratorExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
     ss (JSAsyncFunctionExpression _ _ n _lb pl _rb x3) = "JSAsyncFunctionExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
     ss (JSHexInteger _ s) = "JSHexInteger " ++ singleQuote s
+    ss (JSBinaryInteger _ s) = "JSBinaryInteger " ++ singleQuote s
     ss (JSOctal _ s) = "JSOctal " ++ singleQuote s
     ss (JSBigIntLiteral _ s) = "JSBigIntLiteral " ++ singleQuote s
     ss (JSIdentifier _ s) = "JSIdentifier " ++ singleQuote s
@@ -685,26 +732,80 @@ instance ShowStripped a => ShowStripped [a] where
 -- -----------------------------------------------------------------------------
 -- Helpers.
 
+-- | Join strings with commas, filtering out empty strings.
+--
+-- Utility function for generating comma-separated lists in pretty printing,
+-- automatically removing empty strings to avoid extra commas.
+--
+-- ==== Examples
+--
+-- >>> commaJoin ["foo", "", "bar"]
+-- "foo,bar"
+--
+-- >>> commaJoin ["single"]
+-- "single"
+--
+-- @since 0.7.1.0
 commaJoin :: [String] -> String
-commaJoin s = intercalate "," $ filter (not . null) s
+commaJoin s = List.intercalate "," $ List.filter (not . null) s
 
+-- | Convert comma-separated list AST to regular Haskell list.
+--
+-- Extracts the elements from a 'JSCommaList' structure, which represents
+-- comma-separated sequences in JavaScript syntax (function parameters,
+-- array elements, etc.).
+--
+-- ==== Examples
+--
+-- >>> fromCommaList (JSLOne element)
+-- [element]
+--
+-- >>> fromCommaList (JSLCons (JSLOne a) comma b)
+-- [a, b]
+--
+-- @since 0.7.1.0
 fromCommaList :: JSCommaList a -> [a]
 fromCommaList (JSLCons l _ i) = fromCommaList l ++ [i]
 fromCommaList (JSLOne i)      = [i]
 fromCommaList JSLNil = []
 
+-- | Wrap string in single quotes.
+--
+-- Utility function for pretty printing JavaScript string literals
+-- and identifiers that need to be quoted.
+--
+-- @since 0.7.1.0
 singleQuote :: String -> String
 singleQuote s = '\'' : (s ++ "'")
 
+-- | Extract string from JavaScript identifier with quotes.
+--
+-- Converts 'JSIdent' to its quoted string representation for pretty printing.
+-- Returns empty quotes for 'JSIdentNone'.
+--
+-- @since 0.7.1.0
 ssid :: JSIdent -> String
 ssid (JSIdentName _ s) = singleQuote s
 ssid JSIdentNone = "''"
 
+-- | Add comma prefix to non-empty strings.
+--
+-- Utility for conditional comma insertion in pretty printing.
+-- Returns empty string for empty input, comma-prefixed string otherwise.
+--
+-- @since 0.7.1.0
 commaIf :: String -> String
 commaIf "" = ""
 commaIf xs = ',' : xs
 
 
+-- | Remove annotation from binary operator.
+--
+-- Strips position information from 'JSBinOp' by replacing all annotations
+-- with 'JSNoAnnot'. Used in testing and comparison operations where
+-- position information should be ignored.
+--
+-- @since 0.7.1.0
 deAnnot :: JSBinOp -> JSBinOp
 deAnnot (JSBinOpAnd _) = JSBinOpAnd JSNoAnnot
 deAnnot (JSBinOpBitAnd _) = JSBinOpBitAnd JSNoAnnot
@@ -733,5 +834,19 @@ deAnnot (JSBinOpStrictNeq _) = JSBinOpStrictNeq JSNoAnnot
 deAnnot (JSBinOpTimes _) = JSBinOpTimes JSNoAnnot
 deAnnot (JSBinOpUrsh _) = JSBinOpUrsh JSNoAnnot
 
+-- | Compare binary operators ignoring annotations.
+--
+-- Tests equality of two 'JSBinOp' values while ignoring position information.
+-- Useful for testing and AST comparison where location data is irrelevant.
+--
+-- ==== Examples
+--
+-- >>> binOpEq (JSBinOpPlus pos1) (JSBinOpPlus pos2)  
+-- True  -- Same operator, different positions
+--
+-- >>> binOpEq (JSBinOpPlus pos1) (JSBinOpMinus pos2)
+-- False -- Different operators
+--
+-- @since 0.7.1.0
 binOpEq :: JSBinOp -> JSBinOp -> Bool
 binOpEq a b = deAnnot a == deAnnot b

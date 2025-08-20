@@ -11,6 +11,7 @@ import Test.Language.Javascript.ASTConstructorTest
 import Test.Language.Javascript.ErrorRecoveryTest
 import Test.Language.Javascript.ErrorQualityTest
 import Test.Language.Javascript.ErrorRecoveryBench
+import Test.Language.Javascript.ES6ValidationSimpleTest
 import Test.Language.Javascript.ExpressionParser
 import Test.Language.Javascript.ExportStar
 import Test.Language.Javascript.Generic
@@ -26,6 +27,11 @@ import Test.Language.Javascript.StatementParser
 import Test.Language.Javascript.StringLiteralComplexity
 import Test.Language.Javascript.UnicodeTest
 import Test.Language.Javascript.Validator
+import Test.Language.Javascript.PropertyTest
+import qualified Test.Language.Javascript.StrictModeValidationTest as StrictModeValidationTest
+import qualified Test.Language.Javascript.ModuleValidationTest as ModuleValidationTest
+import qualified Test.Language.Javascript.ControlFlowValidationTest as ControlFlowValidationTest
+import qualified Test.Language.Javascript.PerformanceTest as PerformanceTest
 
 
 main :: IO ()
@@ -57,8 +63,14 @@ testAll = do
     testMinifyModule
     testGenericNFData
     testValidator
+    testES6ValidationSimple
     testASTConstructors
     testSrcLocation
     testErrorRecovery
     testErrorQuality
     benchmarkErrorRecovery
+    testPropertyInvariants
+    StrictModeValidationTest.tests
+    ModuleValidationTest.tests
+    ControlFlowValidationTest.testControlFlowValidation
+    PerformanceTest.performanceTests

@@ -14,7 +14,7 @@ module Language.JavaScript.Parser.Parser (
    , showStrippedMaybe
    ) where
 
-import qualified Language.JavaScript.Parser.Grammar7 as P
+import qualified Language.JavaScript.Parser.Grammar7 as Grammar
 import Language.JavaScript.Parser.Lexer
 import qualified Language.JavaScript.Parser.AST as AST
 import System.IO
@@ -28,7 +28,7 @@ parse :: String -- ^ The input stream (Javascript source code).
       -> Either String AST.JSAST
          -- ^ An error or maybe the abstract syntax tree (AST) of zero
          -- or more Javascript statements, plus comments.
-parse = parseUsing P.parseProgram
+parse = parseUsing Grammar.parseProgram
 
 -- | Parse JavaScript module
 parseModule :: String -- ^ The input stream (JavaScript source code).
@@ -36,7 +36,7 @@ parseModule :: String -- ^ The input stream (JavaScript source code).
             -> Either String AST.JSAST
             -- ^ An error or maybe the abstract syntax tree (AST) of zero
             -- or more JavaScript statements, plus comments.
-parseModule = parseUsing P.parseModule
+parseModule = parseUsing Grammar.parseModule
 
 readJsWith :: (String -> String -> Either String AST.JSAST)
            -> String

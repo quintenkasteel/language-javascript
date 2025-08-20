@@ -68,6 +68,7 @@ instance RenderJS JSExpression where
     (|>) pacc (JSDecimal        annot i) = pacc |> annot |> i
     (|>) pacc (JSLiteral        annot l) = pacc |> annot |> l
     (|>) pacc (JSHexInteger     annot i) = pacc |> annot |> i
+    (|>) pacc (JSBinaryInteger  annot i) = pacc |> annot |> i
     (|>) pacc (JSOctal          annot i) = pacc |> annot |> i
     (|>) pacc (JSStringLiteral  annot s) = pacc |> annot |> s
     (|>) pacc (JSRegEx          annot s) = pacc |> annot |> s

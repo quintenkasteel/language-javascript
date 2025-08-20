@@ -150,6 +150,7 @@ instance MinifyJS JSExpression where
     fix a (JSDecimal        _ s) = JSDecimal a s
     fix a (JSLiteral        _ s) = JSLiteral a s
     fix a (JSHexInteger     _ s) = JSHexInteger a s
+    fix a (JSBinaryInteger  _ s) = JSBinaryInteger a s
     fix a (JSOctal          _ s) = JSOctal a s
     fix _ (JSStringLiteral  _ s) = JSStringLiteral emptyAnnot s
     fix _ (JSRegEx          _ s) = JSRegEx emptyAnnot s

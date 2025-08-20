@@ -41,6 +41,7 @@ $dq = \"  -- double quote
 $digit = 0-9     	   	-- digits
 $oct_digit = [0-7]
 $hex_digit = [0-9a-fA-F]
+$bin_digit = [01]
 $alpha = [a-zA-Z]       -- alphabetic characters
 $non_zero_digit = 1-9
 $ident_letter = [a-zA-Z_]
@@ -249,7 +250,13 @@ tokens :-
 -- HexIntegerLiteral = '0x' {Hex Digit}+
 <reg,divide> ("0x"|"0X") $hex_digit+ { adapt (mkString hexIntegerToken) }
 
--- OctalLiteral = '0' {Octal Digit}+
+-- BinaryIntegerLiteral = '0b' {Binary Digit}+ (ES2015)
+<reg,divide> ("0b"|"0B") $bin_digit+ { adapt (mkString binaryIntegerToken) }
+
+-- Modern OctalLiteral = '0o' {Octal Digit}+ (ES2015)
+<reg,divide> ("0o"|"0O") $oct_digit+ { adapt (mkString octalToken) }
+
+-- Legacy OctalLiteral = '0' {Octal Digit}+
 <reg,divide> ("0") $oct_digit+ { adapt (mkString octalToken) }
 
 -- RegExp         = '/' ({RegExp Chars} | '\' {Non Terminator})+ '/' ( 'g' | 'i' | 'm' )*
@@ -297,6 +304,7 @@ tokens :-
 
 -- BigInt literals: numeric patterns followed by 'n'
 <reg,divide> ("0x"|"0X") $hex_digit+ "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0b"|"0B") $bin_digit+ "n" { adapt (mkString bigIntToken) }
 <reg,divide> ("0o"|"0O") $oct_digit+ "n" { adapt (mkString bigIntToken) }
 <reg,divide> ("0") $oct_digit+ "n" { adapt (mkString bigIntToken) }
 <reg,divide> "0"              "." $digit* ("e"|"E") ("+"|"-")? $digit+ "n"

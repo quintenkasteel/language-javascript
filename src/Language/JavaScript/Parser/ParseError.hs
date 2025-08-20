@@ -8,12 +8,19 @@
 -- Stability   : experimental
 -- Portability : ghc
 --
--- Error values for the lexer and parser.
+-- Enhanced error values for the lexer and parser with rich context information
+-- and recovery suggestions for improved error reporting and recovery capabilities.
 -----------------------------------------------------------------------------
 
 module Language.JavaScript.Parser.ParseError
     ( Error (..)
     , ParseError (..)
+    , ParseContext (..)
+    , ErrorSeverity (..)
+    , RecoveryStrategy (..)
+    , renderParseError
+    , getErrorPosition
+    , isRecoverableError
     ) where
 
 --import Language.JavaScript.Parser.Pretty
@@ -22,17 +29,74 @@ import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Language.JavaScript.Parser.Lexer
 import Language.JavaScript.Parser.SrcLocation (TokenPosn)
--- import Language.JavaScript.Parser.Token (Token)
+import qualified Data.Text as Text
 
+-- | Parse context information for enhanced error reporting
+data ParseContext
+  = TopLevelContext      -- ^ At the top level of a program/module
+  | FunctionContext      -- ^ Inside a function declaration or expression
+  | ClassContext         -- ^ Inside a class declaration
+  | ExpressionContext    -- ^ Inside an expression
+  | StatementContext     -- ^ Inside a statement
+  | ObjectLiteralContext -- ^ Inside an object literal
+  | ArrayLiteralContext  -- ^ Inside an array literal
+  | ParameterContext     -- ^ Inside function parameters
+  | ImportContext        -- ^ Inside import declaration
+  | ExportContext        -- ^ Inside export declaration
+  deriving (Eq, Generic, NFData, Show)
+
+-- | Error severity levels for prioritizing error reporting
+data ErrorSeverity
+  = CriticalError  -- ^ Parse cannot continue
+  | MajorError     -- ^ Significant syntax error but recovery possible
+  | MinorError     -- ^ Style or compatibility issue
+  | Warning        -- ^ Potential issue but valid syntax
+  deriving (Eq, Generic, NFData, Show, Ord)
+
+-- | Recovery strategies for panic mode error recovery
+data RecoveryStrategy
+  = SyncToSemicolon    -- ^ Skip to next semicolon
+  | SyncToCloseBrace   -- ^ Skip to next closing brace
+  | SyncToKeyword      -- ^ Skip to next statement keyword
+  | SyncToEOF          -- ^ Skip to end of file
+  | NoRecovery         -- ^ Cannot recover from this error
+  deriving (Eq, Generic, NFData, Show)
+
+-- | Enhanced parse error types with rich context and recovery information
 data ParseError
-   = UnexpectedToken Token
-     -- ^ An error from the parser. Token found where it should not be.
-     --   Note: tokens contain their own source span.
-   | UnexpectedChar Char TokenPosn
-     -- ^ An error from the lexer. Character found where it should not be.
+   = UnexpectedToken 
+     { errorToken :: !Token
+     , errorContext :: !ParseContext
+     , expectedTokens :: ![String]
+     , errorSeverity :: !ErrorSeverity
+     , recoveryStrategy :: !RecoveryStrategy
+     }
+     -- ^ Parser found unexpected token with context and suggestions
+   | UnexpectedChar 
+     { errorChar :: !Char
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , errorSeverity :: !ErrorSeverity
+     }
+     -- ^ Lexer found unexpected character
+   | SyntaxError
+     { errorMessage :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , errorSeverity :: !ErrorSeverity
+     , suggestions :: ![String]
+     }
+     -- ^ General syntax error with suggestions
+   | SemanticError
+     { errorMessage :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , errorDetails :: !String
+     }
+     -- ^ Semantic validation error (e.g., invalid break/continue)
    | StrError String
-     -- ^ A generic error containing a string message. No source location.
-   deriving (Eq, Generic, NFData, {- Ord,-} Show)
+     -- ^ Legacy generic string error for backwards compatibility
+   deriving (Eq, Generic, NFData, Show)
 
 class Error a where
     -- | Creates an exception without a message.
@@ -45,4 +109,76 @@ class Error a where
 instance Error ParseError where
    noMsg = StrError ""
    strMsg = StrError
+
+-- | Render a parse error to a human-readable string with context
+renderParseError :: ParseError -> String
+renderParseError err = case err of
+  UnexpectedToken token ctx expected severity _ ->
+    let pos = show (tokenSpan token)
+        tokenStr = show token
+        contextStr = renderContext ctx
+        expectedStr = if null expected 
+                      then ""
+                      else "\n  Expected: " ++ unwords expected
+        severityStr = "[" ++ show severity ++ "]"
+    in severityStr ++ " Unexpected token " ++ tokenStr ++ " at " ++ pos ++ 
+       "\n  Context: " ++ contextStr ++ expectedStr
+       
+  UnexpectedChar char pos ctx severity ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        severityStr = "[" ++ show severity ++ "]"
+    in severityStr ++ " Unexpected character '" ++ [char] ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr
+       
+  SyntaxError msg pos ctx severity suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        severityStr = "[" ++ show severity ++ "]"
+        suggestStr = if null suggestions
+                     then ""
+                     else "\n  Suggestions: " ++ unlines (map ("    - " ++) suggestions)
+    in severityStr ++ " Syntax error at " ++ posStr ++ ": " ++ msg ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  SemanticError msg pos ctx details ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+    in "[Semantic Error] " ++ msg ++ " at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++
+       "\n  Details: " ++ details
+       
+  StrError msg -> "Parse error: " ++ msg
+
+-- | Render parse context to human-readable string
+renderContext :: ParseContext -> String
+renderContext ctx = case ctx of
+  TopLevelContext -> "top level"
+  FunctionContext -> "function body"
+  ClassContext -> "class definition"
+  ExpressionContext -> "expression"
+  StatementContext -> "statement"
+  ObjectLiteralContext -> "object literal"
+  ArrayLiteralContext -> "array literal"
+  ParameterContext -> "parameter list"
+  ImportContext -> "import declaration"
+  ExportContext -> "export declaration"
+
+-- | Get the source position from any parse error
+getErrorPosition :: ParseError -> Maybe TokenPosn
+getErrorPosition err = case err of
+  UnexpectedToken token _ _ _ _ -> Just (tokenSpan token)
+  UnexpectedChar _ pos _ _ -> Just pos
+  SyntaxError _ pos _ _ _ -> Just pos
+  SemanticError _ pos _ _ -> Just pos
+  StrError _ -> Nothing
+
+-- | Check if an error is recoverable using panic mode
+isRecoverableError :: ParseError -> Bool
+isRecoverableError err = case err of
+  UnexpectedToken _ _ _ _ strategy -> strategy /= NoRecovery
+  UnexpectedChar _ _ _ severity -> severity /= CriticalError
+  SyntaxError _ _ _ severity _ -> severity /= CriticalError
+  SemanticError _ _ _ _ -> True  -- Semantic errors don't prevent parsing
+  StrError _ -> False  -- Legacy errors are not recoverable
 

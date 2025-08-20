@@ -51,6 +51,8 @@ data Token
     -- ^ Literal: Decimal
     | HexIntegerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Hexadecimal Integer
+    | BinaryIntegerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
+    -- ^ Literal: Binary Integer (ES2015)
     | OctalToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Octal Integer
     | StringToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }

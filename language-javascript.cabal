@@ -73,6 +73,11 @@ Test-Suite testsuite
   build-depends: base, Cabal >= 1.9.2
                  , QuickCheck >= 2
                  , hspec
+                 , criterion        >= 1.1
+                 , weigh            >= 0.0.10
+                 , temporary        >= 1.2
+                 , filepath         >= 1.3
+                 , directory        >= 1.2
                  , array            >= 0.3
                  , containers       >= 0.2
                  , mtl              >= 1.1
@@ -90,6 +95,7 @@ Test-Suite testsuite
                     Test.Language.Javascript.ErrorRecoveryTest
                     Test.Language.Javascript.ErrorQualityTest
                     Test.Language.Javascript.ErrorRecoveryBench
+                    Test.Language.Javascript.ES6ValidationSimpleTest
                     Test.Language.Javascript.ExpressionParser
                     Test.Language.Javascript.ExportStar
                     Test.Language.Javascript.Generic
@@ -98,6 +104,7 @@ Test-Suite testsuite
                     Test.Language.Javascript.Minify
                     Test.Language.Javascript.ModuleParser
                     Test.Language.Javascript.NumericLiteralEdgeCases
+                    Test.Language.Javascript.PerformanceTest
                     Test.Language.Javascript.ProgramParser
                     Test.Language.Javascript.RoundTrip
                     Test.Language.Javascript.SrcLocationTest
@@ -105,6 +112,10 @@ Test-Suite testsuite
                     Test.Language.Javascript.StringLiteralComplexity
                     Test.Language.Javascript.UnicodeTest
                     Test.Language.Javascript.Validator
+                    Test.Language.Javascript.PropertyTest
+                    Test.Language.Javascript.StrictModeValidationTest
+                    Test.Language.Javascript.ModuleValidationTest
+                    Test.Language.Javascript.ControlFlowValidationTest
 
 source-repository head
   type:     git
