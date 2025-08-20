@@ -35,6 +35,8 @@ import qualified Test.Language.Javascript.StrictModeValidationTest as StrictMode
 import qualified Test.Language.Javascript.ModuleValidationTest as ModuleValidationTest
 import qualified Test.Language.Javascript.ControlFlowValidationTest as ControlFlowValidationTest
 import qualified Test.Language.Javascript.PerformanceTest as PerformanceTest
+import qualified Test.Language.Javascript.MemoryTest as MemoryTest
+-- import qualified Test.Language.Javascript.PerformanceAdvancedTest as PerformanceAdvancedTest
 
 
 main :: IO ()
@@ -79,4 +81,6 @@ testAll = do
     ModuleValidationTest.tests
     ControlFlowValidationTest.testControlFlowValidation
     PerformanceTest.performanceTests
+    MemoryTest.memoryTests
+    -- PerformanceAdvancedTest.advancedPerformanceTests
     goldenTests

@@ -108,6 +108,7 @@ Test-Suite testsuite
                     Test.Language.Javascript.ModuleParser
                     Test.Language.Javascript.NumericLiteralEdgeCases
                     Test.Language.Javascript.PerformanceTest
+                    Test.Language.Javascript.PerformanceAdvancedTest
                     Test.Language.Javascript.ProgramParser
                     Test.Language.Javascript.RoundTrip
                     Test.Language.Javascript.SrcLocationTest
@@ -119,6 +120,7 @@ Test-Suite testsuite
                     Test.Language.Javascript.StrictModeValidationTest
                     Test.Language.Javascript.ModuleValidationTest
                     Test.Language.Javascript.ControlFlowValidationTest
+                    Test.Language.Javascript.MemoryTest
                     Test.Language.Javascript.Generators
                     Test.Language.Javascript.GeneratorsTest
 
