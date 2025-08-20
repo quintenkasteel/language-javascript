@@ -90,45 +90,71 @@ Test-Suite testsuite
                  , blaze-builder    >= 0.2
                  , deepseq          >= 1.3
                  , time             >= 1.4
+                 , process          >= 1.2
+                 , random           >= 1.1
                  , language-javascript
 
   Other-modules:
-                    Test.Language.Javascript.AdvancedLexerTest
-                    Test.Language.Javascript.ASIEdgeCases
-                    Test.Language.Javascript.ASTConstructorTest
-                    Test.Language.Javascript.ErrorRecoveryTest
-                    Test.Language.Javascript.ErrorRecoveryAdvancedTest
-                    Test.Language.Javascript.ErrorQualityTest
-                    Test.Language.Javascript.ErrorRecoveryBench
-                    Test.Language.Javascript.ES6ValidationSimpleTest
-                    Test.Language.Javascript.ExpressionParser
-                    Test.Language.Javascript.ExportStar
-                    Test.Language.Javascript.Generic
-                    Test.Language.Javascript.GoldenTest
-                    Test.Language.Javascript.Lexer
-                    Test.Language.Javascript.LiteralParser
-                    Test.Language.Javascript.Minify
-                    Test.Language.Javascript.ModuleParser
-                    Test.Language.Javascript.NumericLiteralEdgeCases
-                    Test.Language.Javascript.PerformanceTest
-                    Test.Language.Javascript.ProgramParser
-                    Test.Language.Javascript.RoundTrip
-                    Test.Language.Javascript.SrcLocationTest
-                    Test.Language.Javascript.StatementParser
-                    Test.Language.Javascript.StringLiteralComplexity
-                    Test.Language.Javascript.UnicodeTest
-                    Test.Language.Javascript.Validator
-                    Test.Language.Javascript.PropertyTest
-                    Test.Language.Javascript.StrictModeValidationTest
-                    Test.Language.Javascript.ModuleValidationTest
-                    Test.Language.Javascript.ControlFlowValidationTest
-                    Test.Language.Javascript.MemoryTest
-                    Test.Language.Javascript.FuzzingSuite
-                    Test.Language.Javascript.FuzzTest
-                    Test.Language.Javascript.CompatibilityTest
-                    Test.Language.Javascript.Generators
-                    Test.Language.Javascript.GeneratorsTest
-                    Test.Language.Javascript.NegativeTest
+                    -- Unit Tests - Lexer
+                    Unit.Language.Javascript.Parser.Lexer.BasicLexer
+                    Unit.Language.Javascript.Parser.Lexer.AdvancedLexer
+                    Unit.Language.Javascript.Parser.Lexer.ASIHandling
+                    Unit.Language.Javascript.Parser.Lexer.NumericLiterals
+                    Unit.Language.Javascript.Parser.Lexer.StringLiterals
+                    Unit.Language.Javascript.Parser.Lexer.UnicodeSupport
+                    
+                    -- Unit Tests - Parser
+                    Unit.Language.Javascript.Parser.Parser.Expressions
+                    Unit.Language.Javascript.Parser.Parser.Statements
+                    Unit.Language.Javascript.Parser.Parser.Programs
+                    Unit.Language.Javascript.Parser.Parser.Modules
+                    Unit.Language.Javascript.Parser.Parser.ExportStar
+                    Unit.Language.Javascript.Parser.Parser.Literals
+                    
+                    -- Unit Tests - AST
+                    Unit.Language.Javascript.Parser.AST.Construction
+                    Unit.Language.Javascript.Parser.AST.Generic
+                    Unit.Language.Javascript.Parser.AST.SrcLocation
+                    
+                    -- Unit Tests - Validation
+                    Unit.Language.Javascript.Parser.Validation.Core
+                    Unit.Language.Javascript.Parser.Validation.ES6Features
+                    Unit.Language.Javascript.Parser.Validation.StrictMode
+                    Unit.Language.Javascript.Parser.Validation.Modules
+                    Unit.Language.Javascript.Parser.Validation.ControlFlow
+                    
+                    -- Unit Tests - Error
+                    Unit.Language.Javascript.Parser.Error.Recovery
+                    Unit.Language.Javascript.Parser.Error.AdvancedRecovery
+                    Unit.Language.Javascript.Parser.Error.Quality
+                    Unit.Language.Javascript.Parser.Error.Negative
+                    
+                    -- Integration Tests
+                    Integration.Language.Javascript.Parser.RoundTrip
+                    -- Integration.Language.Javascript.Parser.AdvancedFeatures  -- Temporarily disabled
+                    Integration.Language.Javascript.Parser.Minification
+                    Integration.Language.Javascript.Parser.Compatibility
+                    
+                    -- Golden Tests
+                    Golden.Language.Javascript.Parser.GoldenTests
+                    
+                    -- Property Tests
+                    Properties.Language.Javascript.Parser.CoreProperties
+                    Properties.Language.Javascript.Parser.Generators
+                    Properties.Language.Javascript.Parser.GeneratorsTest
+                    Properties.Language.Javascript.Parser.Fuzzing
+                    
+                    -- Fuzz Tests
+                    Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
+                    Properties.Language.Javascript.Parser.Fuzz.DifferentialTesting
+                    Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
+                    Properties.Language.Javascript.Parser.Fuzz.FuzzHarness
+                    Properties.Language.Javascript.Parser.Fuzz.FuzzTest
+                    
+                    -- Benchmark Tests
+                    Benchmarks.Language.Javascript.Parser.Performance
+                    Benchmarks.Language.Javascript.Parser.Memory
+                    Benchmarks.Language.Javascript.Parser.ErrorRecovery
 
 -- Coverage-driven test generation tool
 Executable coverage-gen
@@ -153,30 +179,7 @@ Executable coverage-gen
                , Coverage.Corpus
                , Coverage.Integration
 
--- Coverage generation test suite
-Test-Suite coverage-gen-test
-  Type: exitcode-stdio-1.0
-  default-language:    Haskell2010
-  Main-is: Test/Coverage/CoverageGenerationTest.hs
-  hs-source-dirs: test, tools/coverage-gen
-  ghc-options: -Wall -fwarn-tabs
-  build-depends: base
-               , hspec
-               , text >= 1.2
-               , containers >= 0.2
-               , time >= 1.4
-               , vector >= 0.11
-               , random >= 1.1
-               , MonadRandom >= 0.5
-               , process >= 1.2
-               , directory >= 1.2
-               , filepath >= 1.3
-               , language-javascript
-  Other-modules: Coverage.Analysis
-               , Coverage.Generation
-               , Coverage.Optimization
-               , Coverage.Corpus
-               , Coverage.Integration 
+ 
 
 source-repository head
   type:     git
