@@ -1226,7 +1226,9 @@ genBlock = do
 -- | Check if AST is valid
 isValidAST :: AST.JSAST -> Bool
 isValidAST (AST.JSAstProgram stmts _) = all isValidStatement stmts
-isValidAST _ = False
+isValidAST (AST.JSAstStatement stmt _) = isValidStatement stmt
+isValidAST (AST.JSAstExpression expr _) = isValidExpression expr
+isValidAST (AST.JSAstLiteral _) = True
 
 -- | Check if expression is valid
 isValidExpression :: AST.JSExpression -> Bool
@@ -1347,7 +1349,14 @@ structurallyEquivalent ast1 ast2 = case (ast1, ast2) of
 
 -- | Replace first expression in AST
 replaceFirstExpression :: AST.JSAST -> AST.JSExpression -> AST.JSAST
-replaceFirstExpression ast _ = ast  -- Simplified for now
+replaceFirstExpression ast newExpr = case ast of
+  AST.JSAstProgram stmts annot -> 
+    AST.JSAstProgram (replaceFirstExprInStatements stmts newExpr) annot
+  AST.JSAstStatement stmt annot -> 
+    AST.JSAstStatement (replaceFirstExprInStatement stmt newExpr) annot
+  AST.JSAstExpression _ annot -> 
+    AST.JSAstExpression newExpr annot
+  _ -> ast
 
 -- | Insert statement into AST
 insertStatement :: AST.JSAST -> AST.JSStatement -> AST.JSAST
@@ -1356,7 +1365,12 @@ insertStatement (AST.JSAstProgram stmts annot) newStmt =
 
 -- | Delete node from AST
 deleteNode :: AST.JSAST -> Int -> AST.JSAST
-deleteNode ast _ = ast  -- Simplified for now
+deleteNode ast index = case ast of
+  AST.JSAstProgram stmts annot -> 
+    if index >= 0 && index < length stmts
+    then AST.JSAstProgram (deleteAtIndex index stmts) annot
+    else ast
+  _ -> ast  -- Cannot delete from non-program AST
 
 -- | Parse and reparse AST (safe version)
 parseAndReparse :: AST.JSAST -> AST.JSAST
@@ -1771,3 +1785,20 @@ statementAnnotationsMatch stmt1 stmt2 = case (stmt1, stmt2) of
     annotationTypesMatch AST.JSNoAnnot AST.JSNoAnnot = True
     annotationTypesMatch (AST.JSAnnot {}) (AST.JSAnnot {}) = True
     annotationTypesMatch _ _ = False
+
+-- Helper functions for AST manipulation
+replaceFirstExprInStatements :: [AST.JSStatement] -> AST.JSExpression -> [AST.JSStatement]
+replaceFirstExprInStatements [] _ = []
+replaceFirstExprInStatements (stmt:stmts) newExpr = 
+  case replaceFirstExprInStatement stmt newExpr of
+    stmt' -> stmt' : stmts
+
+replaceFirstExprInStatement :: AST.JSStatement -> AST.JSExpression -> AST.JSStatement
+replaceFirstExprInStatement stmt newExpr = case stmt of
+  AST.JSExpressionStatement expr semi -> AST.JSExpressionStatement newExpr semi
+  _ -> stmt  -- For other statements, return unchanged
+
+deleteAtIndex :: Int -> [a] -> [a]
+deleteAtIndex _ [] = []
+deleteAtIndex 0 (_:xs) = xs
+deleteAtIndex n (x:xs) = x : deleteAtIndex (n-1) xs
