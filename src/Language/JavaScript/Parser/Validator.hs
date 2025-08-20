@@ -51,6 +51,7 @@ import qualified Data.Text as Text
 import Data.List (group, isSuffixOf, nub, sort)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Char (isDigit)
+import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
 
 import Language.JavaScript.Parser.AST
@@ -588,7 +589,7 @@ validateAST ctx ast = case ast of
   JSAstProgram stmts _annot ->
     let strictMode = detectStrictMode stmts
         ctx' = ctx { contextStrictMode = strictMode }
-    in concatMap (validateStatement ctx') stmts ++
+    in validateStatementsWithLabels ctx' stmts ++
        validateProgramLevel stmts
 
   JSAstModule items _annot ->
@@ -611,6 +612,33 @@ detectStrictMode stmts =
   case stmts of
     (JSExpressionStatement (JSStringLiteral _annot "use strict") _):_ -> StrictModeOn
     _ -> StrictModeOff
+
+-- | Validate statements sequentially with accumulated label context.
+validateStatementsWithLabels :: ValidationContext -> [JSStatement] -> [ValidationError]
+validateStatementsWithLabels ctx stmts = 
+  validateDuplicateLabelsInStatements stmts ++
+  concatMap (validateStatement ctx) stmts
+
+-- | Validate that no duplicate labels exist in the same statement list.
+validateDuplicateLabelsInStatements :: [JSStatement] -> [ValidationError]
+validateDuplicateLabelsInStatements stmts =
+  let labels = concatMap extractLabelFromStatement stmts
+      duplicates = findDuplicateLabels labels
+  in map (\(labelText, pos) -> DuplicateLabel labelText pos) duplicates
+  where
+    extractLabelFromStatement stmt = case stmt of
+      JSLabelled label _colon _stmt -> case label of
+        JSIdentName _annot labelName -> 
+          [(Text.pack labelName, extractIdentPos label)]
+        JSIdentNone -> []
+      _ -> []
+    
+    findDuplicateLabels :: [(Text, TokenPosn)] -> [(Text, TokenPosn)]
+    findDuplicateLabels labelList =
+      let labelCounts = Map.fromListWith (++) [(name, [pos]) | (name, pos) <- labelList]
+          duplicateEntries = Map.filter ((>1) . length) labelCounts
+      in [(name, head positions) | (name, positions) <- Map.toList duplicateEntries]
+
 
 -- | Validate program-level constraints.
 validateProgramLevel :: [JSStatement] -> [ValidationError]
@@ -1073,15 +1101,16 @@ validateConstDeclarations _ctx exprs = concatMap checkConstInit exprs
 validateLetDeclarations :: ValidationContext -> [JSExpression] -> [ValidationError] 
 validateLetDeclarations ctx exprs = validateBindingNames ctx (extractBindingNames exprs)
 
--- | Validate function parameters for duplicates.
+-- | Validate function parameters for duplicates and strict mode violations.
 validateFunctionParameters :: ValidationContext -> [JSExpression] -> [ValidationError]
 validateFunctionParameters ctx params = 
   let paramNames = extractParameterNames params
       duplicates = findDuplicates paramNames
       duplicateErrors = map (\name -> DuplicateParameter name (TokenPn 0 0 0)) duplicates
+      strictModeErrors = concatMap (validateIdentifier ctx . Text.unpack) paramNames
       defaultValueErrors = concatMap (validateParameterDefault ctx) params
       restParamErrors = validateRestParameters params
-  in duplicateErrors ++ defaultValueErrors ++ restParamErrors
+  in duplicateErrors ++ strictModeErrors ++ defaultValueErrors ++ restParamErrors
 
 -- | Validate rest parameters constraints.
 validateRestParameters :: [JSExpression] -> [ValidationError]
@@ -1152,6 +1181,8 @@ extractParameterNames :: [JSExpression] -> [Text]
 extractParameterNames = concatMap extractParamName
   where
     extractParamName (JSIdentifier _annot name) = [Text.pack name]
+    extractParamName (JSSpreadExpression _spread (JSIdentifier _annot name)) = [Text.pack name]
+    extractParamName (JSVarInitExpression (JSIdentifier _annot name) _init) = [Text.pack name]
     extractParamName _ = [] -- Handle destructuring patterns, defaults, etc.
 
 -- | Extract binding names from variable declarations.
@@ -1532,7 +1563,8 @@ validateVarInitializer ctx init = case init of
 
 validateArrowParameters :: ValidationContext -> JSArrowParameterList -> [ValidationError]
 validateArrowParameters ctx params = case params of
-  JSUnparenthesizedArrowParameter (JSIdentName _annot _name) -> []
+  JSUnparenthesizedArrowParameter (JSIdentName _annot name) -> 
+    validateIdentifier ctx name
   JSUnparenthesizedArrowParameter JSIdentNone -> []
   JSParenthesizedArrowParameterList _lparen exprs _rparen ->
     concatMap (validateExpression ctx) (fromCommaList exprs)
