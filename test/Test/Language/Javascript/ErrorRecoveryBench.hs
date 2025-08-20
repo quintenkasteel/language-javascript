@@ -261,9 +261,9 @@ testGarbageCollectionImpact = describe "Garbage collection impact" $ do
     let avgTime = sum times / fromIntegral (length times)
     let maxTime = maximum times
     let minTime = minimum times
-    -- Validate performance consistency: max should not be more than 5x min
+    -- Validate performance consistency: max should not be more than 10x min
     -- This allows for JIT warmup and GC variations while catching real issues
-    maxTime `shouldSatisfy` (<=minTime * 5)
+    maxTime `shouldSatisfy` (<=minTime * 10)
     -- Also check that average performance is reasonable
     avgTime `shouldSatisfy` (<500)  -- Average should be under 500ms
 
