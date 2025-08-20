@@ -1669,6 +1669,7 @@ mkJSMemberNew a e (JSArguments l arglist r) = AST.JSMemberNew a e l arglist r
 mkJSOptionalCallExpression :: AST.JSExpression -> AST.JSAnnot -> JSArguments -> AST.JSExpression
 mkJSOptionalCallExpression e annot (JSArguments l arglist r) = AST.JSOptionalCallExpression e annot arglist r
 
+
 parseError :: Token -> Alex a
 parseError = alexError . show
 
