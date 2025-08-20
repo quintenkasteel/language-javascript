@@ -40,8 +40,9 @@ testGenerators = describe "QuickCheck Generators" $ do
     it "generates valid JSAST instances" $ property $
       \ast -> isValidJSAST (ast :: JSAST)
     
-    it "generates valid identifier strings" $ property $ \(ident :: String) ->
-      not (null ident) ==> all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$")) ident
+    it "generates valid identifier strings" $ property $ do
+      ident <- genValidIdentifier
+      return $ not (null ident) && all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$")) ident
 
   describe "Complex structure generators" $ do
     it "generates JSObjectProperty instances" $ property $
