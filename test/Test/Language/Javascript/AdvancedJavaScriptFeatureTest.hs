@@ -552,13 +552,19 @@ frameworkCompatibilityTests = describe "Framework-Specific Syntax Compatibility"
   
   describe "Angular patterns" $ do
     it "validates Angular component metadata pattern" $ do
-      -- Temporarily disabled due to AST construction syntax issues
-      pending
+      -- Simple Angular component test that should pass validation
+      let angularCode = "angular.module('app').component('myComponent', { template: '<div>Hello</div>', controller: function() { this.message = 'test'; } });"
+      case parse (Text.unpack angularCode) "angular-component" of
+        Right ast -> validateProgram standardContext ast `shouldSatisfy` null
+        Left _ -> expectationFailure "Failed to parse Angular component"
   
   describe "Vue.js patterns" $ do
     it "validates Vue component options object" $ do
-      -- Temporarily disabled due to AST construction syntax issues
-      pending
+      -- Simple Vue component test that should pass validation
+      let vueCode = "new Vue({ el: '#app', data: { message: 'Hello' }, methods: { greet: function() { console.log(this.message); } } });"
+      case parse (Text.unpack vueCode) "vue-component" of
+        Right ast -> validateProgram standardContext ast `shouldSatisfy` null
+        Left _ -> expectationFailure "Failed to parse Vue component"
       {-
       let vueComponent = JSObjectLiteral noAnnot
             (JSCTLNone (JSLCons
