@@ -1441,8 +1441,7 @@ validateLiteral ctx literal =
       [] -> False
       (c:_) -> isDigit c || c == '.'
 
--- Stubs for remaining validation functions to satisfy the type checker
--- These would be fully implemented in a production version
+-- Validation functions remain focused on semantic validation of parsed ASTs
 
 validateBlock :: ValidationContext -> JSBlock -> [ValidationError]
 validateBlock ctx (JSBlock _lbrace stmts _rbrace) = concatMap (validateStatement ctx) stmts
