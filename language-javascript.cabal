@@ -90,7 +90,8 @@ Test-Suite testsuite
                  , time             >= 1.4
                  , language-javascript
 
-  Other-modules:    Test.Language.Javascript.AdvancedLexerTest
+  Other-modules:    Test.Language.Javascript.AdvancedJavaScriptFeatureTest
+                    Test.Language.Javascript.AdvancedLexerTest
                     Test.Language.Javascript.ASIEdgeCases
                     Test.Language.Javascript.ASTConstructorTest
                     Test.Language.Javascript.ErrorRecoveryTest
@@ -108,7 +109,6 @@ Test-Suite testsuite
                     Test.Language.Javascript.ModuleParser
                     Test.Language.Javascript.NumericLiteralEdgeCases
                     Test.Language.Javascript.PerformanceTest
-                    Test.Language.Javascript.PerformanceAdvancedTest
                     Test.Language.Javascript.ProgramParser
                     Test.Language.Javascript.RoundTrip
                     Test.Language.Javascript.SrcLocationTest
@@ -121,8 +121,44 @@ Test-Suite testsuite
                     Test.Language.Javascript.ModuleValidationTest
                     Test.Language.Javascript.ControlFlowValidationTest
                     Test.Language.Javascript.MemoryTest
-                    Test.Language.Javascript.Generators
-                    Test.Language.Javascript.GeneratorsTest
+                    Test.Language.Javascript.FuzzingSuite
+                    Test.Language.Javascript.CompatibilityTest
+
+-- Coverage-driven test generation tool
+Executable coverage-gen
+  Main-is: Main.hs
+  hs-source-dirs: tools/coverage-gen
+  ghc-options: -Wall -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
+  build-depends: base >= 4 && < 5
+               , text >= 1.2
+               , containers >= 0.2
+               , vector >= 0.11
+               , random >= 1.1
+               , MonadRandom >= 0.5
+               , process >= 1.2
+               , directory >= 1.2
+               , filepath >= 1.3
+               , time >= 1.4
+               , language-javascript
+  Other-modules: Coverage.Analysis
+               , Coverage.Generation
+               , Coverage.Optimization
+               , Coverage.Corpus
+               , Coverage.Integration
+
+-- Coverage generation test suite
+Test-Suite coverage-gen-test
+  Type: exitcode-stdio-1.0
+  Main-is: CoverageGenerationTest.hs
+  hs-source-dirs: test/Test/Coverage
+  ghc-options: -Wall -fwarn-tabs
+  build-depends: base
+               , hspec
+               , text >= 1.2
+               , containers >= 0.2
+               , time >= 1.4
+               , language-javascript
+  Other-modules: 
 
 source-repository head
   type:     git

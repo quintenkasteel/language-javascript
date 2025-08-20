@@ -12,6 +12,15 @@ GHCFLAGS = -Wall -fwarn-tabs
 check : testsuite.exe
 	./testsuite.exe
 
+# Fuzzing targets
+fuzz-basic :
+	FUZZ_TEST_ENV=ci cabal test testsuite
+
+fuzz-comprehensive :
+	FUZZ_TEST_ENV=development cabal test testsuite
+
+fuzz-regression :
+	FUZZ_TEST_ENV=regression cabal test testsuite
 
 clean :
 	find dist/build/ src/ -name \*.{o -o -name \*.hi | xargs rm -f

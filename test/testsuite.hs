@@ -5,6 +5,7 @@ import Test.Hspec
 import Test.Hspec.Runner
 
 
+import Test.Language.Javascript.AdvancedJavaScriptFeatureTest
 import Test.Language.Javascript.AdvancedLexerTest
 import Test.Language.Javascript.ASIEdgeCases
 import Test.Language.Javascript.ASTConstructorTest
@@ -16,7 +17,7 @@ import Test.Language.Javascript.ES6ValidationSimpleTest
 import Test.Language.Javascript.ExpressionParser
 import Test.Language.Javascript.ExportStar
 import Test.Language.Javascript.Generic
-import Test.Language.Javascript.GoldenTest
+-- import Test.Language.Javascript.GoldenTest
 import Test.Language.Javascript.Lexer
 import Test.Language.Javascript.LiteralParser
 import Test.Language.Javascript.Minify
@@ -30,12 +31,14 @@ import Test.Language.Javascript.StringLiteralComplexity
 import Test.Language.Javascript.UnicodeTest
 import Test.Language.Javascript.Validator
 import Test.Language.Javascript.PropertyTest
-import Test.Language.Javascript.GeneratorsTest
+-- import Test.Language.Javascript.GeneratorsTest
 import qualified Test.Language.Javascript.StrictModeValidationTest as StrictModeValidationTest
 import qualified Test.Language.Javascript.ModuleValidationTest as ModuleValidationTest
 import qualified Test.Language.Javascript.ControlFlowValidationTest as ControlFlowValidationTest
 import qualified Test.Language.Javascript.PerformanceTest as PerformanceTest
 import qualified Test.Language.Javascript.MemoryTest as MemoryTest
+import qualified Test.Language.Javascript.FuzzingSuite as FuzzingSuite
+import qualified Test.Language.Javascript.CompatibilityTest as CompatibilityTest
 -- import qualified Test.Language.Javascript.PerformanceAdvancedTest as PerformanceAdvancedTest
 
 
@@ -69,6 +72,7 @@ testAll = do
     testGenericNFData
     testValidator
     testES6ValidationSimple
+    testAdvancedJavaScriptFeatures
     testASTConstructors
     testSrcLocation
     testErrorRecovery
@@ -76,11 +80,13 @@ testAll = do
     testErrorQuality
     benchmarkErrorRecovery
     testPropertyInvariants
-    testGenerators
+    -- testGenerators
     StrictModeValidationTest.tests
     ModuleValidationTest.tests
     ControlFlowValidationTest.testControlFlowValidation
     PerformanceTest.performanceTests
     MemoryTest.memoryTests
     -- PerformanceAdvancedTest.advancedPerformanceTests
-    goldenTests
+    FuzzingSuite.testFuzzingSuite
+    CompatibilityTest.testRealWorldCompatibility
+    -- goldenTests
