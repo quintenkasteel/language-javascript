@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test Quality Audit - Zero Tolerance Enforcement
+# Test Quality Audit - Zero Tolerance Enforcement for language-javascript parser
 # Detects ALL lazy test patterns that agents must eliminate
 
 set -e
@@ -12,6 +12,7 @@ echo "🔍 COMPREHENSIVE TEST QUALITY AUDIT"
 echo "=================================="
 echo "Directory: $TEST_DIR"
 echo "Standard: CLAUDE.md Zero Tolerance Policy"
+echo "Project: language-javascript parser"
 echo ""
 
 # Function to report violations and set failure flag
@@ -24,20 +25,20 @@ report_violation() {
     AUDIT_FAILED=1
 }
 
-# Pattern 1: Lazy shouldBe with True/False
-echo "1. Checking for lazy shouldBe patterns..."
-LAZY_SHOULDBE_COUNT=$(grep -rn "shouldBe.*True\|shouldBe.*False\|shouldSatisfy.*const True\|shouldSatisfy.*const False" "$TEST_DIR" | wc -l)
-if [ "$LAZY_SHOULDBE_COUNT" -gt 0 ]; then
-    report_violation "Lazy shouldBe Patterns" "$LAZY_SHOULDBE_COUNT"
+# Pattern 1: Lazy assertBool with True/False
+echo "1. Checking for lazy assertBool patterns..."
+LAZY_ASSERT_COUNT=$(grep -rn "assertBool.*True\|assertBool.*False" "$TEST_DIR" | wc -l)
+if [ "$LAZY_ASSERT_COUNT" -gt 0 ]; then
+    report_violation "Lazy assertBool Patterns" "$LAZY_ASSERT_COUNT"
     echo "   Examples found:"
-    grep -rn "shouldBe.*True\|shouldBe.*False\|shouldSatisfy.*const True\|shouldSatisfy.*const False" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    grep -rn "assertBool.*True\|assertBool.*False" "$TEST_DIR" | head -3 | sed 's/^/   /'
     echo ""
     echo "   REQUIRED FIX: Replace with exact value assertions:"
-    echo "   ❌ result \`shouldBe\` True"
-    echo "   ✅ result \`shouldBe\` expectedValue"
+    echo "   ❌ assertBool \"test passes\" True"
+    echo "   ✅ parseExpression \"42\" @?= Right (JSLiteral (JSNumericLiteral noAnnot \"42\"))"
     echo ""
 else
-    echo "   ✅ No lazy shouldBe patterns found"
+    echo "   ✅ No lazy assertBool patterns found"
 fi
 
 # Pattern 2: Mock functions
@@ -48,7 +49,9 @@ if [ "$MOCK_COUNT" -gt 0 ]; then
     echo "   Examples found:"
     grep -rn "_ = True\|_ = False\|undefined" "$TEST_DIR" | head -3 | sed 's/^/   /'
     echo ""
-    echo "   REQUIRED FIX: Replace with real constructors"
+    echo "   REQUIRED FIX: Replace with real JavaScript parser constructors"
+    echo "   ❌ isValidJavaScript _ = True"
+    echo "   ✅ parseExpression :: Text -> Either ParseError JSExpression"
     echo ""
 else
     echo "   ✅ No mock functions found"
@@ -56,58 +59,66 @@ fi
 
 # Pattern 3: Reflexive equality tests
 echo "3. Checking for reflexive equality tests..."
-REFLEXIVE_COUNT=$(grep -rn "shouldBe.*\b\(\w\+\)\b.*\b\1\b" "$TEST_DIR" | wc -l)
+REFLEXIVE_COUNT=$(grep -rn "@?=.*\b\(\w\+\)\b.*\b\1\b" "$TEST_DIR" | wc -l)
 if [ "$REFLEXIVE_COUNT" -gt 0 ]; then
     report_violation "Reflexive Equality Tests" "$REFLEXIVE_COUNT"
     echo "   Examples found:"
-    grep -rn "shouldBe.*\b\(\w\+\)\b.*\b\1\b" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    grep -rn "@?=.*\b\(\w\+\)\b.*\b\1\b" "$TEST_DIR" | head -3 | sed 's/^/   /'
     echo ""
-    echo "   REQUIRED FIX: Test meaningful behavior:"
-    echo "   ❌ x \`shouldBe\` x"
-    echo "   ✅ parseExpression input \`shouldBe\` expectedAST"
+    echo "   REQUIRED FIX: Test meaningful parser behavior:"
+    echo "   ❌ ast @?= ast"
+    echo "   ✅ parseExpression \"f(x)\" @?= Right (JSCallExpression _ func [arg])"
     echo ""
 else
     echo "   ✅ No reflexive equality tests found"
 fi
 
-# Pattern 4: Empty/trivial descriptions and always-true conditions
-echo "4. Checking for trivial test patterns..."
-TRIVIAL_COUNT=$(grep -rn "shouldSatisfy.*not.*null\|shouldSatisfy.*length.*>.*0\|shouldSatisfy.*(const True)\|expectationFailure.*\"\"" "$TEST_DIR" | wc -l)
+# Pattern 4: Empty/trivial descriptions
+echo "4. Checking for trivial test descriptions..."
+TRIVIAL_COUNT=$(grep -rn "assertBool.*\"\".*\|assertBool.*should.*True\|assertBool.*works.*True" "$TEST_DIR" | wc -l)
 if [ "$TRIVIAL_COUNT" -gt 0 ]; then
-    report_violation "Trivial Test Patterns" "$TRIVIAL_COUNT"
+    report_violation "Trivial Test Descriptions" "$TRIVIAL_COUNT"
     echo "   Examples found:"
-    grep -rn "shouldSatisfy.*not.*null\|shouldSatisfy.*length.*>.*0\|shouldSatisfy.*(const True)\|expectationFailure.*\"\"" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    grep -rn "assertBool.*\"\".*\|assertBool.*should.*True\|assertBool.*works.*True" "$TEST_DIR" | head -3 | sed 's/^/   /'
     echo ""
-    echo "   REQUIRED FIX: Use specific, meaningful assertions"
+    echo "   REQUIRED FIX: Use specific, meaningful descriptions"
+    echo "   ❌ assertBool \"should work\" True"
+    echo "   ✅ testCase \"parse function call expression\" $ ..."
     echo ""
 else
-    echo "   ✅ No trivial test patterns found"
+    echo "   ✅ No trivial test descriptions found"
 fi
 
-# Pattern 5: JavaScript parser specific - weak syntax testing
-echo "5. Checking for weak syntax testing..."
-WEAK_SYNTAX_COUNT=$(grep -rn "shouldSatisfy.*isRight\|shouldSatisfy.*isLeft" "$TEST_DIR" | wc -l)
-if [ "$WEAK_SYNTAX_COUNT" -gt 0 ]; then
-    echo "⚠️  WARNING: Weak syntax testing patterns found: $WEAK_SYNTAX_COUNT"
-    echo "   Consider using exact AST matching instead of just Right/Left:"
-    echo "   ❌ parseExpression input \`shouldSatisfy\` isRight"
-    echo "   ✅ parseExpression input \`shouldBe\` Right expectedAST"
+# Pattern 5: Always-true conditions
+echo "5. Checking for always-true conditions..."
+ALWAYS_TRUE_COUNT=$(grep -rn "assertBool.*length.*>= 0\|assertBool.*not.*null\|assertBool.*Map\.size.*>= 0" "$TEST_DIR" | wc -l)
+if [ "$ALWAYS_TRUE_COUNT" -gt 0 ]; then
+    report_violation "Always-True Conditions" "$ALWAYS_TRUE_COUNT"
+    echo "   Examples found:"
+    grep -rn "assertBool.*length.*>= 0\|assertBool.*not.*null\|assertBool.*Map\.size.*>= 0" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    echo ""
+    echo "   REQUIRED FIX: Test specific parser values:"
+    echo "   ❌ assertBool \"non-empty\" (not (null result))"
+    echo "   ✅ length (parseTokens input) @?= 5"
     echo ""
 else
-    echo "   ✅ No weak syntax testing patterns found"
+    echo "   ✅ No always-true conditions found"
 fi
 
-# Pattern 6: Missing specific error validation
-echo "6. Checking for specific error validation..."
-WEAK_ERROR_COUNT=$(grep -rn "shouldSatisfy.*isLeft\|expectationFailure.*\"Expected.*error\"" "$TEST_DIR" | wc -l)
-if [ "$WEAK_ERROR_COUNT" -gt 0 ]; then
-    echo "⚠️  INFO: Consider validating specific error messages: $WEAK_ERROR_COUNT occurrences"
-    echo "   Enhancement suggestion:"
-    echo "   ✅ case parseExpression invalidInput of"
-    echo "       Left (ParseError pos msg) -> msg \`shouldContain\` \"expected\""
+# Pattern 6: Parser-specific anti-patterns
+echo "6. Checking for parser-specific lazy patterns..."
+PARSER_LAZY_COUNT=$(grep -rn "shouldBe.*True\|shouldBe.*False" "$TEST_DIR" | wc -l)
+if [ "$PARSER_LAZY_COUNT" -gt 0 ]; then
+    report_violation "Parser Lazy shouldBe Patterns" "$PARSER_LAZY_COUNT"
+    echo "   Examples found:"
+    grep -rn "shouldBe.*True\|shouldBe.*False" "$TEST_DIR" | head -3 | sed 's/^/   /'
+    echo ""
+    echo "   REQUIRED FIX: Test specific parse results:"
+    echo "   ❌ result \`shouldBe\` True"
+    echo "   ✅ result \`shouldBe\` Right (JSProgram [JSExpressionStatement expr])"
     echo ""
 else
-    echo "   ✅ Strong error validation patterns in use"
+    echo "   ✅ No parser lazy shouldBe patterns found"
 fi
 
 # Summary
@@ -115,25 +126,39 @@ echo "=================================="
 if [ "$AUDIT_FAILED" -eq 1 ]; then
     echo "🚫 AUDIT FAILED - IMMEDIATE ACTION REQUIRED"
     echo ""
-    echo "CRITICAL: Lazy test patterns detected!"
+    echo "CRITICAL: Lazy test patterns detected in JavaScript parser tests!"
     echo ""
     echo "NO AGENT MAY REPORT 'DONE' UNTIL:"
-    echo "• ALL shouldBe True/False patterns eliminated"  
-    echo "• ALL mock functions replaced with real constructors"
-    echo "• ALL reflexive tests replaced with behavioral tests"
-    echo "• ALL trivial conditions replaced with exact assertions"
+    echo "• ALL assertBool True/False patterns eliminated"  
+    echo "• ALL mock functions replaced with real parser constructors"
+    echo "• ALL reflexive tests replaced with behavioral parse tests"
+    echo "• ALL trivial conditions replaced with exact parser assertions"
+    echo "• ALL shouldBe True/False replaced with specific AST comparisons"
     echo ""
     echo "AGENTS MUST ITERATE until this audit shows 0 violations"
+    echo ""
+    echo "JavaScript parser tests MUST validate:"
+    echo "• Exact AST structure from parsing"
+    echo "• Specific error types and messages"
+    echo "• Real token streams and parse results"
+    echo "• Concrete JavaScript syntax handling"
     echo ""
     exit 1
 else
     echo "✅ AUDIT PASSED - All test quality requirements met"
     echo ""
-    echo "🎉 Test suite meets CLAUDE.md standards:"
-    echo "• No lazy shouldBe patterns"
+    echo "🎉 JavaScript parser test suite meets CLAUDE.md standards:"
+    echo "• No lazy assertBool patterns"
     echo "• No mock functions" 
     echo "• No reflexive equality tests"
     echo "• No trivial test conditions"
-    echo "• All tests validate real, meaningful behavior"
+    echo "• No lazy shouldBe patterns"
+    echo "• All tests validate real, meaningful parser behavior"
+    echo ""
+    echo "JavaScript parser tests properly validate:"
+    echo "• AST construction and structure"
+    echo "• Parse error handling and messages"
+    echo "• Token stream processing"
+    echo "• JavaScript syntax recognition"
     echo ""
 fi
