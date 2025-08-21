@@ -25,6 +25,9 @@ import Unit.Language.Javascript.Parser.AST.Construction
 import Unit.Language.Javascript.Parser.AST.Generic
 import Unit.Language.Javascript.Parser.AST.SrcLocation
 
+-- Unit Tests - Pretty Printing
+import Unit.Language.Javascript.Parser.Pretty.JSONTest
+
 -- Unit Tests - Validation
 import Unit.Language.Javascript.Parser.Validation.Core
 import Unit.Language.Javascript.Parser.Validation.ES6Features
@@ -88,6 +91,9 @@ testAll = do
     Unit.Language.Javascript.Parser.AST.Construction.testASTConstructors
     Unit.Language.Javascript.Parser.AST.Generic.testGenericNFData
     Unit.Language.Javascript.Parser.AST.SrcLocation.testSrcLocation
+    
+    -- Unit Tests - Pretty Printing
+    Unit.Language.Javascript.Parser.Pretty.JSONTest.testJSONSerialization
     
     -- Unit Tests - Validation
     Unit.Language.Javascript.Parser.Validation.Core.testValidator
