@@ -92,6 +92,7 @@ Test-Suite testsuite
                  , time             >= 1.4
                  , process          >= 1.2
                  , random           >= 1.1
+                 , aeson            >= 1.0
                  , language-javascript
 
   Other-modules:
@@ -115,6 +116,9 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Parser.AST.Construction
                     Unit.Language.Javascript.Parser.AST.Generic
                     Unit.Language.Javascript.Parser.AST.SrcLocation
+                    
+                    -- Unit Tests - Pretty Printing
+                    Unit.Language.Javascript.Parser.Pretty.JSONTest
                     
                     -- Unit Tests - Validation
                     Unit.Language.Javascript.Parser.Validation.Core
