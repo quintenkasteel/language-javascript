@@ -40,6 +40,9 @@ module Language.JavaScript.Pretty.JSON
     , renderProgramToJSON
     , renderExpressionToJSON
     , renderStatementToJSON
+    , renderImportDeclarationToJSON
+    , renderExportDeclarationToJSON
+    , renderAnnotation
     -- * JSON utilities
     , escapeJSONString
     , formatJSONObject
