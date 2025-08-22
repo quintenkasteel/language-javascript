@@ -28,6 +28,7 @@ module Unit.Language.Javascript.Parser.Validation.StrictMode
 
 import Test.Hspec
 import qualified Data.Text as Text
+import qualified Data.ByteString.Char8 as BS8
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Validator
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..))
@@ -500,8 +501,8 @@ testAssignmentToReserved :: String -> (JSAnnot -> JSAssignOp) -> String -> Spec
 testAssignmentToReserved word opConstructor desc =
   it ("rejects " ++ word ++ " in " ++ desc) $ do
     let program = createStrictProgram [
-          JSAssignStatement (JSIdentifier noAnnot word)
-            (opConstructor noAnnot) (JSDecimal noAnnot "42") auto
+          JSAssignStatement (JSIdentifier noAnnot (BS8.pack word))
+            (opConstructor noAnnot) (JSDecimal noAnnot (BS8.pack "42")) auto
           ]
     validateProgram program `shouldFailWith` isReservedWordError word
 
@@ -529,8 +530,8 @@ isReservedWordViolation _ = False
 -- | Create variable initialization expression.
 createVarInit :: String -> String -> JSCommaList JSExpression
 createVarInit name value = JSLOne (JSVarInitExpression
-  (JSIdentifier noAnnot name)
-  (JSVarInit noAnnot (JSDecimal noAnnot value)))
+  (JSIdentifier noAnnot (BS8.pack name))
+  (JSVarInit noAnnot (JSDecimal noAnnot (BS8.pack value))))
 
 -- | Create simple object property list with one property.
 createObjPropList :: [(JSPropertyName, [JSExpression])] -> JSObjectPropertyList

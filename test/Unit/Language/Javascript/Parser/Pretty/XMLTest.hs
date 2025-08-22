@@ -23,6 +23,7 @@ module Unit.Language.Javascript.Parser.Pretty.XMLTest
 import Test.Hspec
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 
 import qualified Language.JavaScript.Parser.AST as AST
 import qualified Language.JavaScript.Pretty.XML as PXML
@@ -152,7 +153,7 @@ testLiteralSerialization = describe "Literal Serialization" $ do
       xml `shouldSatisfy` Text.isInfixOf "<JSIdentifier name=\"variable\">"
     
     it "serializes identifiers with Unicode" $ do
-      let expr = AST.JSIdentifier testAnnot "variableσ"
+      let expr = AST.JSIdentifier testAnnot (Text.encodeUtf8 (Text.pack "variableσ"))
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "variableσ"
   

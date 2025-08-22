@@ -8,6 +8,11 @@ import Language.JavaScript.Parser.Grammar7
 import Language.JavaScript.Parser.Parser
 import Language.JavaScript.Parser.Lexer
 import qualified Data.List as List
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import qualified Data.Text.Encoding.Error as Text
 
 -- | Comprehensive test suite for automatic semicolon insertion edge cases
 testASIEdgeCases :: Spec
@@ -136,10 +141,17 @@ testLex str =
   where
     stringify xs = "[" ++ List.intercalate "," (map showToken xs) ++ "]"
       where
+        -- | Helper function to safely decode UTF-8 ByteString to String
+        -- Falls back to Latin-1 decoding if UTF-8 fails
+        utf8ToString :: ByteString -> String
+        utf8ToString bs = case Text.decodeUtf8' bs of
+          Right text -> Text.unpack text
+          Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
+        
         showToken :: Token -> String
-        showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
-        showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
-        showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
+        showToken (StringToken _ lit _) = "StringToken " ++ stringEscape (utf8ToString lit)
+        showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape (utf8ToString lit) ++ "'"
+        showToken (DecimalToken _ lit _) = "DecimalToken " ++ utf8ToString lit
         showToken (CommentToken _ _ _) = "CommentToken"
         showToken (AutoSemiToken _ _ _) = "AutoSemiToken"
         showToken (WsToken _ _ _) = "WsToken"

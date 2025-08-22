@@ -58,6 +58,7 @@ import Control.Monad (forM_)
 import Data.Data (toConstr, dataTypeOf)
 import Data.List (nub, sort)
 import qualified Data.Text as Text
+import qualified Data.ByteString.Char8 as BS8
 
 import Language.JavaScript.Parser
 import qualified Language.JavaScript.Parser as Language.JavaScript.Parser
@@ -744,6 +745,22 @@ genValidExpression = oneof
   , genCallExpression
   ]
 
+-- | Generate ByteString numbers
+genNumber :: Gen BS8.ByteString
+genNumber = BS8.pack . show <$> (arbitrary :: Gen Int)
+
+-- | Generate ByteString quoted strings
+genQuotedString :: Gen BS8.ByteString  
+genQuotedString = BS8.pack <$> elements ["\"test\"", "\"hello\"", "'world'", "'value'"]
+
+-- | Generate ByteString boolean literals
+genBoolean :: Gen BS8.ByteString
+genBoolean = BS8.pack <$> elements ["true", "false"]
+
+-- | Generate valid ByteString identifiers
+genValidIdentifier :: Gen BS8.ByteString
+genValidIdentifier = BS8.pack <$> elements ["x", "y", "value", "result", "temp", "item"]
+
 -- | Generate literal expressions
 genLiteralExpression :: Gen AST.JSExpression
 genLiteralExpression = oneof
@@ -1019,7 +1036,7 @@ genFunctionWithVars = do
   func <- genValidFunction
   oldVar <- genValidIdentifier
   newVar <- genValidIdentifier
-  return (func, oldVar, newVar)
+  return (func, BS8.unpack oldVar, BS8.unpack newVar)
 
 -- | Generate function with bound and free variables
 genFunctionWithBoundAndFree :: Gen (AST.JSStatement, String, String, String)
@@ -1028,7 +1045,7 @@ genFunctionWithBoundAndFree = do
   boundVar <- genValidIdentifier
   freeVar <- genValidIdentifier
   newName <- genValidIdentifier
-  return (func, boundVar, freeVar, newName)
+  return (func, BS8.unpack boundVar, BS8.unpack freeVar, BS8.unpack newName)
 
 -- | Generate alpha equivalent functions
 genAlphaEquivalentFunctions :: Gen (AST.JSStatement, AST.JSStatement)
@@ -1061,7 +1078,7 @@ genFunctionWithNoCapture = do
   func <- genValidFunction
   oldName <- genValidIdentifier
   newName <- genValidIdentifier
-  return (func, oldName, newName)
+  return (func, BS8.unpack oldName, BS8.unpack newName)
 
 -- | Generate program with renaming map
 genProgramWithRenamingMap :: Gen (AST.JSAST, [(String, String)])
@@ -1081,30 +1098,9 @@ genProgramWithDeletableNode = do
 -- Helper Generators
 -- ---------------------------------------------------------------------
 
--- | Generate valid JavaScript identifier
-genValidIdentifier :: Gen String
-genValidIdentifier = do
-  first <- elements (['a'..'z'] ++ ['A'..'Z'] ++ "_$")
-  rest <- listOf (elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$"))
-  return (first : rest)
-
 -- | Generate annotation
 genAnnot :: Gen AST.JSAnnot
 genAnnot = return AST.JSNoAnnot
-
--- | Generate number literal
-genNumber :: Gen String
-genNumber = show <$> (arbitrary :: Gen Int)
-
--- | Generate quoted string
-genQuotedString :: Gen String
-genQuotedString = do
-  str <- listOf (elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " "))
-  return ("\"" ++ str ++ "\"")
-
--- | Generate boolean literal
-genBoolean :: Gen String
-genBoolean = elements ["true", "false"]
 
 -- | Generate binary operator
 genBinaryOperator :: Gen AST.JSBinOp
@@ -1203,7 +1199,7 @@ genRenamePair :: Gen (String, String)
 genRenamePair = do
   oldName <- genValidIdentifier
   newName <- genValidIdentifier
-  return (oldName, newName)
+  return (BS8.unpack oldName, BS8.unpack newName)
 
 -- | Generate valid JSIdent
 genValidIdent :: Gen AST.JSIdent
@@ -1757,10 +1753,10 @@ simpleExprStmt :: AST.JSExpression -> AST.JSStatement
 simpleExprStmt expr = AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
 
 literalNumber :: String -> AST.JSExpression  
-literalNumber num = AST.JSDecimal AST.JSNoAnnot num
+literalNumber num = AST.JSDecimal AST.JSNoAnnot (BS8.pack num)
 
 literalString :: String -> AST.JSExpression
-literalString str = AST.JSStringLiteral AST.JSNoAnnot ("\"" ++ str ++ "\"")
+literalString str = AST.JSStringLiteral AST.JSNoAnnot (BS8.pack ("\"" ++ str ++ "\""))
 
 createEquivalent :: AST.JSAST -> AST.JSAST
 createEquivalent = id  -- Simplified for now

@@ -10,6 +10,7 @@ import Test.Hspec
 import Language.JavaScript.Parser.Grammar7
 import Language.JavaScript.Parser.Parser
 import qualified Language.JavaScript.Parser.AST as AST
+import qualified Data.ByteString.Char8 as BS8
 
 testGenericNFData :: Spec
 testGenericNFData = describe "Generic and NFData instances" $ do
@@ -21,7 +22,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
                     let !evaluated = rnf ast `seq` ast
                     -- Verify the AST structure is preserved after deep evaluation
                     case evaluated of
-                        AST.JSAstExpression (AST.JSDecimal _ "42") _ -> pure ()
+                        AST.JSAstExpression (AST.JSDecimal _ val) _ | val == BS8.pack "42" -> pure ()
                         _ -> expectationFailure "NFData evaluation altered AST structure"
                 Left _ -> expectationFailure "Parse failed"
 
@@ -83,26 +84,26 @@ testGenericNFData = describe "Generic and NFData instances" $ do
 
         it "can deep evaluate AST components" $ do
             let annotation = AST.JSNoAnnot
-            let identifier = AST.JSIdentifier annotation "test"
-            let literal = AST.JSDecimal annotation "42"
+            let identifier = AST.JSIdentifier annotation (BS8.pack "test")
+            let literal = AST.JSDecimal annotation (BS8.pack "42")
             -- Test NFData on individual AST components
             let !evalAnnot = rnf annotation `seq` annotation
             let !evalIdent = rnf identifier `seq` identifier
             let !evalLiteral = rnf literal `seq` literal
             -- Verify components maintain their values after evaluation
             case (evalAnnot, evalIdent, evalLiteral) of
-                (AST.JSNoAnnot, AST.JSIdentifier _ "test", AST.JSDecimal _ "42") -> pure ()
+                (AST.JSNoAnnot, AST.JSIdentifier _ testVal, AST.JSDecimal _ val42) | testVal == BS8.pack "test" && val42 == BS8.pack "42" -> pure ()
                 _ -> expectationFailure "NFData evaluation altered AST component values"
 
     describe "Generic instances" $ do
         it "supports generic operations on expressions" $ do
-            let expr = AST.JSIdentifier AST.JSNoAnnot "test"
+            let expr = AST.JSIdentifier AST.JSNoAnnot (BS8.pack "test")
             let generic = from expr
             let reconstructed = to generic
             reconstructed `shouldBe` expr
 
         it "supports generic operations on statements" $ do
-            let stmt = AST.JSExpressionStatement (AST.JSIdentifier AST.JSNoAnnot "x") AST.JSSemiAuto
+            let stmt = AST.JSExpressionStatement (AST.JSIdentifier AST.JSNoAnnot (BS8.pack "x")) AST.JSSemiAuto
             let generic = from stmt
             let reconstructed = to generic
             reconstructed `shouldBe` stmt
@@ -115,12 +116,12 @@ testGenericNFData = describe "Generic and NFData instances" $ do
 
         it "generic instances compile correctly" $ do
             -- Test that Generic instances are well-formed and functional
-            let expr = AST.JSDecimal AST.JSNoAnnot "123"
+            let expr = AST.JSDecimal AST.JSNoAnnot (BS8.pack "123")
             let generic = from expr
             let reconstructed = to generic
             -- Verify Generic round-trip preserves exact structure
             case (expr, reconstructed) of
-                (AST.JSDecimal _ "123", AST.JSDecimal _ "123") -> pure ()
+                (AST.JSDecimal _ val1, AST.JSDecimal _ val2) | val1 == BS8.pack "123" && val2 == BS8.pack "123" -> pure ()
                 _ -> expectationFailure "Generic round-trip failed to preserve structure"
             -- Verify Generic representation is meaningful (non-empty and contains structure)
             let genericStr = show generic

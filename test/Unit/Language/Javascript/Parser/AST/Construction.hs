@@ -26,6 +26,7 @@ import Control.DeepSeq (deepseq)
 
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..))
+import qualified Data.ByteString.Char8 as BS8
 
 -- | Test annotation for constructor testing
 noAnnot :: AST.JSAnnot
@@ -35,7 +36,7 @@ testAnnot :: AST.JSAnnot
 testAnnot = AST.JSAnnot (TokenPn 0 1 1) []
 
 testIdent :: AST.JSIdent
-testIdent = AST.JSIdentName testAnnot "test"
+testIdent = AST.JSIdentName testAnnot (BS8.pack "test")
 
 testSemi :: AST.JSSemi
 testSemi = AST.JSSemiAuto
@@ -553,15 +554,15 @@ testPatternMatchingCoverage = describe "Pattern matching coverage" $ do
 -- Helper functions for constructor testing
 
 extractLiteral :: AST.JSExpression -> String
-extractLiteral (AST.JSIdentifier _ s) = s
-extractLiteral (AST.JSDecimal _ s) = s
-extractLiteral (AST.JSLiteral _ s) = s
-extractLiteral (AST.JSHexInteger _ s) = s
-extractLiteral (AST.JSBinaryInteger _ s) = s
-extractLiteral (AST.JSOctal _ s) = s
-extractLiteral (AST.JSBigIntLiteral _ s) = s
-extractLiteral (AST.JSStringLiteral _ s) = s
-extractLiteral (AST.JSRegEx _ s) = s
+extractLiteral (AST.JSIdentifier _ s) = BS8.unpack s
+extractLiteral (AST.JSDecimal _ s) = BS8.unpack s
+extractLiteral (AST.JSLiteral _ s) = BS8.unpack s
+extractLiteral (AST.JSHexInteger _ s) = BS8.unpack s
+extractLiteral (AST.JSBinaryInteger _ s) = BS8.unpack s
+extractLiteral (AST.JSOctal _ s) = BS8.unpack s
+extractLiteral (AST.JSBigIntLiteral _ s) = BS8.unpack s
+extractLiteral (AST.JSStringLiteral _ s) = BS8.unpack s
+extractLiteral (AST.JSRegEx _ s) = BS8.unpack s
 extractLiteral _ = ""
 
 -- Constructor identification functions (predicates)

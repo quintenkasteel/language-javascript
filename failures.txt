@@ -1,0 +1,82 @@
+Failures:
+
+  test/Unit/Language/Javascript/Parser/Lexer/AdvancedLexer.hs:201:38:
+  1) Advanced Lexer Features, Automatic Semicolon Insertion (ASI), line terminator types, Line Separator (LS) U+2028
+       expected: "[ReturnToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
+        but got: "[ReturnToken,WsToken,IdentifierToken 'x']"
+
+  To rerun use: --match "/Advanced Lexer Features/Automatic Semicolon Insertion (ASI)/line terminator types/Line Separator (LS) U+2028/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/AdvancedLexer.hs:207:38:
+  2) Advanced Lexer Features, Automatic Semicolon Insertion (ASI), line terminator types, Paragraph Separator (PS) U+2029
+       expected: "[ReturnToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
+        but got: "[ReturnToken,WsToken,IdentifierToken 'x']"
+
+  To rerun use: --match "/Advanced Lexer Features/Automatic Semicolon Insertion (ASI)/line terminator types/Paragraph Separator (PS) U+2029/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/AdvancedLexer.hs:368:30:
+  3) Advanced Lexer Features, Lexer Error Recovery, unicode and encoding recovery, handles unicode in string literals
+       expected: "[StringToken 'Hello 世界']"
+        but got: "[StringToken 'Hello \SYNL']"
+
+  To rerun use: --match "/Advanced Lexer Features/Lexer Error Recovery/unicode and encoding recovery/handles unicode in string literals/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/UnicodeSupport.hs:91:28:
+  4) Unicode Lexer Tests, Partial Unicode Support, processes mathematical Unicode symbols as escaped
+       expected: "[IdentifierToken '\\u03C0']"
+        but got: "[IdentifierToken '\\u00C0']"
+
+  To rerun use: --match "/Unicode Lexer Tests/Partial Unicode Support/processes mathematical Unicode symbols as escaped/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/UnicodeSupport.hs:110:33:
+  5) Unicode Lexer Tests, Partial Unicode Support, displays Unicode strings in escaped form
+       expected: "[StringToken \\\"\\u4E2D\\u6587\\\"]"
+        but got: "[StringToken \\\"-\\u0087\\\"]"
+
+  To rerun use: --match "/Unicode Lexer Tests/Partial Unicode Support/displays Unicode strings in escaped form/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/UnicodeSupport.hs:149:36:
+  6) Unicode Lexer Tests, Future Unicode Features (Not Yet Supported), documents string Unicode processing behavior
+       expected: "[StringToken \\\"\\u524D\\\\n\\u540E\\\"]"
+        but got: "[StringToken \\\"M\\\\n\\u000E\\\"]"
+
+  To rerun use: --match "/Unicode Lexer Tests/Future Unicode Features (Not Yet Supported)/documents string Unicode processing behavior/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/ASIHandling.hs:28:52:
+  7) ASI Edge Cases and Error Conditions, different line terminator types, handles Unicode line separator (\u2028) in comments
+       expected: "[ReturnToken,WsToken,CommentToken,AutoSemiToken,WsToken,DecimalToken 4]"
+        but got: "[ReturnToken,WsToken,CommentToken,WsToken,DecimalToken 4]"
+
+  To rerun use: --match "/ASI Edge Cases and Error Conditions/different line terminator types/handles Unicode line separator (\\u2028) in comments/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Lexer/ASIHandling.hs:31:52:
+  8) ASI Edge Cases and Error Conditions, different line terminator types, handles Unicode paragraph separator (\u2029) in comments
+       expected: "[ReturnToken,WsToken,CommentToken,AutoSemiToken,WsToken,DecimalToken 4]"
+        but got: "[ReturnToken,WsToken,CommentToken,WsToken,DecimalToken 4]"
+
+  To rerun use: --match "/ASI Edge Cases and Error Conditions/different line terminator types/handles Unicode paragraph separator (\\u2029) in comments/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Parser/Programs.hs:54:49:
+  9) Program parser: unicode
+       expected: "Right (JSAstProgram [JSOpAssign ('=',JSIdentifier 'x',JSStringLiteral \"àáâãäå\"),JSSemicolon,JSOpAssign ('=',JSIdentifier 'y',JSStringLiteral '\3012aD')])"
+        but got: "Right (JSAstProgram [JSOpAssign ('=',JSIdentifier 'x',JSStringLiteral \"àáâãäå\"),JSSemicolon,JSOpAssign ('=',JSIdentifier 'y',JSStringLiteral 'ÄaD')])"
+
+  To rerun use: --match "/Program parser:/unicode/" --seed 846444577
+
+  test/Unit/Language/Javascript/Parser/Pretty/XMLTest.hs:157:11:
+  10) XML Serialization Tests, Literal Serialization, identifiers, serializes identifiers with Unicode
+       predicate failed on: "<JSIdentifier name=\"variable\195\"><annotation><position line=\"0\" column=\"0\" address=\"0\"/><comments/></annotation></JSIdentifier>"
+
+  To rerun use: --match "/XML Serialization Tests/Literal Serialization/identifiers/serializes identifiers with Unicode/" --seed 846444577
+
+  test/Integration/Language/Javascript/Parser/Minification.hs:155:47:
+  11) Minify expressions: string concatenation
+       expected: "'ef\\'gh\\'ij'"
+        but got: "'ef\\\\'gh\\\\'ij'"
+
+  To rerun use: --match "/Minify expressions:/string concatenation/" --seed 846444577
+
+Randomized with seed 846444577
+
+Finished in 54.8454 seconds
+1321 examples, 11 failures
