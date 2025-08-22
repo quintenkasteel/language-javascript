@@ -32,6 +32,10 @@ module Language.JavaScript.Parser
        , renderJS
        , renderToString
        , renderToText
+       -- * XML Serialization  
+       , renderToXML
+       -- * S-Expression Serialization
+       , renderToSExpr
        ) where
 
 
@@ -40,5 +44,7 @@ import Language.JavaScript.Parser.Token
 import qualified Language.JavaScript.Parser.Parser as PA
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Pretty.Printer
+import Language.JavaScript.Pretty.XML (renderToXML)
+import Language.JavaScript.Pretty.SExpr (renderToSExpr)
 
 -- EOF
