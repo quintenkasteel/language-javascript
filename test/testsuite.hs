@@ -27,6 +27,8 @@ import Unit.Language.Javascript.Parser.AST.SrcLocation
 
 -- Unit Tests - Pretty Printing
 import Unit.Language.Javascript.Parser.Pretty.JSONTest
+import Unit.Language.Javascript.Parser.Pretty.XMLTest
+import Unit.Language.Javascript.Parser.Pretty.SExprTest
 
 -- Unit Tests - Validation
 import Unit.Language.Javascript.Parser.Validation.Core
@@ -94,6 +96,8 @@ testAll = do
     
     -- Unit Tests - Pretty Printing
     Unit.Language.Javascript.Parser.Pretty.JSONTest.testJSONSerialization
+    Unit.Language.Javascript.Parser.Pretty.XMLTest.testXMLSerialization
+    Unit.Language.Javascript.Parser.Pretty.SExprTest.testSExprSerialization
     
     -- Unit Tests - Validation
     Unit.Language.Javascript.Parser.Validation.Core.testValidator

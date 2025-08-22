@@ -61,6 +61,8 @@ Library
                        Language.JavaScript.Parser.Validator
                        Language.JavaScript.Pretty.Printer
                        Language.JavaScript.Pretty.JSON
+                       Language.JavaScript.Pretty.XML
+                       Language.JavaScript.Pretty.SExpr
                        Language.JavaScript.Process.Minify
   Other-modules:       Language.JavaScript.Parser.LexerUtils
                        Language.JavaScript.Parser.ParserMonad
@@ -119,6 +121,8 @@ Test-Suite testsuite
                     
                     -- Unit Tests - Pretty Printing
                     Unit.Language.Javascript.Parser.Pretty.JSONTest
+                    Unit.Language.Javascript.Parser.Pretty.XMLTest
+                    Unit.Language.Javascript.Parser.Pretty.SExprTest
                     
                     -- Unit Tests - Validation
                     Unit.Language.Javascript.Parser.Validation.Core
