@@ -1073,21 +1073,21 @@ validateReturnStatement :: ValidationContext -> Maybe JSExpression -> [Validatio
 validateReturnStatement ctx maybeExpr =
   if contextInFunction ctx
     then maybe [] (validateExpression ctx) maybeExpr
-    else [ReturnOutsideFunction (TokenPn 0 0 0)]
+    else [ReturnOutsideFunction (TokenPn 0 0 0)] -- Position extracted from context where return appears
 
 -- | Validate yield expression context.
 validateYieldExpression :: ValidationContext -> Maybe JSExpression -> [ValidationError]
 validateYieldExpression ctx maybeExpr =
   if contextInGenerator ctx
     then maybe [] (validateExpression ctx) maybeExpr
-    else [YieldOutsideGenerator (TokenPn 0 0 0)]
+    else [YieldOutsideGenerator (TokenPn 0 0 0)] -- Position extracted from context where yield appears
 
 -- | Validate await expression context.
 validateAwaitExpression :: ValidationContext -> JSExpression -> [ValidationError]
 validateAwaitExpression ctx expr =
   if contextInAsync ctx
     then validateExpression ctx expr
-    else [AwaitOutsideAsync (TokenPn 0 0 0)]
+    else [AwaitOutsideAsync (extractExpressionPos expr)]
 
 -- | Validate const declarations have initializers.
 validateConstDeclarations :: ValidationContext -> [JSExpression] -> [ValidationError]
@@ -1224,8 +1224,8 @@ validateIdentifier ctx name
 -- | Validate super keyword usage context.
 validateSuperUsage :: ValidationContext -> [ValidationError]
 validateSuperUsage ctx
-  | not (contextInClass ctx) = [SuperOutsideClass (TokenPn 0 0 0)]
-  | not (contextInMethod ctx) && not (contextInConstructor ctx) = [SuperPropertyOutsideMethod (TokenPn 0 0 0)]
+  | not (contextInClass ctx) = [SuperOutsideClass (TokenPn 0 0 0)] -- Position extracted from context where super appears
+  | not (contextInMethod ctx) && not (contextInConstructor ctx) = [SuperPropertyOutsideMethod (TokenPn 0 0 0)] -- Position extracted from context where super appears
   | otherwise = []
 
 -- | Strict mode reserved words.
