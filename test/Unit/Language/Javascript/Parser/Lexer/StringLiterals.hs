@@ -260,24 +260,24 @@ testStringErrorRecovery = describe "String Error Recovery" $ do
       Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
       result -> expectationFailure ("Expected parse error, got: " ++ show result)
 
-  it "detects invalid escape sequences" $ do
+  it "should reject invalid escape sequences" $ do
     case testStringLiteral "'\\z'" of
-      Right (JSAstLiteral (JSStringLiteral _ "'\\z'") _) -> pure ()
-      result -> expectationFailure ("Expected string literal, got: " ++ show result)
+      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
+      Right result -> expectationFailure ("Expected parse error for invalid escape sequence '\\z', got: " ++ show result)
     case testStringLiteral "'\\x'" of
-      Right (JSAstLiteral (JSStringLiteral _ "'\\x'") _) -> pure ()
-      result -> expectationFailure ("Expected string literal, got: " ++ show result)
+      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
+      Right result -> expectationFailure ("Expected parse error for incomplete hex escape '\\x', got: " ++ show result)
 
-  it "detects invalid unicode escapes" $ do  
+  it "should reject invalid unicode escapes" $ do  
     case testStringLiteral "'\\u'" of
-      Right (JSAstLiteral (JSStringLiteral _ "'\\u'") _) -> pure ()
-      result -> expectationFailure ("Expected string literal, got: " ++ show result)
+      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
+      Right result -> expectationFailure ("Expected parse error for incomplete unicode escape '\\u', got: " ++ show result)
     case testStringLiteral "'\\u123'" of
-      Right (JSAstLiteral (JSStringLiteral _ "'\\u123'") _) -> pure ()
-      result -> expectationFailure ("Expected string literal, got: " ++ show result)
+      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
+      Right result -> expectationFailure ("Expected parse error for incomplete unicode escape '\\u123', got: " ++ show result)
     case testStringLiteral "'\\uGHIJ'" of
-      Right (JSAstLiteral (JSStringLiteral _ "'\\uGHIJ'") _) -> pure ()
-      result -> expectationFailure ("Expected string literal, got: " ++ show result)
+      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
+      Right result -> expectationFailure ("Expected parse error for invalid unicode escape '\\uGHIJ', got: " ++ show result)
 
 -- ---------------------------------------------------------------------
 -- Phase 2 Implementation  
