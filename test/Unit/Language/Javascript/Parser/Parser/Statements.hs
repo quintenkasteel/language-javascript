@@ -1,13 +1,32 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Unit.Language.Javascript.Parser.Parser.Statements
     ( testStatementParser
     ) where
 
 
 import Test.Hspec
+import Data.List (isInfixOf)
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.Grammar7
 import Language.JavaScript.Parser.Parser
+import Language.JavaScript.Parser.AST
+  ( JSAST(..)
+  , JSStatement(..)
+  , JSExpression(..)
+  , JSVarInitializer(..)
+  , JSObjectProperty(..)
+  , JSAnnot
+  , JSArrayElement(..)
+  , JSAssignOp(..)
+  , JSCommaList(..)
+  , JSCommaTrailingList(..)
+  , JSIdent(..)
+  , JSBlock(..)
+  , JSPropertyName(..)
+  , JSSemi(..)
+  )
 
 
 testStatementParser :: Spec
@@ -101,36 +120,77 @@ testStatementParser = describe "Parse statements:" $ do
         testStmt "const {prop, ...others} = data;" `shouldBe` "Right (JSAstStatement (JSConstant (JSVarInitExpression (JSObjectLiteral [JSPropertyIdentRef 'prop',JSObjectSpread (JSIdentifier 'others')]) [JSIdentifier 'data'])))"
 
     it "destructuring default values validation (ES2015) - actual parser capabilities" $ do
-        -- Test array default values (these work as assignment expressions)
-        parse "let [a = 1, b = 2] = array;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "const [x = 'default', y = null] = arr;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "const [first, second = 'fallback'] = values;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        -- Test array default values - comprehensive structural validation
+        case testStatement "let [a = 1, b = 2] = array;" of
+            Right (JSAstStatement (JSLet _ (JSLOne (JSVarInitExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ "1")), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "b") (JSAssign _) (JSDecimal _ "2"))] _) (JSVarInit _ (JSIdentifier _ "array")))) _) _) -> pure ()
+            Right ast -> expectationFailure ("Expected let with array destructuring defaults, got: " ++ show ast)
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
+            
+        case testStatement "const [x = 'default', y = null] = arr;" of
+            Right (JSAstStatement (JSConstant _ (JSLOne (JSVarInitExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "x") (JSAssign _) (JSStringLiteral _ "'default'")), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "y") (JSAssign _) (JSLiteral _ "null"))] _) (JSVarInit _ (JSIdentifier _ "arr")))) _) _) -> pure ()
+            Right ast -> expectationFailure ("Expected const with array destructuring defaults, got: " ++ show ast)
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
+            
+        case testStatement "const [first, second = 'fallback'] = values;" of
+            Right (JSAstStatement (JSConstant _ (JSLOne (JSVarInitExpression (JSArrayLiteral _ [JSArrayElement (JSIdentifier _ "first"), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "second") (JSAssign _) (JSStringLiteral _ "'fallback'"))] _) (JSVarInit _ (JSIdentifier _ "values")))) _) _) -> pure ()
+            Right ast -> expectationFailure ("Expected const with mixed array destructuring, got: " ++ show ast)
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
         
-        -- Test object default values - NOT SUPPORTED (confirmed to fail)
-        parse "const {prop = defaultValue} = obj;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "let {x = 1, y = 2} = point;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "const {a = 'hello', b = 42} = data;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        -- Test object default values (limited parser support - expect parse error for now)
+        case testStatement "const {prop = defaultValue} = obj;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation: doesn't support object destructuring with defaults
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
+        -- Similar parser limitations for other object destructuring with defaults
+        case testStatement "let {x = 1, y = 2} = point;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
+        case testStatement "const {a = 'hello', b = 42} = data;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
         
-        -- Test mixed destructuring with defaults - NOT SUPPORTED
-        parse "const {a, b = 2, c: d = 3} = mixed;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "let {name, age = 25, city = 'Unknown'} = person;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        -- Test mixed destructuring with defaults (parser limitation)
+        case testStatement "const {a, b = 2, c: d = 3} = mixed;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
+        case testStatement "let {name, age = 25, city = 'Unknown'} = person;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
         
-        -- Test complex mixed patterns - NOT SUPPORTED due to object defaults
-        parse "const [a = 1, {b = 2, c}] = complex;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "const {user: {name = 'Unknown', age = 0} = {}} = data;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        -- Test complex mixed patterns (parser limitation)
+        case testStatement "const [a = 1, {b = 2, c}] = complex;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
+        case testStatement "const {user: {name = 'Unknown', age = 0} = {}} = data;" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation - nested destructuring with defaults
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
         
-        -- Test function parameter destructuring - check both object and array
-        parse "function test({x = 1, y = 2} = {}) {}" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "function test2([a = 1, b = 2] = []) {}" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        -- Test function parameter destructuring - check both object and array (parser limitation)
+        case testStatement "function test({x = 1, y = 2} = {}) {}" of
+            Left err -> err `shouldSatisfy` ("SimpleAssignToken" `isInfixOf`)  -- Parser limitation - function parameters with object destructuring defaults
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
+        case testStatement "function test2([a = 1, b = 2] = []) {}" of
+            Right (JSAstStatement (JSFunction _ (JSIdentName _ "test2") _ (JSLOne (JSAssignExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ "1")), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "b") (JSAssign _) (JSDecimal _ "2"))] _) (JSAssign _) (JSArrayLiteral _ [] _))) _ (JSBlock _ [] _) JSSemiAuto) _) -> pure ()
+            Right ast -> expectationFailure ("Expected function with array parameter defaults, got: " ++ show ast)
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
         
-        -- Test object rest patterns (these ARE supported via JSObjectSpread)
-        parse "let {a, ...rest} = obj;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "const {prop, ...others} = data;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        -- Test object rest patterns (these ARE supported via JSObjectSpread) - proper structural validation  
+        case testStatement "let {a, ...rest} = obj;" of
+            Right (JSAstStatement (JSLet _ (JSLOne (JSVarInitExpression (JSObjectLiteral _ (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef _ "a")) _ (JSObjectSpread _ (JSIdentifier _ "rest")))) _) (JSVarInit _ (JSIdentifier _ "obj")))) _) _) -> pure ()
+            Right ast -> expectationFailure ("Expected let with object destructuring and rest pattern, got: " ++ show ast)  
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
+        case testStatement "const {prop, ...others} = data;" of
+            Right (JSAstStatement (JSConstant _ (JSLOne (JSVarInitExpression (JSObjectLiteral _ (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef _ "prop")) _ (JSObjectSpread _ (JSIdentifier _ "others")))) _) (JSVarInit _ (JSIdentifier _ "data")))) _) _) -> pure ()
+            Right ast -> expectationFailure ("Expected const with object destructuring and rest pattern, got: " ++ show ast)
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
         
-        -- Test property renaming with defaults - NOT SUPPORTED for defaults
-        parse "let {prop: newName = default} = obj;" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        -- Test property renaming WITHOUT defaults (this should work)
-        parse "const {x: newX, y: newY} = coords;" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+        -- Test property renaming with and without defaults (parser limitation for defaults)
+        case testStatement "let {prop: newName = default} = obj;" of
+            Left err -> err `shouldSatisfy` ("DefaultToken" `isInfixOf`)  -- Parser limitation - 'default' is a reserved keyword
+            Right ast -> expectationFailure ("Expected parse error due to parser limitations, got: " ++ show ast)
+        case testStatement "const {x: newX, y: newY} = coords;" of
+            Right (JSAstStatement (JSConstant _ (JSLOne (JSVarInitExpression (JSObjectLiteral _ (JSCTLNone (JSLCons (JSLOne (JSPropertyNameandValue (JSPropertyIdent _ "x") _ [JSIdentifier _ "newX"])) _ (JSPropertyNameandValue (JSPropertyIdent _ "y") _ [JSIdentifier _ "newY"]))) _) (JSVarInit _ (JSIdentifier _ "coords")))) _) _) -> pure ()
+            Right ast -> expectationFailure ("Expected const with object property renaming, got: " ++ show ast)
+            Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
 
     it "comprehensive destructuring patterns with AST validation (ES2015) - supported features" $ do
         -- Array destructuring with default values (parsed as assignment expressions)
@@ -284,18 +344,37 @@ testStatementParser = describe "Parse statements:" $ do
     it "static class features - current limitations" $ do
         -- Note: Static field declarations are not yet supported by the parser
         -- These tests document the existing limitations for future implementation
-        parse "class Test { static field = 42; }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "class Demo { static x = 1, y = 2; }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "class Example { static #privateField = 'secret'; }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        case testStatement "class Test { static field = 42; }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "SimpleAssignToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for static field, got: " ++ show result)
+        case testStatement "class Demo { static x = 1, y = 2; }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "SimpleAssignToken" `isInfixOf` msg || "CommaToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for static field, got: " ++ show result)
+        case testStatement "class Example { static #privateField = 'secret'; }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "PrivateNameToken" `isInfixOf` msg || "SimpleAssignToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for private field, got: " ++ show result)
         
         -- Note: Static initialization blocks are not yet supported
-        parse "class Init { static { console.log('initialization'); } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "class Complex { static { this.computed = this.a + this.b; } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        case testStatement "class Init { static { console.log('initialization'); } }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "LeftCurlyToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for static block, got: " ++ show result)
+        case testStatement "class Complex { static { this.computed = this.a + this.b; } }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "LeftCurlyToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for static block, got: " ++ show result)
         
         -- Note: Static async methods are not yet supported
-        parse "class API { static async fetch() { return await response; } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-        parse "class Service { static async *generator() { yield await data; } }" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+        case testStatement "class API { static async fetch() { return await response; } }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "IdentifierToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for static async method, got: " ++ show result)
+        case testStatement "class Service { static async *generator() { yield await data; } }" of
+            Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "IdentifierToken" `isInfixOf` msg || "MulToken" `isInfixOf` msg)
+            Right result -> expectationFailure ("Expected parse error for static async generator, got: " ++ show result)
 
 
+-- | Original function for existing string-based tests
 testStmt :: String -> String
-testStmt str = showStrippedMaybe (parseUsing parseStatement str "src")
+testStmt str = showStrippedMaybeString (parseUsing parseStatement str "src")
+
+-- | New function for proper structural validation tests
+testStatement :: String -> Either String JSAST
+testStatement input = parseUsing parseStatement input "test"
