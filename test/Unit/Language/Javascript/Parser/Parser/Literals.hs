@@ -139,25 +139,24 @@ testLiteralParser = describe "Parse literals:" $ do
             Right (JSAstLiteral (JSBigIntLiteral _ "0o777n") _) -> pure ()
             result -> expectationFailure ("Expected bigint 0o777n, got: " ++ show result)
 
-    it "numeric separators (ES2021) - current parser behavior" $ do
-        -- Note: Current parser does not support numeric separators as single tokens
-        -- They are parsed as separate identifier tokens following numbers
-        -- These tests document the existing behavior for regression testing
+    it "numeric separators (ES2021) - ES2021 compliant behavior" $ do
+        -- Note: Parser now correctly supports ES2021 numeric separators as single tokens
+        -- These tests verify ES2021-compliant parsing behavior
         case parse "1_000" "test" of
-            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "_000") _] _) -> pure ()
+            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1_000") _] _) -> pure ()
             Left err -> expectationFailure ("Expected parse to succeed for 1_000, got: " ++ show err)
         case parse "1_000_000" "test" of
-            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "_000_000") _] _) -> pure ()
+            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1_000_000") _] _) -> pure ()
             Left err -> expectationFailure ("Expected parse to succeed for 1_000_000, got: " ++ show err)
         case parse "0xFF_EC_DE" "test" of
-            Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ "0xFF") _, JSExpressionStatement (JSIdentifier _ "_EC_DE") _] _) -> pure ()
+            Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ "0xFF_EC_DE") _] _) -> pure ()
             Left err -> expectationFailure ("Expected parse to succeed for 0xFF_EC_DE, got: " ++ show err)
         case parse "3.14_15" "test" of
-            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "3.14") _, JSExpressionStatement (JSIdentifier _ "_15") _] _) -> pure ()
+            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "3.14_15") _] _) -> pure ()
             Left err -> expectationFailure ("Expected parse to succeed for 3.14_15, got: " ++ show err)
-        case parse "123n_suffix" "test" of
-            Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ "123n") _, JSExpressionStatement (JSIdentifier _ "_suffix") _] _) -> pure ()
-            Left err -> expectationFailure ("Expected parse to succeed for 123n_suffix, got: " ++ show err)
+        case parse "123_456n" "test" of
+            Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ "123_456n") _] _) -> pure ()
+            Left err -> expectationFailure ("Expected parse to succeed for 123_456n, got: " ++ show err)
         case testLiteral "077n" of
             Right (JSAstLiteral (JSBigIntLiteral _ "077n") _) -> pure ()
             result -> expectationFailure ("Expected bigint 077n, got: " ++ show result)
