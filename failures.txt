@@ -1,82 +1,96 @@
 Failures:
 
-  test/Unit/Language/Javascript/Parser/Lexer/AdvancedLexer.hs:201:38:
-  1) Advanced Lexer Features, Automatic Semicolon Insertion (ASI), line terminator types, Line Separator (LS) U+2028
-       expected: "[ReturnToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
-        but got: "[ReturnToken,WsToken,IdentifierToken 'x']"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:289:23:
+  1) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Basic Template Literals, parses simple template literals
+       predicate failed on: "NoSubstitutionTemplateToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`hello`\", tokenComment = []}"
 
-  To rerun use: --match "/Advanced Lexer Features/Automatic Semicolon Insertion (ASI)/line terminator types/Line Separator (LS) U+2028/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Basic Template Literals/parses simple template literals/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/AdvancedLexer.hs:207:38:
-  2) Advanced Lexer Features, Automatic Semicolon Insertion (ASI), line terminator types, Paragraph Separator (PS) U+2029
-       expected: "[ReturnToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
-        but got: "[ReturnToken,WsToken,IdentifierToken 'x']"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:297:23:
+  2) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Basic Template Literals, parses template literals with whitespace
+       predicate failed on: "NoSubstitutionTemplateToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`hello world`\", tokenComment = []}"
 
-  To rerun use: --match "/Advanced Lexer Features/Automatic Semicolon Insertion (ASI)/line terminator types/Paragraph Separator (PS) U+2029/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Basic Template Literals/parses template literals with whitespace/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/AdvancedLexer.hs:368:30:
-  3) Advanced Lexer Features, Lexer Error Recovery, unicode and encoding recovery, handles unicode in string literals
-       expected: "[StringToken 'Hello 世界']"
-        but got: "[StringToken 'Hello \SYNL']"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:305:23:
+  3) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Basic Template Literals, parses empty template literals
+       predicate failed on: "NoSubstitutionTemplateToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"``\", tokenComment = []}"
 
-  To rerun use: --match "/Advanced Lexer Features/Lexer Error Recovery/unicode and encoding recovery/handles unicode in string literals/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Basic Template Literals/parses empty template literals/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/UnicodeSupport.hs:91:28:
-  4) Unicode Lexer Tests, Partial Unicode Support, processes mathematical Unicode symbols as escaped
-       expected: "[IdentifierToken '\\u03C0']"
-        but got: "[IdentifierToken '\\u00C0']"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:313:23:
+  4) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Template Interpolation, parses single interpolation
+       predicate failed on: "TemplateHeadToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`hello ${\", tokenComment = []}"
 
-  To rerun use: --match "/Unicode Lexer Tests/Partial Unicode Support/processes mathematical Unicode symbols as escaped/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Template Interpolation/parses single interpolation/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/UnicodeSupport.hs:110:33:
-  5) Unicode Lexer Tests, Partial Unicode Support, displays Unicode strings in escaped form
-       expected: "[StringToken \\\"\\u4E2D\\u6587\\\"]"
-        but got: "[StringToken \\\"-\\u0087\\\"]"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:321:23:
+  5) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Template Interpolation, parses multiple interpolations
+       predicate failed on: "TemplateHeadToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`${\", tokenComment = []}"
 
-  To rerun use: --match "/Unicode Lexer Tests/Partial Unicode Support/displays Unicode strings in escaped form/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Template Interpolation/parses multiple interpolations/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/UnicodeSupport.hs:149:36:
-  6) Unicode Lexer Tests, Future Unicode Features (Not Yet Supported), documents string Unicode processing behavior
-       expected: "[StringToken \\\"\\u524D\\\\n\\u540E\\\"]"
-        but got: "[StringToken \\\"M\\\\n\\u000E\\\"]"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:329:23:
+  6) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Template Interpolation, parses complex expression interpolations
+       predicate failed on: "TemplateHeadToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`value: ${\", tokenComment = []}"
 
-  To rerun use: --match "/Unicode Lexer Tests/Future Unicode Features (Not Yet Supported)/documents string Unicode processing behavior/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Template Interpolation/parses complex expression interpolations/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/ASIHandling.hs:28:52:
-  7) ASI Edge Cases and Error Conditions, different line terminator types, handles Unicode line separator (\u2028) in comments
-       expected: "[ReturnToken,WsToken,CommentToken,AutoSemiToken,WsToken,DecimalToken 4]"
-        but got: "[ReturnToken,WsToken,CommentToken,WsToken,DecimalToken 4]"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:341:23:
+  7) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Nested Template Literals, parses templates within templates
+       predicate failed on: "TemplateHeadToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`outer ${\", tokenComment = []}"
 
-  To rerun use: --match "/ASI Edge Cases and Error Conditions/different line terminator types/handles Unicode line separator (\\u2028) in comments/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Nested Template Literals/parses templates within templates/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Lexer/ASIHandling.hs:31:52:
-  8) ASI Edge Cases and Error Conditions, different line terminator types, handles Unicode paragraph separator (\u2029) in comments
-       expected: "[ReturnToken,WsToken,CommentToken,AutoSemiToken,WsToken,DecimalToken 4]"
-        but got: "[ReturnToken,WsToken,CommentToken,WsToken,DecimalToken 4]"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:386:23:
+  8) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Template Escape Sequences, parses escapes in template literals
+       predicate failed on: "NoSubstitutionTemplateToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`line1\\\\nline2`\", tokenComment = []}"
 
-  To rerun use: --match "/ASI Edge Cases and Error Conditions/different line terminator types/handles Unicode paragraph separator (\\u2029) in comments/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Template Escape Sequences/parses escapes in template literals/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Parser/Programs.hs:54:49:
-  9) Program parser: unicode
-       expected: "Right (JSAstProgram [JSOpAssign ('=',JSIdentifier 'x',JSStringLiteral \"àáâãäå\"),JSSemicolon,JSOpAssign ('=',JSIdentifier 'y',JSStringLiteral '\3012aD')])"
-        but got: "Right (JSAstProgram [JSOpAssign ('=',JSIdentifier 'x',JSStringLiteral \"àáâãäå\"),JSSemicolon,JSOpAssign ('=',JSIdentifier 'y',JSStringLiteral 'ÄaD')])"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:394:23:
+  9) String Literal Complexity Tests, Phase 2: Template Literal Comprehensive, Template Escape Sequences, parses unicode escapes in templates
+       predicate failed on: "NoSubstitutionTemplateToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`\\\\u0041`\", tokenComment = []}"
 
-  To rerun use: --match "/Program parser:/unicode/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 2: Template Literal Comprehensive/Template Escape Sequences/parses unicode escapes in templates/" --seed 1133718817
 
-  test/Unit/Language/Javascript/Parser/Pretty/XMLTest.hs:157:11:
-  10) XML Serialization Tests, Literal Serialization, identifiers, serializes identifiers with Unicode
-       predicate failed on: "<JSIdentifier name=\"variable\195\"><annotation><position line=\"0\" column=\"0\" address=\"0\"/><comments/></annotation></JSIdentifier>"
+  test/Unit/Language/Javascript/Parser/Lexer/StringLiterals.hs:424:23:
+  10) String Literal Complexity Tests, Phase 3: Edge Cases and Performance, Long String Performance, parses very long template literals
+       predicate failed on: "NoSubstitutionTemplateToken {tokenSpan = TokenPn 0 1 1, tokenLiteral = \"`aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`\", tokenComment = []}"
 
-  To rerun use: --match "/XML Serialization Tests/Literal Serialization/identifiers/serializes identifiers with Unicode/" --seed 846444577
+  To rerun use: --match "/String Literal Complexity Tests/Phase 3: Edge Cases and Performance/Long String Performance/parses very long template literals/" --seed 1133718817
 
-  test/Integration/Language/Javascript/Parser/Minification.hs:155:47:
-  11) Minify expressions: string concatenation
-       expected: "'ef\\'gh\\'ij'"
-        but got: "'ef\\\\'gh\\\\'ij'"
+  test/Unit/Language/Javascript/Parser/Lexer/NumericLiterals.hs:258:25:
+  11) Numeric Literal Edge Cases, Parser Behavior with Malformed Patterns, decimal literal edge cases, rejects decimal point without digits
+       predicate failed on: "DotToken {tokenSpan = TokenPn 0 1 1, tokenComment = []}"
 
-  To rerun use: --match "/Minify expressions:/string concatenation/" --seed 846444577
+  To rerun use: --match "/Numeric Literal Edge Cases/Parser Behavior with Malformed Patterns/decimal literal edge cases/rejects decimal point without digits/" --seed 1133718817
 
-Randomized with seed 846444577
+  test/Unit/Language/Javascript/Parser/Lexer/NumericLiterals.hs:273:25:
+  12) Numeric Literal Edge Cases, Parser Behavior with Malformed Patterns, decimal literal edge cases, rejects exponent with only sign
+       predicate failed on: "TailToken {tokenSpan = TokenPn 0 0 0, tokenComment = []}"
 
-Finished in 54.8454 seconds
-1321 examples, 11 failures
+  To rerun use: --match "/Numeric Literal Edge Cases/Parser Behavior with Malformed Patterns/decimal literal edge cases/rejects exponent with only sign/" --seed 1133718817
+
+  test/Unit/Language/Javascript/Parser/Parser/Statements.hs:348:29:
+  13) Parse statements: static class features - current limitations
+       predicate failed on: "SimpleAssignToken {tokenSpan = TokenPn 26 1 27, tokenComment = [WhiteSpace (TokenPn 25 1 26) \" \"]}"
+
+  To rerun use: --match "/Parse statements:/static class features - current limitations/" --seed 1133718817
+
+  test/Unit/Language/Javascript/Parser/Parser/Programs.hs:216:26:
+  14) Program parser: automatic semicolon insertion with comments in functions
+       Expected program with function f4, got: JSAstProgram [JSFunction (JSAnnot (TokenPn 0 1 1) []) (JSIdentName (JSAnnot (TokenPn 9 1 10) [WhiteSpace (TokenPn 8 1 9) " "]) "f4") (JSAnnot (TokenPn 11 1 12) []) JSLNil (JSAnnot (TokenPn 12 1 13) []) (JSBlock (JSAnnot (TokenPn 14 1 15) [WhiteSpace (TokenPn 13 1 14) " "]) [JSReturn (JSAnnot (TokenPn 16 1 17) [WhiteSpace (TokenPn 15 1 16) " "]) Nothing JSSemiAuto,JSExpressionStatement (JSDecimal (JSAnnot (TokenPn 24 2 2) [WhiteSpace (TokenPn 22 1 23) "\n "]) "4") JSSemiAuto] (JSAnnot (TokenPn 26 2 4) [WhiteSpace (TokenPn 25 2 3) " "])) JSSemiAuto] (JSAnnot (TokenPn 0 0 0) [])
+
+  To rerun use: --match "/Program parser:/automatic semicolon insertion with comments in functions/" --seed 1133718817
+
+Randomized with seed 1133718817
+
+Finished in 54.9472 seconds
+1321 examples, 14 failures
+Test suite testsuite: FAIL
+Test suite logged to:
+/home/quinten/projects/language-javascript/dist-newstyle/build/x86_64-linux/ghc-9.4.8/language-javascript-0.7.1.0/t/testsuite/test/language-javascript-0.7.1.0-testsuite.log
+0 of 1 test suites (0 of 1 test cases) passed.
+Error: cabal: Tests failed for test:testsuite from
+language-javascript-0.7.1.0.
