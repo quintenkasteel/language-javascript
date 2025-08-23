@@ -80,17 +80,18 @@ $not_eol_char = ~$eol_char -- anything but an end of line character
 $string_chars = [^ \n \r ' \" \\]
 
 -- See e.g. http://es5.github.io/x7.html#x7.8.4 (Table 4)
-@sq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | x )
-@dq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | x )
+@sq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | \/ )
+@dq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | \/ )
 
+-- Valid escape sequences
+@hex_escape = \\ x $hex_digit{2}
 @unicode_escape = \\ u $hex_digit{4}
+@octal_escape = \\ $oct_digit{1,3}
 
-@string_parts = $string_chars | \\ $digit | $ls | $ps
+@string_parts = $string_chars | $ls | $ps
 
-@non_escape_char = \\ [^ \n \\ ]
-
-@stringCharsSingleQuote = @string_parts | @sq_escapes | @unicode_escape | $dq | @non_escape_char
-@stringCharsDoubleQuote = @string_parts | @dq_escapes | @unicode_escape | $sq | @non_escape_char
+@stringCharsSingleQuote = @string_parts | @sq_escapes | @hex_escape | @unicode_escape | @octal_escape | $dq
+@stringCharsDoubleQuote = @string_parts | @dq_escapes | @hex_escape | @unicode_escape | @octal_escape | $sq
 
 -- Character values < 0x20.
 $low_unprintable = [\x00-\x1f]
@@ -251,14 +252,20 @@ tokens :-
 <reg,divide>  $dq (@stringCharsDoubleQuote *) $dq
             | $sq (@stringCharsSingleQuote *) $sq		{ adapt (mkString stringToken) }
 
--- HexIntegerLiteral = '0x' {Hex Digit}+
-<reg,divide> ("0x"|"0X") $hex_digit+ { adapt (mkString hexIntegerToken) }
+-- HexIntegerLiteral = '0x' {Hex Digit}+ with optional separators and BigInt suffix
+<reg,divide> ("0x"|"0X") ($hex_digit ("_"? $hex_digit)*) "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0x"|"0X") ($hex_digit ("_"? $hex_digit)*) { adapt (mkString hexIntegerToken) }
 
--- BinaryIntegerLiteral = '0b' {Binary Digit}+ (ES2015)
-<reg,divide> ("0b"|"0B") $bin_digit+ { adapt (mkString binaryIntegerToken) }
 
--- Modern OctalLiteral = '0o' {Octal Digit}+ (ES2015)
-<reg,divide> ("0o"|"0O") $oct_digit+ { adapt (mkString octalToken) }
+-- BinaryIntegerLiteral = '0b' {Binary Digit}+ with optional separators and BigInt suffix
+<reg,divide> ("0b"|"0B") ($bin_digit ("_"? $bin_digit)*) "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0b"|"0B") ($bin_digit ("_"? $bin_digit)*) { adapt (mkString binaryIntegerToken) }
+
+
+-- Modern OctalLiteral = '0o' {Octal Digit}+ with optional separators and BigInt suffix
+<reg,divide> ("0o"|"0O") ($oct_digit ("_"? $oct_digit)*) "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0o"|"0O") ($oct_digit ("_"? $oct_digit)*) { adapt (mkString octalToken) }
+
 
 -- Legacy OctalLiteral = '0' {Octal Digit}+
 <reg,divide> ("0") $oct_digit+ { adapt (mkString octalToken) }
@@ -294,33 +301,32 @@ tokens :-
 --     | "0"
 --     | "0." $digit+                    { mkString decimalToken }
 
-<reg,divide> "0"              "." $digit* ("e"|"E") ("+"|"-")? $digit+
-    | $non_zero_digit $digit* "." $digit* ("e"|"E") ("+"|"-")? $digit+
-    |                "." $digit+          ("e"|"E") ("+"|"-")? $digit+
-    |        "0"                          ("e"|"E") ("+"|"-")? $digit+
-    | $non_zero_digit $digit*             ("e"|"E") ("+"|"-")? $digit+
--- ++FOO++
-    |        "0"              "." $digit*
-    | $non_zero_digit $digit* "." $digit*
-    |                "." $digit+
+-- Decimal literals with optional numeric separators (ES2021)
+<reg,divide> "0"              "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    |                "." ($digit ("_"? $digit)*)          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    |        "0"                          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    | ($non_zero_digit ("_"? $digit)*)             ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    |        "0"              "." ($digit ("_"? $digit)*)
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*)
+    |                "." ($digit ("_"? $digit)*)
     |        "0"
-    | $non_zero_digit $digit*         { adapt (mkString decimalToken) }
+    | ($non_zero_digit ("_"? $digit)*)         { adapt (mkString decimalToken) }
 
--- BigInt literals: numeric patterns followed by 'n'
-<reg,divide> ("0x"|"0X") $hex_digit+ "n" { adapt (mkString bigIntToken) }
-<reg,divide> ("0b"|"0B") $bin_digit+ "n" { adapt (mkString bigIntToken) }
-<reg,divide> ("0o"|"0O") $oct_digit+ "n" { adapt (mkString bigIntToken) }
+-- Legacy octal BigInt literals: '0' followed by octal digits and 'n'
 <reg,divide> ("0") $oct_digit+ "n" { adapt (mkString bigIntToken) }
-<reg,divide> "0"              "." $digit* ("e"|"E") ("+"|"-")? $digit+ "n"
-    | $non_zero_digit $digit* "." $digit* ("e"|"E") ("+"|"-")? $digit+ "n"
-    |                "." $digit+          ("e"|"E") ("+"|"-")? $digit+ "n"
-    |        "0"                          ("e"|"E") ("+"|"-")? $digit+ "n"
-    | $non_zero_digit $digit*             ("e"|"E") ("+"|"-")? $digit+ "n"
-    |        "0"              "." $digit* "n"
-    | $non_zero_digit $digit* "." $digit* "n"
-    |                "." $digit+ "n"
+
+-- Decimal BigInt literals with optional numeric separators (ES2021)  
+<reg,divide> "0"              "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    |                "." ($digit ("_"? $digit)*)          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    |        "0"                          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    | ($non_zero_digit ("_"? $digit)*)             ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    |        "0"              "." ($digit ("_"? $digit)*) "n"
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*) "n"
+    |                "." ($digit ("_"? $digit)*) "n"
     |        "0" "n"
-    | $non_zero_digit $digit* "n"         { adapt (mkString bigIntToken) }
+    | ($non_zero_digit ("_"? $digit)*) "n"         { adapt (mkString bigIntToken) }
 
 
 -- beginning of file
