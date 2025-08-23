@@ -32,28 +32,28 @@
 --
 -- @since 0.7.1.0
 module Unit.Language.Javascript.Parser.Lexer.NumericLiterals
-  ( testNumericLiteralEdgeCases
-  , testNumericEdgeCase
-  , numericEdgeCaseSpecs
-  ) where
+  ( testNumericLiteralEdgeCases,
+    testNumericEdgeCase,
+    numericEdgeCaseSpecs,
+  )
+where
 
+import qualified Data.ByteString.Char8 as BS8
+import Data.List (isInfixOf)
+import qualified Data.List as List
+-- Import types unqualified, functions qualified per CLAUDE.md standards
+
+import Language.JavaScript.Parser.AST
+  ( JSAST (..),
+    JSAnnot,
+    JSExpression (..),
+    JSSemi,
+    JSStatement (..),
+    JSUnaryOp (..),
+  )
+import Language.JavaScript.Parser.Parser (parse)
 import Test.Hspec
 import Test.QuickCheck (property)
-import Data.List (isInfixOf)
-
-import qualified Data.List as List
-import qualified Data.ByteString.Char8 as BS8
-
--- Import types unqualified, functions qualified per CLAUDE.md standards
-import Language.JavaScript.Parser.Parser (parse)
-import Language.JavaScript.Parser.AST
-  ( JSAST(..) 
-  , JSStatement(..)
-  , JSExpression(..)
-  , JSUnaryOp(..)
-  , JSAnnot
-  , JSSemi
-  )
 
 -- | Main test specification for numeric literal edge cases.
 --
@@ -83,12 +83,12 @@ testNumericEdgeCase input = parse input "test"
 -- with other test suites or selective execution.
 numericEdgeCaseSpecs :: [Spec]
 numericEdgeCaseSpecs =
-  [ numericSeparatorTests
-  , boundaryValueTests
-  , invalidFormatErrorTests
-  , floatingPointEdgeCases
-  , performanceTests
-  , propertyBasedTests
+  [ numericSeparatorTests,
+    boundaryValueTests,
+    invalidFormatErrorTests,
+    floatingPointEdgeCases,
+    performanceTests,
+    propertyBasedTests
   ]
 
 -- ---------------------------------------------------------------------
@@ -98,45 +98,44 @@ numericEdgeCaseSpecs =
 -- | Test numeric separator behavior and document current limitations.
 --
 -- ES2021 introduced numeric separators (_) for improved readability.
--- Current parser does not support these as single tokens but parses
--- them as separate identifier tokens following numbers.
+-- Parser now supports these as single tokens in ES2021-compliant mode.
 numericSeparatorTests :: Spec
 numericSeparatorTests = describe "Numeric Separators (ES2021)" $ do
-  describe "current parser behavior documentation" $ do
-    it "parses decimal with separator as separate tokens" $ do
+  describe "ES2021 compliant parser behavior" $ do
+    it "parses decimal with separator as single token" $ do
       let result = testNumericEdgeCase "1_000"
       case result of
-        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "_000") _] _) -> pure ()
-        Right other -> expectationFailure ("Expected decimal with identifier, got: " ++ show other)
+        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1_000") _] _) -> pure ()
+        Right other -> expectationFailure ("Expected single decimal token, got: " ++ show other)
         Left err -> expectationFailure ("Expected successful parse, got error: " ++ err)
 
-    it "parses hex with separator as separate tokens" $ do
+    it "parses hex with separator as single token" $ do
       let result = testNumericEdgeCase "0xFF_EC_DE"
       case result of
-        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ "0xFF") _, JSExpressionStatement (JSIdentifier _ "_EC_DE") _] _) -> pure ()
-        Right other -> expectationFailure ("Expected hex with identifier, got: " ++ show other)
+        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ "0xFF_EC_DE") _] _) -> pure ()
+        Right other -> expectationFailure ("Expected single hex token, got: " ++ show other)
         Left err -> expectationFailure ("Expected successful parse, got error: " ++ err)
 
-    it "parses binary with separator as separate tokens" $ do
+    it "parses binary with separator as single token" $ do
       let result = testNumericEdgeCase "0b1010_1111"
       case result of
-        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ "0b1010") _, JSExpressionStatement (JSIdentifier _ "_1111") _] _) -> pure ()
-        Right other -> expectationFailure ("Expected binary with identifier, got: " ++ show other)
+        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ "0b1010_1111") _] _) -> pure ()
+        Right other -> expectationFailure ("Expected single binary token, got: " ++ show other)
         Left err -> expectationFailure ("Expected successful parse, got error: " ++ err)
 
-    it "parses octal with separator as separate tokens" $ do
+    it "parses octal with separator as single token" $ do
       let result = testNumericEdgeCase "0o777_123"
       case result of
-        Right (JSAstProgram [JSExpressionStatement (JSOctal _ "0o777") _, JSExpressionStatement (JSIdentifier _ "_123") _] _) -> pure ()
-        Right other -> expectationFailure ("Expected octal with identifier, got: " ++ show other)
+        Right (JSAstProgram [JSExpressionStatement (JSOctal _ "0o777_123") _] _) -> pure ()
+        Right other -> expectationFailure ("Expected single octal token, got: " ++ show other)
         Left err -> expectationFailure ("Expected successful parse, got error: " ++ err)
 
-  describe "separator edge cases with current behavior" $ do
-    it "handles multiple separators in decimal" $ do
+  describe "separator edge cases with ES2021 behavior" $ do
+    it "handles multiple separators in decimal as single token" $ do
       let result = testNumericEdgeCase "1_000_000_000"
       case result of
-        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "_000_000_000") _] _) -> pure ()
-        Right other -> expectationFailure ("Expected decimal with identifier, got: " ++ show other)
+        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1_000_000_000") _] _) -> pure ()
+        Right other -> expectationFailure ("Expected single decimal token, got: " ++ show other)
         Left err -> expectationFailure ("Expected successful parse, got error: " ++ err)
 
     it "handles trailing separator patterns" $ do
@@ -184,7 +183,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
     it "parses very large decimal BigInt" $ do
       let largeNumber = "12345678901234567890123456789012345678901234567890n"
       case testNumericEdgeCase largeNumber of
-        Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _)
           | val == BS8.pack largeNumber -> pure ()
         result -> expectationFailure ("Expected BigInt literal with value " ++ largeNumber ++ ", got: " ++ show result)
 
@@ -196,7 +195,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
     it "parses very large binary BigInt" $ do
       let largeBinary = "0b" ++ List.replicate 64 '1' ++ "n"
       case testNumericEdgeCase largeBinary of
-        Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _)
           | val == BS8.pack largeBinary -> pure ()
         result -> expectationFailure ("Expected binary BigInt literal with value " ++ largeBinary ++ ", got: " ++ show result)
 
@@ -209,7 +208,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
     it "parses maximum hex digits" $ do
       let maxHex = "0x" ++ List.replicate 16 'F'
       case testNumericEdgeCase maxHex of
-        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
           | val == BS8.pack maxHex -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ maxHex ++ ", got: " ++ show result)
 
@@ -222,7 +221,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
     it "parses long binary sequence" $ do
       let longBinary = "0b" ++ List.replicate 32 '1'
       case testNumericEdgeCase longBinary of
-        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
           | val == BS8.pack longBinary -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ longBinary ++ ", got: " ++ show result)
 
@@ -251,28 +250,26 @@ invalidFormatErrorTests = describe "Parser Behavior with Malformed Patterns" $ d
     it "handles multiple decimal points as separate tokens" $ do
       case testNumericEdgeCase "1.2.3" of
         Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1.2") _, JSExpressionStatement (JSDecimal _ ".3") _] _) -> pure ()
-        result -> expectationFailure ("Expected two decimal literals, got: " ++ show result)
+        result -> expectationFailure ("Expected decimal literals as separate tokens, got: " ++ show result)
 
     it "rejects decimal point without digits" $ do
       case testNumericEdgeCase "." of
         Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "DotToken" `isInfixOf` msg)
-        Right _ -> pure ()  -- Accept successful parsing (dot treated as operator)
-
+        Right _ -> pure () -- Accept successful parsing (dot treated as operator)
     it "handles multiple exponent markers as separate tokens" $ do
       case testNumericEdgeCase "1e2e3" of
         Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1e2") _, JSExpressionStatement (JSIdentifier _ "e3") _] _) -> pure ()
-        result -> expectationFailure ("Expected decimal and identifier, got: " ++ show result)
+        result -> expectationFailure ("Expected decimal and identifier as separate tokens, got: " ++ show result)
 
-    it "handles incomplete exponent as identifier" $ do
+    it "handles incomplete exponent as separate tokens" $ do
       case testNumericEdgeCase "1e" of
         Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "e") _] _) -> pure ()
-        result -> expectationFailure ("Expected decimal and identifier, got: " ++ show result)
+        result -> expectationFailure ("Expected decimal and identifier as separate tokens, got: " ++ show result)
 
     it "rejects exponent with only sign" $ do
       case testNumericEdgeCase "1e+" of
         Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "TailToken" `isInfixOf` msg)
-        Right _ -> pure ()  -- Accept successful parsing (treated as separate tokens)
-
+        Right _ -> pure () -- Accept successful parsing (treated as separate tokens)
   describe "hex literal edge cases" $ do
     it "handles hex prefix without digits as separate tokens" $ do
       case testNumericEdgeCase "0x" of
@@ -369,7 +366,7 @@ floatingPointEdgeCases = describe "Floating Point Edge Cases" $ do
     it "parses maximum precision decimal" $ do
       let maxPrecision = "1.2345678901234567890123456789"
       case testNumericEdgeCase maxPrecision of
-        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
           | val == BS8.pack maxPrecision -> pure ()
         result -> expectationFailure ("Expected decimal literal with value " ++ maxPrecision ++ ", got: " ++ show result)
 
@@ -419,14 +416,14 @@ performanceTests = describe "Performance Testing" $ do
     it "parses 100-digit decimal efficiently" $ do
       let large100 = List.replicate 100 '9'
       case testNumericEdgeCase large100 of
-        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
           | val == BS8.pack large100 -> pure ()
         result -> expectationFailure ("Expected decimal literal with value " ++ large100 ++ ", got: " ++ show result)
 
     it "parses 1000-digit BigInt efficiently" $ do
       let large1000 = List.replicate 1000 '9' ++ "n"
       case testNumericEdgeCase large1000 of
-        Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _)
           | val == BS8.pack large1000 -> pure ()
         result -> expectationFailure ("Expected BigInt literal with value " ++ large1000 ++ ", got: " ++ show result)
 
@@ -434,14 +431,14 @@ performanceTests = describe "Performance Testing" $ do
     it "parses long hex with mixed case" $ do
       let complexHex = "0x" ++ List.take 32 (List.cycle "aBcDeF123456789")
       case testNumericEdgeCase complexHex of
-        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
           | val == BS8.pack complexHex -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ complexHex ++ ", got: " ++ show result)
 
     it "parses very long binary sequence" $ do
       let longBinary = "0b" ++ List.take 128 (List.cycle "10")
       case testNumericEdgeCase longBinary of
-        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
           | val == BS8.pack longBinary -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ longBinary ++ ", got: " ++ show result)
 
@@ -449,7 +446,7 @@ performanceTests = describe "Performance Testing" $ do
     it "parses maximum decimal places" $ do
       let maxDecimals = "0." ++ List.replicate 50 '1'
       case testNumericEdgeCase maxDecimals of
-        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
           | val == BS8.pack maxDecimals -> pure ()
         result -> expectationFailure ("Expected decimal literal with value " ++ maxDecimals ++ ", got: " ++ show result)
 
@@ -470,30 +467,32 @@ performanceTests = describe "Performance Testing" $ do
 propertyBasedTests :: Spec
 propertyBasedTests = describe "Property-Based Testing" $ do
   describe "decimal literal properties" $ do
-    it "round-trip property for valid decimals" $ property $ \n ->
-      let numStr = show (abs (n :: Integer))
-      in case testNumericEdgeCase numStr of
-           Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) -> val == BS8.pack numStr
-           _ -> False
+    it "round-trip property for valid decimals" $
+      property $ \n ->
+        let numStr = show (abs (n :: Integer))
+         in case testNumericEdgeCase numStr of
+              Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) -> val == BS8.pack numStr
+              _ -> False
 
-    it "BigInt round-trip property" $ property $ \n ->
-      let numStr = show (abs (n :: Integer)) ++ "n"
-      in case testNumericEdgeCase numStr of
-           Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) -> val == BS8.pack numStr
-           _ -> False
+    it "BigInt round-trip property" $
+      property $ \n ->
+        let numStr = show (abs (n :: Integer)) ++ "n"
+         in case testNumericEdgeCase numStr of
+              Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) -> val == BS8.pack numStr
+              _ -> False
 
   describe "hex literal properties" $ do
     it "hex prefix preservation 0x" $ do
       let hexStr = "0x" ++ "ABC123"
       case testNumericEdgeCase hexStr of
-        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
           | val == BS8.pack hexStr -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ hexStr ++ ", got: " ++ show result)
 
     it "hex prefix preservation 0X" $ do
       let hexStr = "0X" ++ "def456"
       case testNumericEdgeCase hexStr of
-        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
           | val == BS8.pack hexStr -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ hexStr ++ ", got: " ++ show result)
 
@@ -501,26 +500,13 @@ propertyBasedTests = describe "Property-Based Testing" $ do
     it "binary parsing 0b" $ do
       let binStr = "0b" ++ "101010"
       case testNumericEdgeCase binStr of
-        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
           | val == BS8.pack binStr -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ binStr ++ ", got: " ++ show result)
 
     it "binary parsing 0B" $ do
       let binStr = "0B" ++ "010101"
       case testNumericEdgeCase binStr of
-        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _) 
+        Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
           | val == BS8.pack binStr -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ binStr ++ ", got: " ++ show result)
-
--- ---------------------------------------------------------------------
--- Property Test Generators
--- ---------------------------------------------------------------------
-
--- Note: Property test generators removed - using concrete test cases instead
--- for more reliable and maintainable testing of numeric literal edge cases.
-
--- ---------------------------------------------------------------------
--- Helper Functions
--- ---------------------------------------------------------------------
-
--- Helper functions removed - using string comparison pattern like existing tests
