@@ -12,6 +12,7 @@ import Control.Applicative ((<$>))
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
+import qualified Data.ByteString.Char8 as BS8
 
 -- ---------------------------------------------------------------------
 
@@ -219,27 +220,34 @@ fixBinOpPlus a lhs rhs =
 -- Concatenate two JSStringLiterals. Since the strings will include the string
 -- terminators (either single or double quotes) we use whatever terminator is
 -- used by the first string.
-stringLitConcat :: String -> String -> JSExpression
-stringLitConcat xs [] = JSStringLiteral emptyAnnot xs
-stringLitConcat [] ys = JSStringLiteral emptyAnnot ys
-stringLitConcat xall (_:yss) =
-    JSStringLiteral emptyAnnot (init xall ++ init yss ++ "'")
+stringLitConcat :: BS8.ByteString -> BS8.ByteString -> JSExpression
+stringLitConcat xs ys | BS8.null xs = JSStringLiteral emptyAnnot ys
+stringLitConcat xs ys | BS8.null ys = JSStringLiteral emptyAnnot xs
+stringLitConcat xall yall =
+    case BS8.uncons yall of
+      Nothing -> JSStringLiteral emptyAnnot xall
+      Just (_, yss) -> JSStringLiteral emptyAnnot (BS8.init xall `BS8.append` BS8.init yss `BS8.append` BS8.pack "'")
 
 -- Normalize a String. If its single quoted, just return it and its double quoted
 -- convert it to single quoted.
-normalizeToSQ :: String -> String
+normalizeToSQ :: BS8.ByteString -> BS8.ByteString
 normalizeToSQ str =
-    case str of
-        [] -> []
-        ('\'' : _) -> str
-        ('"' : xs) -> '\'' : convertSQ xs
-        other -> other -- Should not happen.
+    case BS8.uncons str of
+        Nothing -> BS8.empty
+        Just ('\'' , _) -> str
+        Just ('"' , xs) -> BS8.cons '\'' (convertSQ xs)
+        _ -> str -- Should not happen.
   where
-    convertSQ [] = []
-    convertSQ [_] = "'"
-    convertSQ ('\'':xs) = '\\' : '\'' : convertSQ xs
-    convertSQ ('\\':'\"':xs) = '"' : convertSQ xs
-    convertSQ (x:xs) = x : convertSQ xs
+    convertSQ bs = case BS8.uncons bs of
+        Nothing -> BS8.empty
+        Just (c, rest) -> case BS8.uncons rest of
+            Nothing -> BS8.pack "'"
+            _ -> case c of
+                '\'' -> BS8.pack "\\'" `BS8.append` convertSQ rest
+                '\\' -> case BS8.uncons rest of
+                    Just ('"', rest') -> BS8.cons '"' (convertSQ rest')
+                    _ -> BS8.cons c (convertSQ rest)
+                _ -> BS8.cons c (convertSQ rest)
 
 
 instance MinifyJS JSBinOp where
@@ -468,13 +476,13 @@ instance MinifyJS [JSClassElement] where
 
 
 spaceAnnot :: JSAnnot
-spaceAnnot = JSAnnot tokenPosnEmpty [WhiteSpace tokenPosnEmpty " "]
+spaceAnnot = JSAnnot tokenPosnEmpty [WhiteSpace tokenPosnEmpty (BS8.pack " ")]
 
 emptyAnnot :: JSAnnot
 emptyAnnot = JSNoAnnot
 
 newlineAnnot :: JSAnnot
-newlineAnnot = JSAnnot tokenPosnEmpty [WhiteSpace tokenPosnEmpty "\n"]
+newlineAnnot = JSAnnot tokenPosnEmpty [WhiteSpace tokenPosnEmpty (BS8.pack "\n")]
 
 semi :: JSSemi
 semi = JSSemi emptyAnnot

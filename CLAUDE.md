@@ -27,6 +27,7 @@ These constraints are enforced by CI and must be followed without exception:
 7. **Qualified imports**: Everything qualified except types, lenses, and pragmas
 8. **Test coverage**: Minimum 85% coverage for all modules (higher than typical projects due to parser criticality)
 9. **Add documentation to each module in Haddock style**: Complete module-level documentation with purpose, examples, and function-level docs with type explanations
+10. **Tests**: NEVER use input parsing (2>&1 | ...) or head 10 etc. in cabal commands. This won't work and the test will keep running. always just run timeout 180 cabal test.
 
 ## 📁 Project Structure
 
@@ -151,7 +152,7 @@ createInitialState tokens = ParseState
 
 -- Access with (^.)
 getCurrentToken :: ParseState -> Maybe Token
-getCurrentToken state = 
+getCurrentToken state =
   let pos = state ^. statePosition
       tokens = state ^. stateTokens
   in tokens !? pos
@@ -221,7 +222,7 @@ parseJSBinaryOp = do
     tokenToBinOp (PlusToken {}) = Right (JSBinOpPlus (JSAnnot pos []))
     tokenToBinOp (MinusToken {}) = Right (JSBinOpMinus (JSAnnot pos []))
     tokenToBinOp _ = Left "Expected binary operator"
-    
+
     parseError pos msg = ParseError pos msg
 ```
 
@@ -268,10 +269,10 @@ data ParseOptions = ParseOptions
 makeLenses ''ParseOptions
 
 -- Use sum types for parser states
-data ParseContext 
-  = TopLevel 
-  | InFunction 
-  | InClass 
+data ParseContext
+  = TopLevel
+  | InFunction
+  | InClass
   | InExpression
   deriving (Eq, Show)
 
@@ -300,16 +301,16 @@ tests :: Spec
 tests = describe "Expression Parser Tests" $ do
   describe "literal expressions" $ do
     it "parses numeric literals" $ do
-      parseExpression "42" `shouldBe` 
+      parseExpression "42" `shouldBe`
         Right (AST.JSLiteral (AST.JSNumericLiteral noAnnot "42"))
     it "parses string literals" $ do
       parseExpression "\"hello\"" `shouldBe`
         Right (AST.JSLiteral (AST.JSStringLiteral noAnnot "hello"))
-  
+
   describe "binary expressions" $ do
     it "parses addition" $ do
       case parseExpression "1 + 2" of
-        Right (AST.JSExpressionBinary _ _ (AST.JSBinOpPlus _) _) -> 
+        Right (AST.JSExpressionBinary _ _ (AST.JSBinOpPlus _) _) ->
           pure ()
         _ -> expectationFailure "Expected binary addition expression"
 
@@ -321,11 +322,11 @@ import Test.QuickCheck
 import Language.JavaScript.Parser
 import Language.JavaScript.Pretty.Printer
 
-props :: Spec  
+props :: Spec
 props = describe "Round-trip Properties" $ do
   it "parse then pretty-print preserves semantics" $ property $ \validJS ->
     case parseProgram validJS of
-      Right ast -> 
+      Right ast ->
         case parseProgram (renderToString ast) of
           Right ast' -> astEquivalent ast ast'
           Left _ -> False
@@ -356,7 +357,7 @@ goldenTest = describe "JavaScript Generation" $ do
 isValidJavaScript :: Text -> Bool
 isValidJavaScript _ = True  -- This is worthless!
 
-isValidExpression :: JSExpression -> Bool  
+isValidExpression :: JSExpression -> Bool
 isValidExpression _ = True  -- This tests nothing!
 
 -- BAD: Fake validation that doesn't validate
@@ -386,21 +387,21 @@ testParseLiterals = describe "Literal parsing" $ do
   it "parses integer literals correctly" $ do
     parseExpression "123" `shouldBe`
       Right (JSLiteral (JSNumericLiteral noAnnot "123"))
-  
+
   it "parses string literals with quotes" $ do
-    parseExpression "\"hello world\"" `shouldBe` 
+    parseExpression "\"hello world\"" `shouldBe`
       Right (JSLiteral (JSStringLiteral noAnnot "hello world"))
-  
+
   it "handles escape sequences in strings" $ do
     parseExpression "\"hello\\nworld\"" `shouldBe`
       Right (JSLiteral (JSStringLiteral noAnnot "hello\nworld"))
 
 -- GOOD: Test error conditions
-testParseErrors :: Spec  
+testParseErrors :: Spec
 testParseErrors = describe "Parse error handling" $ do
   it "reports unclosed string literals" $ do
     case parseExpression "\"unclosed" of
-      Left (ParseError _ msg) -> 
+      Left (ParseError _ msg) ->
         msg `shouldContain` "unclosed string"
       _ -> expectationFailure "Expected parse error"
 ```
@@ -408,7 +409,7 @@ testParseErrors = describe "Parse error handling" $ do
 ### Testing Requirements
 
 1. **Unit tests** for every public function - NO MOCK FUNCTIONS
-2. **Property tests** for parser invariants and round-trip properties  
+2. **Property tests** for parser invariants and round-trip properties
 3. **Golden tests** for pretty printer output and error messages
 4. **Integration tests** for end-to-end parsing
 5. **Performance tests** for parsing large JavaScript files
@@ -419,7 +420,7 @@ testParseErrors = describe "Parse error handling" $ do
 # Build project
 cabal build
 
-# Run all tests - ALWAYS VERIFY NO MOCKING BEFORE COMMIT  
+# Run all tests - ALWAYS VERIFY NO MOCKING BEFORE COMMIT
 cabal test
 
 # Run specific test suite
@@ -435,7 +436,7 @@ cabal test --test-options="--match Expression"
 grep -r "_ = True" test/    # Should return NOTHING
 grep -r "_ = False" test/   # Should return NOTHING
 
-# MANDATORY: Check for reflexive equality tests  
+# MANDATORY: Check for reflexive equality tests
 grep -r "shouldBe.*\b\(\w\+\)\b.*\b\1\b" test/  # Should return NOTHING
 ```
 
@@ -454,7 +455,7 @@ data ParseError
 
 data SemanticProblem
   = DuplicateIdentifier !Text
-  | UndefinedIdentifier !Text  
+  | UndefinedIdentifier !Text
   | InvalidAssignmentTarget
   | InvalidBreakContext
   | InvalidContinueContext
@@ -564,7 +565,7 @@ parseTokens :: [Token] -> Either ParseError JSAST
 parseTokens = go []
   where
     go !acc [] = Right (buildAST (reverse acc))
-    go !acc (t:ts) = 
+    go !acc (t:ts) =
       case parseToken t of
         Right node -> go (node : acc) ts
         Left err -> Left err
@@ -593,7 +594,7 @@ parseFileStreaming path = do
   pure (parseTokens tokens)
 
 -- Clear parser state between uses
-clearParseState :: ParseState -> ParseState  
+clearParseState :: ParseState -> ParseState
 clearParseState state = state
   & stateTokens .~ []
   & stateErrors .~ []
@@ -611,7 +612,7 @@ validateJavaScriptSource input
   | Text.length input > maxFileSize =
       Left (SecurityError "File too large")
   | containsUnsafePatterns input =
-      Left (SecurityError "Input contains potentially unsafe patterns") 
+      Left (SecurityError "Input contains potentially unsafe patterns")
   | exceedsNestingLimit input =
       Left (SecurityError "Nesting too deep")
   | otherwise = Right input
@@ -640,7 +641,7 @@ Follow conventional commits strictly:
 
 ```bash
 feat(parser): add support for optional chaining (?.)
-fix(lexer): handle BigInt literals correctly  
+fix(lexer): handle BigInt literals correctly
 perf(parser): improve expression parsing by 20%
 docs(api): add examples for Pretty.Printer module
 refactor(ast): split JSExpression into separate modules
@@ -653,7 +654,7 @@ style(format): apply ormolu to all modules
 ### Pull Request Checklist
 
 - [ ] All CI checks pass
-- [ ] Functions meet size/complexity limits  
+- [ ] Functions meet size/complexity limits
 - [ ] Lenses used for all record operations
 - [ ] Qualified imports follow conventions
 - [ ] Unit tests added/updated (coverage ≥85%)
@@ -696,7 +697,7 @@ echo "const x = 42n;" | cabal run language-javascript
 # Run lexer tests
 cabal test --test-options="--match Lexer"
 
-# Run round-trip property tests  
+# Run round-trip property tests
 cabal test --test-options="--match RoundTrip"
 
 # Generate parser from grammar (when grammar changes)
@@ -727,7 +728,7 @@ alex src/Language/JavaScript/Parser/Lexer.x
 - Write functions >15 lines
 - Use partial functions without documentation
 - Parse untrusted JavaScript without validation
-- Commit without tests  
+- Commit without tests
 - Ignore parser warnings or errors
 - Skip code review for parser changes
 - Use String (prefer Text for source code)
@@ -737,7 +738,7 @@ alex src/Language/JavaScript/Parser/Lexer.x
 ```haskell
 -- Module header
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveDataTypeable #-}  
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_GHC -Wall #-}
 module Language.JavaScript.Parser.Feature (api) where
 
@@ -746,7 +747,7 @@ data ParseState = ParseState { _stateField :: !Type }
 makeLenses ''ParseState
 
 -- Error handling
-parseFeature :: Text -> Either ParseError JSExpression  
+parseFeature :: Text -> Either ParseError JSExpression
 parseFeature = tokenize >=> parseTokens >=> validate
 
 -- Testing
@@ -769,7 +770,7 @@ spec = describe "Feature parsing" $
 This coding standard incorporates best practices from:
 
 - The language-javascript library maintainers
-- Haskell parsing community standards  
+- Haskell parsing community standards
 - JavaScript language specification requirements
 - Modern parser construction techniques
 

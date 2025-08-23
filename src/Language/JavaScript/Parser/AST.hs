@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, DeriveAnyClass, FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, DeriveAnyClass, FlexibleInstances, OverloadedStrings #-}
 
 -- | JavaScript Abstract Syntax Tree definitions and utilities.
 --
@@ -86,6 +86,8 @@ import qualified Data.List as List
 import GHC.Generics (Generic)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Parser.Token
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 
 -- ---------------------------------------------------------------------
 
@@ -114,7 +116,7 @@ data JSModuleItem
 
 data JSImportDeclaration
     = JSImportDeclaration !JSImportClause !JSFromClause !(Maybe JSImportAttributes) !JSSemi -- ^imports, module, optional attributes, semi
-    | JSImportDeclarationBare !JSAnnot !String !(Maybe JSImportAttributes) !JSSemi -- ^import, module, optional attributes, semi
+    | JSImportDeclarationBare !JSAnnot !ByteString !(Maybe JSImportAttributes) !JSSemi -- ^import, module, optional attributes, semi
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSImportAttributes
@@ -134,7 +136,7 @@ data JSImportClause
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSFromClause
-    = JSFromClause !JSAnnot !JSAnnot !String -- ^ from, string literal, string literal contents
+    = JSFromClause !JSAnnot !JSAnnot !ByteString -- ^ from, string literal, string literal contents
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- | Import namespace, e.g. '* as whatever'
@@ -214,15 +216,15 @@ data JSStatement
 
 data JSExpression
     -- | Terminals
-    = JSIdentifier !JSAnnot !String
-    | JSDecimal !JSAnnot !String
-    | JSLiteral !JSAnnot !String
-    | JSHexInteger !JSAnnot !String
-    | JSBinaryInteger !JSAnnot !String
-    | JSOctal !JSAnnot !String
-    | JSBigIntLiteral !JSAnnot !String
-    | JSStringLiteral !JSAnnot !String
-    | JSRegEx !JSAnnot !String
+    = JSIdentifier !JSAnnot !ByteString
+    | JSDecimal !JSAnnot !ByteString
+    | JSLiteral !JSAnnot !ByteString
+    | JSHexInteger !JSAnnot !ByteString
+    | JSBinaryInteger !JSAnnot !ByteString
+    | JSOctal !JSAnnot !ByteString
+    | JSBigIntLiteral !JSAnnot !ByteString
+    | JSStringLiteral !JSAnnot !ByteString
+    | JSRegEx !JSAnnot !ByteString
 
     -- | Non Terminals
     | JSArrayLiteral !JSAnnot ![JSArrayElement] !JSAnnot -- ^lb, contents, rb
@@ -251,7 +253,7 @@ data JSExpression
     | JSOptionalCallExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot -- ^expr, ?.(, args, )
     | JSObjectLiteral !JSAnnot !JSObjectPropertyList !JSAnnot -- ^lbrace contents rbrace
     | JSSpreadExpression !JSAnnot !JSExpression
-    | JSTemplateLiteral !(Maybe JSExpression) !JSAnnot !String ![JSTemplatePart] -- ^optional tag, lquot, head, parts
+    | JSTemplateLiteral !(Maybe JSExpression) !JSAnnot !ByteString ![JSTemplatePart] -- ^optional tag, lquot, head, parts
     | JSUnaryExpression !JSUnaryOp !JSExpression
     | JSVarInitExpression !JSExpression !JSVarInitializer -- ^identifier, initializer
     | JSYieldExpression !JSAnnot !(Maybe JSExpression) -- ^yield, optional expr
@@ -359,7 +361,7 @@ data JSVarInitializer
 
 data JSObjectProperty
     = JSPropertyNameandValue !JSPropertyName !JSAnnot ![JSExpression] -- ^name, colon, value
-    | JSPropertyIdentRef !JSAnnot !String
+    | JSPropertyIdentRef !JSAnnot !ByteString
     | JSObjectMethod !JSMethodDefinition
     | JSObjectSpread !JSAnnot !JSExpression -- ^..., expression
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
@@ -371,9 +373,9 @@ data JSMethodDefinition
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSPropertyName
-    = JSPropertyIdent !JSAnnot !String
-    | JSPropertyString !JSAnnot !String
-    | JSPropertyNumber !JSAnnot !String
+    = JSPropertyIdent !JSAnnot !ByteString
+    | JSPropertyString !JSAnnot !ByteString
+    | JSPropertyNumber !JSAnnot !ByteString
     | JSPropertyComputed !JSAnnot !JSExpression !JSAnnot -- ^lb, expr, rb
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
@@ -386,7 +388,7 @@ data JSAccessor
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSIdent
-    = JSIdentName !JSAnnot !String
+    = JSIdentName !JSAnnot !ByteString
     | JSIdentNone
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
@@ -407,7 +409,7 @@ data JSCommaTrailingList a
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSTemplatePart
-    = JSTemplatePart !JSExpression !JSAnnot !String -- ^expr, rb, suffix
+    = JSTemplatePart !JSExpression !JSAnnot !ByteString -- ^expr, rb, suffix
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSClassHeritage
@@ -419,20 +421,20 @@ data JSClassElement
     = JSClassInstanceMethod !JSMethodDefinition
     | JSClassStaticMethod !JSAnnot !JSMethodDefinition
     | JSClassSemi !JSAnnot
-    | JSPrivateField !JSAnnot !String !JSAnnot !(Maybe JSExpression) !JSSemi -- ^#, name, =, optional initializer, autosemi
-    | JSPrivateMethod !JSAnnot !String !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- ^#, name, lb, params, rb, block
-    | JSPrivateAccessor !JSAccessor !JSAnnot !String !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- ^get/set, #, name, lb, params, rb, block
+    | JSPrivateField !JSAnnot !ByteString !JSAnnot !(Maybe JSExpression) !JSSemi -- ^#, name, =, optional initializer, autosemi
+    | JSPrivateMethod !JSAnnot !ByteString !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- ^#, name, lb, params, rb, block
+    | JSPrivateAccessor !JSAccessor !JSAnnot !ByteString !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- ^get/set, #, name, lb, params, rb, block
     deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- -----------------------------------------------------------------------------
 -- | Show the AST elements stripped of their JSAnnot data.
 
 -- Strip out the location info
--- | Convert AST to string representation stripped of position information.
+-- | Convert AST to ByteString representation stripped of position information.
 --
 -- Removes all 'JSAnnot' location data while preserving the logical structure
 -- of the JavaScript AST. Useful for testing and debugging when position 
--- information is not relevant.
+-- information is not relevant. Uses ByteString for optimal performance.
 --
 -- ==== Examples
 --
@@ -440,200 +442,199 @@ data JSClassElement
 -- "JSAstProgram [JSEmptyStatement]"
 --
 -- @since 0.7.1.0
-showStripped :: JSAST -> String
-showStripped (JSAstProgram xs _) = "JSAstProgram " ++ ss xs
-showStripped (JSAstModule xs _) = "JSAstModule " ++ ss xs
-showStripped (JSAstStatement s _) = "JSAstStatement (" ++ ss s ++ ")"
-showStripped (JSAstExpression e _) = "JSAstExpression (" ++ ss e ++ ")"
-showStripped (JSAstLiteral s _)  = "JSAstLiteral (" ++ ss s ++ ")"
-
+showStripped :: JSAST -> ByteString
+showStripped (JSAstProgram xs _) = "JSAstProgram " <> ss xs
+showStripped (JSAstModule xs _) = "JSAstModule " <> ss xs
+showStripped (JSAstStatement s _) = "JSAstStatement (" <> ss s <> ")"
+showStripped (JSAstExpression e _) = "JSAstExpression (" <> ss e <> ")"
+showStripped (JSAstLiteral e _) = "JSAstLiteral (" <> ss e <> ")"
 
 class ShowStripped a where
-    ss :: a -> String
+    ss :: a -> ByteString
 
 instance ShowStripped JSStatement where
-    ss (JSStatementBlock _ xs _ _) = "JSStatementBlock " ++ ss xs
-    ss (JSBreak _ JSIdentNone s) = "JSBreak" ++ commaIf (ss s)
-    ss (JSBreak _ (JSIdentName _ n) s) = "JSBreak " ++ singleQuote n ++ commaIf (ss s)
-    ss (JSClass _ n h _lb xs _rb _) = "JSClass " ++ ssid n ++ " (" ++ ss h ++ ") " ++ ss xs
-    ss (JSContinue _ JSIdentNone s) = "JSContinue" ++ commaIf (ss s)
-    ss (JSContinue _ (JSIdentName _ n) s) = "JSContinue " ++ singleQuote n ++ commaIf (ss s)
-    ss (JSConstant _ xs _as) = "JSConstant " ++ ss xs
-    ss (JSDoWhile _d x1 _w _lb x2 _rb x3) = "JSDoWhile (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSFor _ _lb x1s _s1 x2s _s2 x3s _rb x4) = "JSFor " ++ ss x1s ++ " " ++ ss x2s ++ " " ++ ss x3s ++ " (" ++ ss x4 ++ ")"
-    ss (JSForIn _ _lb x1s _i x2 _rb x3) = "JSForIn " ++ ss x1s ++ " (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForVar _ _lb _v x1s _s1 x2s _s2 x3s _rb x4) = "JSForVar " ++ ss x1s ++ " " ++ ss x2s ++ " " ++ ss x3s ++ " (" ++ ss x4 ++ ")"
-    ss (JSForVarIn _ _lb _v x1 _i x2 _rb x3) = "JSForVarIn (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForLet _ _lb _v x1s _s1 x2s _s2 x3s _rb x4) = "JSForLet " ++ ss x1s ++ " " ++ ss x2s ++ " " ++ ss x3s ++ " (" ++ ss x4 ++ ")"
-    ss (JSForLetIn _ _lb _v x1 _i x2 _rb x3) = "JSForLetIn (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForLetOf _ _lb _v x1 _i x2 _rb x3) = "JSForLetOf (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForConst _ _lb _v x1s _s1 x2s _s2 x3s _rb x4) = "JSForConst " ++ ss x1s ++ " " ++ ss x2s ++ " " ++ ss x3s ++ " (" ++ ss x4 ++ ")"
-    ss (JSForConstIn _ _lb _v x1 _i x2 _rb x3) = "JSForConstIn (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForConstOf _ _lb _v x1 _i x2 _rb x3) = "JSForConstOf (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForOf _ _lb x1s _i x2 _rb x3) = "JSForOf " ++ ss x1s ++ " (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSForVarOf _ _lb _v x1 _i x2 _rb x3) = "JSForVarOf (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSFunction _ n _lb pl _rb x3 _) = "JSFunction " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
-    ss (JSAsyncFunction _ _ n _lb pl _rb x3 _) = "JSAsyncFunction " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
-    ss (JSGenerator _ _ n _lb pl _rb x3 _) = "JSGenerator " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
-    ss (JSIf _ _lb x1 _rb x2) = "JSIf (" ++ ss x1 ++ ") (" ++ ss x2 ++ ")"
-    ss (JSIfElse _ _lb x1 _rb x2 _e x3) = "JSIfElse (" ++ ss x1 ++ ") (" ++ ss x2 ++ ") (" ++ ss x3 ++ ")"
-    ss (JSLabelled x1 _c x2) = "JSLabelled (" ++ ss x1 ++ ") (" ++ ss x2 ++ ")"
-    ss (JSLet _ xs _as) = "JSLet " ++ ss xs
+    ss (JSStatementBlock _ xs _ _) = "JSStatementBlock " <> ss xs
+    ss (JSBreak _ JSIdentNone s) = "JSBreak" <> commaIf (ss s)
+    ss (JSBreak _ (JSIdentName _ n) s) = "JSBreak " <> singleQuote n <> commaIf (ss s)
+    ss (JSClass _ n h _lb xs _rb _) = "JSClass " <> ssid n <> " (" <> ss h <> ") " <> ss xs
+    ss (JSContinue _ JSIdentNone s) = "JSContinue" <> commaIf (ss s)
+    ss (JSContinue _ (JSIdentName _ n) s) = "JSContinue " <> singleQuote n <> commaIf (ss s)
+    ss (JSConstant _ xs _as) = "JSConstant " <> ss xs
+    ss (JSDoWhile _d x1 _w _lb x2 _rb x3) = "JSDoWhile (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSFor _ _lb x1s _s1 x2s _s2 x3s _rb x4) = "JSFor " <> ss x1s <> " " <> ss x2s <> " " <> ss x3s <> " (" <> ss x4 <> ")"
+    ss (JSForIn _ _lb x1s _i x2 _rb x3) = "JSForIn " <> ss x1s <> " (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForVar _ _lb _v x1s _s1 x2s _s2 x3s _rb x4) = "JSForVar " <> ss x1s <> " " <> ss x2s <> " " <> ss x3s <> " (" <> ss x4 <> ")"
+    ss (JSForVarIn _ _lb _v x1 _i x2 _rb x3) = "JSForVarIn (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForLet _ _lb _v x1s _s1 x2s _s2 x3s _rb x4) = "JSForLet " <> ss x1s <> " " <> ss x2s <> " " <> ss x3s <> " (" <> ss x4 <> ")"
+    ss (JSForLetIn _ _lb _v x1 _i x2 _rb x3) = "JSForLetIn (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForLetOf _ _lb _v x1 _i x2 _rb x3) = "JSForLetOf (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForConst _ _lb _v x1s _s1 x2s _s2 x3s _rb x4) = "JSForConst " <> ss x1s <> " " <> ss x2s <> " " <> ss x3s <> " (" <> ss x4 <> ")"
+    ss (JSForConstIn _ _lb _v x1 _i x2 _rb x3) = "JSForConstIn (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForConstOf _ _lb _v x1 _i x2 _rb x3) = "JSForConstOf (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForOf _ _lb x1s _i x2 _rb x3) = "JSForOf " <> ss x1s <> " (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSForVarOf _ _lb _v x1 _i x2 _rb x3) = "JSForVarOf (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSFunction _ n _lb pl _rb x3 _) = "JSFunction " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+    ss (JSAsyncFunction _ _ n _lb pl _rb x3 _) = "JSAsyncFunction " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+    ss (JSGenerator _ _ n _lb pl _rb x3 _) = "JSGenerator " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+    ss (JSIf _ _lb x1 _rb x2) = "JSIf (" <> ss x1 <> ") (" <> ss x2 <> ")"
+    ss (JSIfElse _ _lb x1 _rb x2 _e x3) = "JSIfElse (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+    ss (JSLabelled x1 _c x2) = "JSLabelled (" <> ss x1 <> ") (" <> ss x2 <> ")"
+    ss (JSLet _ xs _as) = "JSLet " <> ss xs
     ss (JSEmptyStatement _) = "JSEmptyStatement"
-    ss (JSExpressionStatement l s) = ss l ++ (let x = ss s in if not (null x) then ',':x else "")
-    ss (JSAssignStatement lhs op rhs s) ="JSOpAssign (" ++ ss op ++ "," ++ ss lhs ++ "," ++ ss rhs ++ (let x = ss s in if not (null x) then "),"++x else ")")
-    ss (JSMethodCall e _ a _ s) = "JSMethodCall (" ++ ss e ++ ",JSArguments " ++ ss a ++ (let x = ss s in if not (null x) then "),"++x else ")")
-    ss (JSReturn _ (Just me) s) = "JSReturn " ++ ss me ++ " " ++ ss s
-    ss (JSReturn _ Nothing s) = "JSReturn " ++ ss s
-    ss (JSSwitch _ _lp x _rp _lb x2 _rb _) = "JSSwitch (" ++ ss x ++ ") " ++ ss x2
-    ss (JSThrow _ x _) = "JSThrow (" ++ ss x ++ ")"
-    ss (JSTry _ xt1 xtc xtf) = "JSTry (" ++ ss xt1 ++ "," ++ ss xtc ++ "," ++ ss xtf ++ ")"
-    ss (JSVariable _ xs _as) = "JSVariable " ++ ss xs
-    ss (JSWhile _ _lb x1 _rb x2) = "JSWhile (" ++ ss x1 ++ ") (" ++ ss x2 ++ ")"
-    ss (JSWith _ _lb x1 _rb x _) = "JSWith (" ++ ss x1 ++ ") (" ++ ss x ++ ")"
+    ss (JSExpressionStatement l s) = ss l <> (let x = ss s in if not (BS8.null x) then "," <> x else "")
+    ss (JSAssignStatement lhs op rhs s) ="JSOpAssign (" <> ss op <> "," <> ss lhs <> "," <> ss rhs <> (let x = ss s in if not (BS8.null x) then ")," <> x else ")")
+    ss (JSMethodCall e _ a _ s) = "JSMethodCall (" <> ss e <> ",JSArguments " <> ss a <> (let x = ss s in if not (BS8.null x) then ")," <> x else ")")
+    ss (JSReturn _ (Just me) s) = "JSReturn " <> ss me <> " " <> ss s
+    ss (JSReturn _ Nothing s) = "JSReturn " <> ss s
+    ss (JSSwitch _ _lp x _rp _lb x2 _rb _) = "JSSwitch (" <> ss x <> ") " <> ss x2
+    ss (JSThrow _ x _) = "JSThrow (" <> ss x <> ")"
+    ss (JSTry _ xt1 xtc xtf) = "JSTry (" <> ss xt1 <> "," <> ss xtc <> "," <> ss xtf <> ")"
+    ss (JSVariable _ xs _as) = "JSVariable " <> ss xs
+    ss (JSWhile _ _lb x1 _rb x2) = "JSWhile (" <> ss x1 <> ") (" <> ss x2 <> ")"
+    ss (JSWith _ _lb x1 _rb x _) = "JSWith (" <> ss x1 <> ") (" <> ss x <> ")"
 
 instance ShowStripped JSExpression where
-    ss (JSArrayLiteral _lb xs _rb) = "JSArrayLiteral " ++ ss xs
-    ss (JSAssignExpression lhs op rhs) = "JSOpAssign (" ++ ss op ++ "," ++ ss lhs ++ "," ++ ss rhs ++ ")"
-    ss (JSAwaitExpression _ e) = "JSAwaitExpresson " ++ ss e
-    ss (JSCallExpression ex _ xs _) = "JSCallExpression ("++ ss ex ++ ",JSArguments " ++ ss xs ++ ")"
-    ss (JSCallExpressionDot ex _os xs) = "JSCallExpressionDot (" ++ ss ex ++ "," ++ ss xs ++ ")"
-    ss (JSCallExpressionSquare ex _os xs _cs) = "JSCallExpressionSquare (" ++ ss ex ++ "," ++ ss xs ++ ")"
-    ss (JSClassExpression _ n h _lb xs _rb) = "JSClassExpression " ++ ssid n ++ " (" ++ ss h ++ ") " ++ ss xs
-    ss (JSDecimal _ s) = "JSDecimal " ++ singleQuote s
-    ss (JSCommaExpression l _ r) = "JSExpression [" ++ ss l ++ "," ++ ss r ++ "]"
-    ss (JSExpressionBinary x2 op x3) = "JSExpressionBinary (" ++ ss op ++ "," ++ ss x2 ++ "," ++ ss x3 ++ ")"
-    ss (JSExpressionParen _lp x _rp) = "JSExpressionParen (" ++ ss x ++ ")"
-    ss (JSExpressionPostfix xs op) = "JSExpressionPostfix (" ++ ss op ++ "," ++ ss xs ++ ")"
-    ss (JSExpressionTernary x1 _q x2 _c x3) = "JSExpressionTernary (" ++ ss x1 ++ "," ++ ss x2 ++ "," ++ ss x3 ++ ")"
-    ss (JSArrowExpression ps _ body) = "JSArrowExpression (" ++ ss ps ++ ") => " ++ ss body
-    ss (JSFunctionExpression _ n _lb pl _rb x3) = "JSFunctionExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
-    ss (JSGeneratorExpression _ _ n _lb pl _rb x3) = "JSGeneratorExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
-    ss (JSAsyncFunctionExpression _ _ n _lb pl _rb x3) = "JSAsyncFunctionExpression " ++ ssid n ++ " " ++ ss pl ++ " (" ++ ss x3 ++ ")"
-    ss (JSHexInteger _ s) = "JSHexInteger " ++ singleQuote s
-    ss (JSBinaryInteger _ s) = "JSBinaryInteger " ++ singleQuote s
-    ss (JSOctal _ s) = "JSOctal " ++ singleQuote s
-    ss (JSBigIntLiteral _ s) = "JSBigIntLiteral " ++ singleQuote s
-    ss (JSIdentifier _ s) = "JSIdentifier " ++ singleQuote s
-    ss (JSLiteral _ []) = "JSLiteral ''"
-    ss (JSLiteral _ s) = "JSLiteral " ++ singleQuote s
-    ss (JSMemberDot x1s _d x2 ) = "JSMemberDot (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
-    ss (JSMemberExpression e _ a _) = "JSMemberExpression (" ++ ss e ++ ",JSArguments " ++ ss a ++ ")"
-    ss (JSMemberNew _a n _ s _) = "JSMemberNew (" ++ ss n ++ ",JSArguments " ++ ss s ++ ")"
-    ss (JSMemberSquare x1s _lb x2 _rb) = "JSMemberSquare (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
-    ss (JSNewExpression _n e) = "JSNewExpression " ++ ss e
-    ss (JSOptionalMemberDot x1s _d x2) = "JSOptionalMemberDot (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
-    ss (JSOptionalMemberSquare x1s _lb x2 _rb) = "JSOptionalMemberSquare (" ++ ss x1s ++ "," ++ ss x2 ++ ")"
-    ss (JSOptionalCallExpression ex _ xs _) = "JSOptionalCallExpression ("++ ss ex ++ ",JSArguments " ++ ss xs ++ ")"
-    ss (JSObjectLiteral _lb xs _rb) = "JSObjectLiteral " ++ ss xs
-    ss (JSRegEx _ s) = "JSRegEx " ++ singleQuote s
-    ss (JSStringLiteral _ s) = "JSStringLiteral " ++ s
-    ss (JSUnaryExpression op x) = "JSUnaryExpression (" ++ ss op ++ "," ++ ss x ++ ")"
-    ss (JSVarInitExpression x1 x2) = "JSVarInitExpression (" ++ ss x1 ++ ") " ++ ss x2
+    ss (JSArrayLiteral _lb xs _rb) = "JSArrayLiteral " <> ss xs
+    ss (JSAssignExpression lhs op rhs) = "JSOpAssign (" <> ss op <> "," <> ss lhs <> "," <> ss rhs <> ")"
+    ss (JSAwaitExpression _ e) = "JSAwaitExpresson " <> ss e
+    ss (JSCallExpression ex _ xs _) = "JSCallExpression (" <> ss ex <> ",JSArguments " <> ss xs <> ")"
+    ss (JSCallExpressionDot ex _os xs) = "JSCallExpressionDot (" <> ss ex <> "," <> ss xs <> ")"
+    ss (JSCallExpressionSquare ex _os xs _cs) = "JSCallExpressionSquare (" <> ss ex <> "," <> ss xs <> ")"
+    ss (JSClassExpression _ n h _lb xs _rb) = "JSClassExpression " <> ssid n <> " (" <> ss h <> ") " <> ss xs
+    ss (JSDecimal _ s) = "JSDecimal " <> singleQuote (s)
+    ss (JSCommaExpression l _ r) = "JSExpression [" <> ss l <> "," <> ss r <> "]"
+    ss (JSExpressionBinary x2 op x3) = "JSExpressionBinary (" <> ss op <> "," <> ss x2 <> "," <> ss x3 <> ")"
+    ss (JSExpressionParen _lp x _rp) = "JSExpressionParen (" <> ss x <> ")"
+    ss (JSExpressionPostfix xs op) = "JSExpressionPostfix (" <> ss op <> "," <> ss xs <> ")"
+    ss (JSExpressionTernary x1 _q x2 _c x3) = "JSExpressionTernary (" <> ss x1 <> "," <> ss x2 <> "," <> ss x3 <> ")"
+    ss (JSArrowExpression ps _ body) = "JSArrowExpression (" <> ss ps <> ") => " <> ss body
+    ss (JSFunctionExpression _ n _lb pl _rb x3) = "JSFunctionExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+    ss (JSGeneratorExpression _ _ n _lb pl _rb x3) = "JSGeneratorExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+    ss (JSAsyncFunctionExpression _ _ n _lb pl _rb x3) = "JSAsyncFunctionExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+    ss (JSHexInteger _ s) = "JSHexInteger " <> singleQuote (s)
+    ss (JSBinaryInteger _ s) = "JSBinaryInteger " <> singleQuote (s)
+    ss (JSOctal _ s) = "JSOctal " <> singleQuote (s)
+    ss (JSBigIntLiteral _ s) = "JSBigIntLiteral " <> singleQuote (s)
+    ss (JSIdentifier _ s) = "JSIdentifier " <> singleQuote (s)
+    ss (JSLiteral _ s) | BS8.null s = "JSLiteral ''"
+    ss (JSLiteral _ s) = "JSLiteral " <> singleQuote (s)
+    ss (JSMemberDot x1s _d x2 ) = "JSMemberDot (" <> ss x1s <> "," <> ss x2 <> ")"
+    ss (JSMemberExpression e _ a _) = "JSMemberExpression (" <> ss e <> ",JSArguments " <> ss a <> ")"
+    ss (JSMemberNew _a n _ s _) = "JSMemberNew (" <> ss n <> ",JSArguments " <> ss s <> ")"
+    ss (JSMemberSquare x1s _lb x2 _rb) = "JSMemberSquare (" <> ss x1s <> "," <> ss x2 <> ")"
+    ss (JSNewExpression _n e) = "JSNewExpression " <> ss e
+    ss (JSOptionalMemberDot x1s _d x2) = "JSOptionalMemberDot (" <> ss x1s <> "," <> ss x2 <> ")"
+    ss (JSOptionalMemberSquare x1s _lb x2 _rb) = "JSOptionalMemberSquare (" <> ss x1s <> "," <> ss x2 <> ")"
+    ss (JSOptionalCallExpression ex _ xs _) = "JSOptionalCallExpression (" <> ss ex <> ",JSArguments " <> ss xs <> ")"
+    ss (JSObjectLiteral _lb xs _rb) = "JSObjectLiteral " <> ss xs
+    ss (JSRegEx _ s) = "JSRegEx " <> singleQuote (s)
+    ss (JSStringLiteral _ s) = "JSStringLiteral " <> s
+    ss (JSUnaryExpression op x) = "JSUnaryExpression (" <> ss op <> "," <> ss x <> ")"
+    ss (JSVarInitExpression x1 x2) = "JSVarInitExpression (" <> ss x1 <> ") " <> ss x2
     ss (JSYieldExpression _ Nothing) = "JSYieldExpression ()"
-    ss (JSYieldExpression _ (Just x)) = "JSYieldExpression (" ++ ss x ++ ")"
-    ss (JSYieldFromExpression _ _ x) = "JSYieldFromExpression (" ++ ss x ++ ")"
+    ss (JSYieldExpression _ (Just x)) = "JSYieldExpression (" <> ss x <> ")"
+    ss (JSYieldFromExpression _ _ x) = "JSYieldFromExpression (" <> ss x <> ")"
     ss (JSImportMeta _ _) = "JSImportMeta"
-    ss (JSSpreadExpression _ x1) = "JSSpreadExpression (" ++ ss x1 ++ ")"
-    ss (JSTemplateLiteral Nothing _ s ps) = "JSTemplateLiteral (()," ++ singleQuote s ++ "," ++ ss ps ++ ")"
-    ss (JSTemplateLiteral (Just t) _ s ps) = "JSTemplateLiteral ((" ++ ss t ++ ")," ++ singleQuote s ++ "," ++ ss ps ++ ")"
+    ss (JSSpreadExpression _ x1) = "JSSpreadExpression (" <> ss x1 <> ")"
+    ss (JSTemplateLiteral Nothing _ s ps) = "JSTemplateLiteral (()," <> singleQuote (s) <> "," <> ss ps <> ")"
+    ss (JSTemplateLiteral (Just t) _ s ps) = "JSTemplateLiteral ((" <> ss t <> ")," <> singleQuote (s) <> "," <> ss ps <> ")"
 
 instance ShowStripped JSArrowParameterList where
     ss (JSUnparenthesizedArrowParameter x) = ss x
     ss (JSParenthesizedArrowParameterList _ xs _) = ss xs
 
 instance ShowStripped JSConciseBody where
-    ss (JSConciseFunctionBody block) = "JSConciseFunctionBody (" ++ ss block ++ ")"
-    ss (JSConciseExpressionBody expr) = "JSConciseExpressionBody (" ++ ss expr ++ ")"
+    ss (JSConciseFunctionBody block) = "JSConciseFunctionBody (" <> ss block <> ")"
+    ss (JSConciseExpressionBody expr) = "JSConciseExpressionBody (" <> ss expr <> ")"
 
 instance ShowStripped JSModuleItem where
-    ss (JSModuleExportDeclaration _ x1) = "JSModuleExportDeclaration (" ++ ss x1 ++ ")"
-    ss (JSModuleImportDeclaration _ x1) = "JSModuleImportDeclaration (" ++ ss x1 ++ ")"
-    ss (JSModuleStatementListItem x1) = "JSModuleStatementListItem (" ++ ss x1 ++ ")"
+    ss (JSModuleExportDeclaration _ x1) = "JSModuleExportDeclaration (" <> ss x1 <> ")"
+    ss (JSModuleImportDeclaration _ x1) = "JSModuleImportDeclaration (" <> ss x1 <> ")"
+    ss (JSModuleStatementListItem x1) = "JSModuleStatementListItem (" <> ss x1 <> ")"
 
 instance ShowStripped JSImportDeclaration where
-    ss (JSImportDeclaration imp from attrs _) = "JSImportDeclaration (" ++ ss imp ++ "," ++ ss from ++ maybe "" (\a -> "," ++ ss a) attrs ++ ")"
-    ss (JSImportDeclarationBare _ m attrs _) = "JSImportDeclarationBare (" ++ singleQuote m ++ maybe "" (\a -> "," ++ ss a) attrs ++ ")"
+    ss (JSImportDeclaration imp from attrs _) = "JSImportDeclaration (" <> ss imp <> "," <> ss from <> maybe "" (\a -> "," <> ss a) attrs <> ")"
+    ss (JSImportDeclarationBare _ m attrs _) = "JSImportDeclarationBare (" <> singleQuote (m) <> maybe "" (\a -> "," <> ss a) attrs <> ")"
 
 instance ShowStripped JSImportClause where
-    ss (JSImportClauseDefault x) = "JSImportClauseDefault (" ++ ss x ++ ")"
-    ss (JSImportClauseNameSpace x) = "JSImportClauseNameSpace (" ++ ss x ++ ")"
-    ss (JSImportClauseNamed x) = "JSImportClauseNameSpace (" ++ ss x ++ ")"
-    ss (JSImportClauseDefaultNameSpace x1 _ x2) = "JSImportClauseDefaultNameSpace (" ++ ss x1 ++ "," ++ ss x2 ++ ")"
-    ss (JSImportClauseDefaultNamed x1 _ x2) = "JSImportClauseDefaultNamed (" ++ ss x1 ++ "," ++ ss x2 ++ ")"
+    ss (JSImportClauseDefault x) = "JSImportClauseDefault (" <> ss x <> ")"
+    ss (JSImportClauseNameSpace x) = "JSImportClauseNameSpace (" <> ss x <> ")"
+    ss (JSImportClauseNamed x) = "JSImportClauseNameSpace (" <> ss x <> ")"
+    ss (JSImportClauseDefaultNameSpace x1 _ x2) = "JSImportClauseDefaultNameSpace (" <> ss x1 <> "," <> ss x2 <> ")"
+    ss (JSImportClauseDefaultNamed x1 _ x2) = "JSImportClauseDefaultNamed (" <> ss x1 <> "," <> ss x2 <> ")"
 
 instance ShowStripped JSFromClause where
-    ss (JSFromClause _ _ m) = "JSFromClause " ++ singleQuote m
+    ss (JSFromClause _ _ m) = "JSFromClause " <> singleQuote (m)
 
 instance ShowStripped JSImportNameSpace where
-    ss (JSImportNameSpace _ _ x) = "JSImportNameSpace (" ++ ss x ++ ")"
+    ss (JSImportNameSpace _ _ x) = "JSImportNameSpace (" <> ss x <> ")"
 
 instance ShowStripped JSImportsNamed where
-    ss (JSImportsNamed _ xs _) = "JSImportsNamed (" ++ ss xs ++ ")"
+    ss (JSImportsNamed _ xs _) = "JSImportsNamed (" <> ss xs <> ")"
 
 instance ShowStripped JSImportSpecifier where
-    ss (JSImportSpecifier x1) = "JSImportSpecifier (" ++ ss x1 ++ ")"
-    ss (JSImportSpecifierAs x1 _ x2) = "JSImportSpecifierAs (" ++ ss x1 ++ "," ++ ss x2 ++ ")"
+    ss (JSImportSpecifier x1) = "JSImportSpecifier (" <> ss x1 <> ")"
+    ss (JSImportSpecifierAs x1 _ x2) = "JSImportSpecifierAs (" <> ss x1 <> "," <> ss x2 <> ")"
 
 instance ShowStripped JSImportAttributes where
-    ss (JSImportAttributes _ attrs _) = "JSImportAttributes (" ++ ss attrs ++ ")"
+    ss (JSImportAttributes _ attrs _) = "JSImportAttributes (" <> ss attrs <> ")"
 
 instance ShowStripped JSImportAttribute where
-    ss (JSImportAttribute key _ value) = "JSImportAttribute (" ++ ss key ++ "," ++ ss value ++ ")"
+    ss (JSImportAttribute key _ value) = "JSImportAttribute (" <> ss key <> "," <> ss value <> ")"
 
 instance ShowStripped JSExportDeclaration where
-    ss (JSExportAllFrom star from _) = "JSExportAllFrom (" ++ ss star ++ "," ++ ss from ++ ")"
-    ss (JSExportAllAsFrom star _ ident from _) = "JSExportAllAsFrom (" ++ ss star ++ "," ++ ss ident ++ "," ++ ss from ++ ")"
-    ss (JSExportFrom xs from _) = "JSExportFrom (" ++ ss xs ++ "," ++ ss from ++ ")"
-    ss (JSExportLocals xs _) = "JSExportLocals (" ++ ss xs ++ ")"
-    ss (JSExport x1 _) = "JSExport (" ++ ss x1 ++ ")"
+    ss (JSExportAllFrom star from _) = "JSExportAllFrom (" <> ss star <> "," <> ss from <> ")"
+    ss (JSExportAllAsFrom star _ ident from _) = "JSExportAllAsFrom (" <> ss star <> "," <> ss ident <> "," <> ss from <> ")"
+    ss (JSExportFrom xs from _) = "JSExportFrom (" <> ss xs <> "," <> ss from <> ")"
+    ss (JSExportLocals xs _) = "JSExportLocals (" <> ss xs <> ")"
+    ss (JSExport x1 _) = "JSExport (" <> ss x1 <> ")"
 
 instance ShowStripped JSExportClause where
-    ss (JSExportClause _ xs _) = "JSExportClause (" ++ ss xs ++ ")"
+    ss (JSExportClause _ xs _) = "JSExportClause (" <> ss xs <> ")"
 
 instance ShowStripped JSExportSpecifier where
-    ss (JSExportSpecifier x1) = "JSExportSpecifier (" ++ ss x1 ++ ")"
-    ss (JSExportSpecifierAs x1 _ x2) = "JSExportSpecifierAs (" ++ ss x1 ++ "," ++ ss x2 ++ ")"
+    ss (JSExportSpecifier x1) = "JSExportSpecifier (" <> ss x1 <> ")"
+    ss (JSExportSpecifierAs x1 _ x2) = "JSExportSpecifierAs (" <> ss x1 <> "," <> ss x2 <> ")"
 
 instance ShowStripped JSTryCatch where
-    ss (JSCatch _ _lb x1 _rb x3) = "JSCatch (" ++ ss x1 ++ "," ++ ss x3 ++ ")"
-    ss (JSCatchIf _ _lb x1 _ ex _rb x3) = "JSCatch (" ++ ss x1 ++ ") if " ++ ss ex ++ " (" ++ ss x3 ++ ")"
+    ss (JSCatch _ _lb x1 _rb x3) = "JSCatch (" <> ss x1 <> "," <> ss x3 <> ")"
+    ss (JSCatchIf _ _lb x1 _ ex _rb x3) = "JSCatch (" <> ss x1 <> ") if " <> ss ex <> " (" <> ss x3 <> ")"
 
 instance ShowStripped JSTryFinally where
-    ss (JSFinally _ x) = "JSFinally (" ++ ss x ++ ")"
+    ss (JSFinally _ x) = "JSFinally (" <> ss x <> ")"
     ss JSNoFinally = "JSFinally ()"
 
 instance ShowStripped JSIdent where
-    ss (JSIdentName _ s) = "JSIdentifier " ++ singleQuote s
+    ss (JSIdentName _ s) = "JSIdentifier " <> singleQuote (s)
     ss JSIdentNone = "JSIdentNone"
 
 instance ShowStripped JSObjectProperty where
-    ss (JSPropertyNameandValue x1 _colon x2s) = "JSPropertyNameandValue (" ++ ss x1 ++ ") " ++ ss x2s
-    ss (JSPropertyIdentRef _ s) = "JSPropertyIdentRef " ++ singleQuote s
+    ss (JSPropertyNameandValue x1 _colon x2s) = "JSPropertyNameandValue (" <> ss x1 <> ") " <> ss x2s
+    ss (JSPropertyIdentRef _ s) = "JSPropertyIdentRef " <> singleQuote (s)
     ss (JSObjectMethod m) = ss m
-    ss (JSObjectSpread _ expr) = "JSObjectSpread (" ++ ss expr ++ ")"
+    ss (JSObjectSpread _ expr) = "JSObjectSpread (" <> ss expr <> ")"
 
 instance ShowStripped JSMethodDefinition where
-    ss (JSMethodDefinition x1 _lb1 x2s _rb1 x3) = "JSMethodDefinition (" ++ ss x1 ++ ") " ++ ss x2s ++ " (" ++ ss x3 ++ ")"
-    ss (JSPropertyAccessor s x1 _lb1 x2s _rb1 x3) = "JSPropertyAccessor " ++ ss s ++ " (" ++ ss x1 ++ ") " ++ ss x2s ++ " (" ++ ss x3 ++ ")"
-    ss (JSGeneratorMethodDefinition _ x1 _lb1 x2s _rb1 x3) = "JSGeneratorMethodDefinition (" ++ ss x1 ++ ") " ++ ss x2s ++ " (" ++ ss x3 ++ ")"
+    ss (JSMethodDefinition x1 _lb1 x2s _rb1 x3) = "JSMethodDefinition (" <> ss x1 <> ") " <> ss x2s <> " (" <> ss x3 <> ")"
+    ss (JSPropertyAccessor s x1 _lb1 x2s _rb1 x3) = "JSPropertyAccessor " <> ss s <> " (" <> ss x1 <> ") " <> ss x2s <> " (" <> ss x3 <> ")"
+    ss (JSGeneratorMethodDefinition _ x1 _lb1 x2s _rb1 x3) = "JSGeneratorMethodDefinition (" <> ss x1 <> ") " <> ss x2s <> " (" <> ss x3 <> ")"
 
 instance ShowStripped JSPropertyName where
-    ss (JSPropertyIdent _ s) = "JSIdentifier " ++ singleQuote s
-    ss (JSPropertyString _ s) = "JSIdentifier " ++ singleQuote s
-    ss (JSPropertyNumber _ s) = "JSIdentifier " ++ singleQuote s
-    ss (JSPropertyComputed _ x _) = "JSPropertyComputed (" ++ ss x ++ ")"
+    ss (JSPropertyIdent _ s) = "JSIdentifier " <> singleQuote (s)
+    ss (JSPropertyString _ s) = "JSIdentifier " <> singleQuote (s)
+    ss (JSPropertyNumber _ s) = "JSIdentifier " <> singleQuote (s)
+    ss (JSPropertyComputed _ x _) = "JSPropertyComputed (" <> ss x <> ")"
 
 instance ShowStripped JSAccessor where
     ss (JSAccessorGet _) = "JSAccessorGet"
     ss (JSAccessorSet _) = "JSAccessorSet"
 
 instance ShowStripped JSBlock where
-    ss (JSBlock _ xs _) = "JSBlock " ++ ss xs
+    ss (JSBlock _ xs _) = "JSBlock " <> ss xs
 
 instance ShowStripped JSSwitchParts where
-    ss (JSCase _ x1 _c x2s) = "JSCase (" ++ ss x1 ++ ") (" ++ ss x2s ++ ")"
-    ss (JSDefault _ _c xs) = "JSDefault (" ++ ss xs ++ ")"
+    ss (JSCase _ x1 _c x2s) = "JSCase (" <> ss x1 <> ") (" <> ss x2s <> ")"
+    ss (JSDefault _ _c xs) = "JSDefault (" <> ss xs <> ")"
 
 instance ShowStripped JSBinOp where
     ss (JSBinOpAnd _) = "'&&'"
@@ -692,7 +693,7 @@ instance ShowStripped JSAssignOp where
     ss (JSNullishAssign _) = "'??='"
 
 instance ShowStripped JSVarInitializer where
-    ss (JSVarInit _ n) = "[" ++ ss n ++ "]"
+    ss (JSVarInit _ n) = "[" <> ss n <> "]"
     ss JSVarInitNone = ""
 
 instance ShowStripped JSSemi where
@@ -704,7 +705,7 @@ instance ShowStripped JSArrayElement where
     ss (JSArrayComma _) = "JSComma"
 
 instance ShowStripped JSTemplatePart where
-    ss (JSTemplatePart e _ s) = "(" ++ ss e ++ "," ++ singleQuote s ++ ")"
+    ss (JSTemplatePart e _ s) = "(" <> ss e <> "," <> singleQuote (s) <> ")"
 
 instance ShowStripped JSClassHeritage where
     ss JSExtendsNone = ""
@@ -712,30 +713,30 @@ instance ShowStripped JSClassHeritage where
 
 instance ShowStripped JSClassElement where
     ss (JSClassInstanceMethod m) = ss m
-    ss (JSClassStaticMethod _ m) = "JSClassStaticMethod (" ++ ss m ++ ")"
+    ss (JSClassStaticMethod _ m) = "JSClassStaticMethod (" <> ss m <> ")"
     ss (JSClassSemi _) = "JSClassSemi"
-    ss (JSPrivateField _ name _ Nothing _) = "JSPrivateField " ++ singleQuote ("#" ++ name)
-    ss (JSPrivateField _ name _ (Just initializer) _) = "JSPrivateField " ++ singleQuote ("#" ++ name) ++ " (" ++ ss initializer ++ ")"
-    ss (JSPrivateMethod _ name _ params _ block) = "JSPrivateMethod " ++ singleQuote ("#" ++ name) ++ " " ++ ss params ++ " (" ++ ss block ++ ")"
-    ss (JSPrivateAccessor accessor _ name _ params _ block) = "JSPrivateAccessor " ++ ss accessor ++ " " ++ singleQuote ("#" ++ name) ++ " " ++ ss params ++ " (" ++ ss block ++ ")"
+    ss (JSPrivateField _ name _ Nothing _) = "JSPrivateField " <> singleQuote ("#" <> name)
+    ss (JSPrivateField _ name _ (Just initializer) _) = "JSPrivateField " <> singleQuote ("#" <> name) <> " (" <> ss initializer <> ")"
+    ss (JSPrivateMethod _ name _ params _ block) = "JSPrivateMethod " <> singleQuote ("#" <> name) <> " " <> ss params <> " (" <> ss block <> ")"
+    ss (JSPrivateAccessor accessor _ name _ params _ block) = "JSPrivateAccessor " <> ss accessor <> " " <> singleQuote ("#" <> name) <> " " <> ss params <> " (" <> ss block <> ")"
 
 instance ShowStripped a => ShowStripped (JSCommaList a) where
-    ss xs = "(" ++ commaJoin (map ss $ fromCommaList xs) ++ ")"
+    ss xs = "(" <> commaJoin (map ss $ fromCommaList xs) <> ")"
 
 instance ShowStripped a => ShowStripped (JSCommaTrailingList a) where
-    ss (JSCTLComma xs _) = "[" ++ commaJoin (map ss $ fromCommaList xs) ++ ",JSComma]"
-    ss (JSCTLNone xs)    = "[" ++ commaJoin (map ss $ fromCommaList xs) ++ "]"
+    ss (JSCTLComma xs _) = "[" <> commaJoin (map ss $ fromCommaList xs) <> ",JSComma]"
+    ss (JSCTLNone xs)    = "[" <> commaJoin (map ss $ fromCommaList xs) <> "]"
 
 instance ShowStripped a => ShowStripped [a] where
-    ss xs = "[" ++ commaJoin (map ss xs) ++ "]"
+    ss xs = "[" <> commaJoin (map ss xs) <> "]"
 
 -- -----------------------------------------------------------------------------
 -- Helpers.
 
--- | Join strings with commas, filtering out empty strings.
+-- | Join ByteStrings with commas, filtering out empty ByteStrings.
 --
 -- Utility function for generating comma-separated lists in pretty printing,
--- automatically removing empty strings to avoid extra commas.
+-- automatically removing empty ByteStrings to avoid extra commas.
 --
 -- ==== Examples
 --
@@ -746,8 +747,8 @@ instance ShowStripped a => ShowStripped [a] where
 -- "single"
 --
 -- @since 0.7.1.0
-commaJoin :: [String] -> String
-commaJoin s = List.intercalate "," $ List.filter (not . null) s
+commaJoin :: [ByteString] -> ByteString
+commaJoin s = BS8.intercalate "," $ List.filter (not . BS8.null) s
 
 -- | Convert comma-separated list AST to regular Haskell list.
 --
@@ -769,34 +770,34 @@ fromCommaList (JSLCons l _ i) = fromCommaList l ++ [i]
 fromCommaList (JSLOne i)      = [i]
 fromCommaList JSLNil = []
 
--- | Wrap string in single quotes.
+-- | Wrap ByteString in single quotes.
 --
 -- Utility function for pretty printing JavaScript string literals
 -- and identifiers that need to be quoted.
 --
 -- @since 0.7.1.0
-singleQuote :: String -> String
-singleQuote s = '\'' : (s ++ "'")
+singleQuote :: ByteString -> ByteString
+singleQuote s = "'" <> s <> "'"
 
--- | Extract string from JavaScript identifier with quotes.
+-- | Extract ByteString from JavaScript identifier with quotes.
 --
--- Converts 'JSIdent' to its quoted string representation for pretty printing.
+-- Converts 'JSIdent' to its quoted ByteString representation for pretty printing.
 -- Returns empty quotes for 'JSIdentNone'.
 --
 -- @since 0.7.1.0
-ssid :: JSIdent -> String
+ssid :: JSIdent -> ByteString
 ssid (JSIdentName _ s) = singleQuote s
 ssid JSIdentNone = "''"
 
--- | Add comma prefix to non-empty strings.
+-- | Add comma prefix to non-empty ByteStrings.
 --
 -- Utility for conditional comma insertion in pretty printing.
--- Returns empty string for empty input, comma-prefixed string otherwise.
+-- Returns empty ByteString for empty input, comma-prefixed ByteString otherwise.
 --
 -- @since 0.7.1.0
-commaIf :: String -> String
-commaIf "" = ""
-commaIf xs = ',' : xs
+commaIf :: ByteString -> ByteString
+commaIf s | BS8.null s = ""
+          | otherwise = "," <> s
 
 
 -- | Remove annotation from binary operator.

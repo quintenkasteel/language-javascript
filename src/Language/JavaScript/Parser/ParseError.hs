@@ -94,6 +94,76 @@ data ParseError
      , errorDetails :: !String
      }
      -- ^ Semantic validation error (e.g., invalid break/continue)
+   | InvalidNumericLiteral
+     { errorLiteral :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid numeric literal (e.g., 1.., 0x, 1e+)
+   | InvalidPropertyAccess
+     { errorProperty :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid property access (e.g., x.123)
+   | InvalidAssignmentTarget
+     { errorTarget :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid assignment target (e.g., 1 = x)
+   | InvalidControlFlowLabel
+     { errorLabel :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid control flow label (e.g., break 123)
+   | MissingConstInitializer
+     { errorIdentifier :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Const declaration without initializer
+   | InvalidIdentifier
+     { errorIdentifier :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid identifier (e.g., 123x)
+   | InvalidArrowParameter
+     { errorParameter :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid arrow function parameter (e.g., (123) => x)
+   | InvalidEscapeSequence
+     { errorSequence :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid escape sequence (e.g., \x, \u)
+   | InvalidRegexPattern
+     { errorPattern :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid regex pattern or flags
+   | InvalidUnicodeSequence
+     { errorSequence :: !String
+     , errorPosition :: !TokenPosn
+     , errorContext :: !ParseContext
+     , suggestions :: ![String]
+     }
+     -- ^ Invalid unicode escape sequence
    | StrError String
      -- ^ Legacy generic string error for backwards compatibility
    deriving (Eq, Generic, NFData, Show)
@@ -148,7 +218,83 @@ renderParseError err = case err of
        "\n  Context: " ++ contextStr ++
        "\n  Details: " ++ details
        
+  InvalidNumericLiteral literal pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid numeric literal '" ++ literal ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidPropertyAccess prop pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid property access '." ++ prop ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidAssignmentTarget target pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid assignment target '" ++ target ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidControlFlowLabel label pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid control flow label '" ++ label ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  MissingConstInitializer ident pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Missing const initializer for '" ++ ident ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidIdentifier ident pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid identifier '" ++ ident ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidArrowParameter param pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid arrow function parameter '" ++ param ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidEscapeSequence seq pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid escape sequence '" ++ seq ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidRegexPattern pattern pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid regex pattern '" ++ pattern ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
+  InvalidUnicodeSequence seq pos ctx suggestions ->
+    let posStr = show pos
+        contextStr = renderContext ctx
+        suggestStr = renderSuggestions suggestions
+    in "[Validation Error] Invalid unicode sequence '" ++ seq ++ "' at " ++ posStr ++
+       "\n  Context: " ++ contextStr ++ suggestStr
+       
   StrError msg -> "Parse error: " ++ msg
+  
+-- | Helper function to render suggestions
+renderSuggestions :: [String] -> String
+renderSuggestions [] = ""
+renderSuggestions suggestions = 
+  "\n  Suggestions: " ++ unlines (map ("    - " ++) suggestions)
 
 -- | Render parse context to human-readable string
 renderContext :: ParseContext -> String
@@ -171,6 +317,16 @@ getErrorPosition err = case err of
   UnexpectedChar _ pos _ _ -> Just pos
   SyntaxError _ pos _ _ _ -> Just pos
   SemanticError _ pos _ _ -> Just pos
+  InvalidNumericLiteral _ pos _ _ -> Just pos
+  InvalidPropertyAccess _ pos _ _ -> Just pos
+  InvalidAssignmentTarget _ pos _ _ -> Just pos
+  InvalidControlFlowLabel _ pos _ _ -> Just pos
+  MissingConstInitializer _ pos _ _ -> Just pos
+  InvalidIdentifier _ pos _ _ -> Just pos
+  InvalidArrowParameter _ pos _ _ -> Just pos
+  InvalidEscapeSequence _ pos _ _ -> Just pos
+  InvalidRegexPattern _ pos _ _ -> Just pos
+  InvalidUnicodeSequence _ pos _ _ -> Just pos
   StrError _ -> Nothing
 
 -- | Check if an error is recoverable using panic mode
@@ -180,5 +336,16 @@ isRecoverableError err = case err of
   UnexpectedChar _ _ _ severity -> severity /= CriticalError
   SyntaxError _ _ _ severity _ -> severity /= CriticalError
   SemanticError _ _ _ _ -> True  -- Semantic errors don't prevent parsing
+  -- Validation errors are not recoverable - syntax must be correct
+  InvalidNumericLiteral _ _ _ _ -> False
+  InvalidPropertyAccess _ _ _ _ -> False
+  InvalidAssignmentTarget _ _ _ _ -> False
+  InvalidControlFlowLabel _ _ _ _ -> False
+  MissingConstInitializer _ _ _ _ -> False
+  InvalidIdentifier _ _ _ _ -> False
+  InvalidArrowParameter _ _ _ _ -> False
+  InvalidEscapeSequence _ _ _ _ -> False
+  InvalidRegexPattern _ _ _ _ -> False
+  InvalidUnicodeSequence _ _ _ _ -> False
   StrError _ -> False  -- Legacy errors are not recoverable
 

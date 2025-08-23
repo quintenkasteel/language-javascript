@@ -12,12 +12,16 @@ module Language.JavaScript.Parser.Parser (
    , parseUsing
    , showStripped
    , showStrippedMaybe
+   , showStrippedString
+   , showStrippedMaybeString
    ) where
 
 import qualified Language.JavaScript.Parser.Grammar7 as Grammar
 import Language.JavaScript.Parser.Lexer
 import qualified Language.JavaScript.Parser.AST as AST
 import System.IO
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 
 -- | Parse JavaScript Program (Script)
 -- Parse one compound statement, or a sequence of simple statements.
@@ -71,14 +75,22 @@ parseFileUtf8 filename =
      x <- hGetContents h
      return $ readJs x
 
-showStripped :: AST.JSAST -> String
+showStripped :: AST.JSAST -> ByteString
 showStripped = AST.showStripped
 
-showStrippedMaybe :: Show a => Either a AST.JSAST -> String
+showStrippedMaybe :: Show a => Either a AST.JSAST -> ByteString
 showStrippedMaybe maybeAst =
   case maybeAst of
-    Left msg -> "Left (" ++ show msg ++ ")"
-    Right p -> "Right (" ++ AST.showStripped p ++ ")"
+    Left msg -> BS8.pack "Left (" <> BS8.pack (show msg) <> BS8.pack ")"
+    Right p -> BS8.pack "Right (" <> AST.showStripped p <> BS8.pack ")"
+
+-- | Backward-compatible String version of showStripped
+showStrippedString :: AST.JSAST -> String
+showStrippedString = BS8.unpack . AST.showStripped
+
+-- | Backward-compatible String version of showStrippedMaybe
+showStrippedMaybeString :: Show a => Either a AST.JSAST -> String
+showStrippedMaybeString = BS8.unpack . showStrippedMaybe
 
 -- | Parse one compound statement, or a sequence of simple statements.
 -- Generally used for interactive input, such as from the command line of an interpreter.
