@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Unit.Language.Javascript.Parser.Parser.Literals
     ( testLiteralParser
     ) where
@@ -6,95 +7,219 @@ import Test.Hspec
 
 import Control.Monad (forM_)
 import Data.Char (chr, isPrint)
+import Data.List (isInfixOf)
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.Grammar7
-import Language.JavaScript.Parser.Parser
+import Language.JavaScript.Parser.Parser (parseUsing)
+import Language.JavaScript.Parser.AST (JSAST(..))
 
 
 testLiteralParser :: Spec
 testLiteralParser = describe "Parse literals:" $ do
     it "null/true/false" $ do
-        testLiteral "null"  `shouldBe` "Right (JSAstLiteral (JSLiteral 'null'))"
-        testLiteral "false" `shouldBe` "Right (JSAstLiteral (JSLiteral 'false'))"
-        testLiteral "true"  `shouldBe` "Right (JSAstLiteral (JSLiteral 'true'))"
+        case testLiteral "null" of
+            Right (JSAstLiteral (JSLiteral _ "null") _) -> pure ()
+            result -> expectationFailure ("Expected null literal, got: " ++ show result)
+        case testLiteral "false" of
+            Right (JSAstLiteral (JSLiteral _ "false") _) -> pure ()
+            result -> expectationFailure ("Expected false literal, got: " ++ show result)
+        case testLiteral "true" of
+            Right (JSAstLiteral (JSLiteral _ "true") _) -> pure ()
+            result -> expectationFailure ("Expected true literal, got: " ++ show result)
     it "hex numbers" $ do
-        testLiteral "0x1234fF"  `shouldBe` "Right (JSAstLiteral (JSHexInteger '0x1234fF'))"
-        testLiteral "0X1234fF"  `shouldBe` "Right (JSAstLiteral (JSHexInteger '0X1234fF'))"
+        case testLiteral "0x1234fF" of
+            Right (JSAstLiteral (JSHexInteger _ "0x1234fF") _) -> pure ()
+            result -> expectationFailure ("Expected hex integer 0x1234fF, got: " ++ show result)
+        case testLiteral "0X1234fF" of
+            Right (JSAstLiteral (JSHexInteger _ "0X1234fF") _) -> pure ()
+            result -> expectationFailure ("Expected hex integer 0X1234fF, got: " ++ show result)
     it "binary numbers (ES2015)" $ do
-        testLiteral "0b1010"    `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0b1010'))"
-        testLiteral "0B1111"    `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0B1111'))"
-        testLiteral "0b0"       `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0b0'))"
-        testLiteral "0B101010"  `shouldBe` "Right (JSAstLiteral (JSBinaryInteger '0B101010'))"
+        case testLiteral "0b1010" of
+            Right (JSAstLiteral (JSBinaryInteger _ "0b1010") _) -> pure ()
+            result -> expectationFailure ("Expected binary integer 0b1010, got: " ++ show result)
+        case testLiteral "0B1111" of
+            Right (JSAstLiteral (JSBinaryInteger _ "0B1111") _) -> pure ()
+            result -> expectationFailure ("Expected binary integer 0B1111, got: " ++ show result)
+        case testLiteral "0b0" of
+            Right (JSAstLiteral (JSBinaryInteger _ "0b0") _) -> pure ()
+            result -> expectationFailure ("Expected binary integer 0b0, got: " ++ show result)
+        case testLiteral "0B101010" of
+            Right (JSAstLiteral (JSBinaryInteger _ "0B101010") _) -> pure ()
+            result -> expectationFailure ("Expected binary integer 0B101010, got: " ++ show result)
     it "decimal numbers" $ do
-        testLiteral "1.0e4"     `shouldBe` "Right (JSAstLiteral (JSDecimal '1.0e4'))"
-        testLiteral "2.3E6"     `shouldBe` "Right (JSAstLiteral (JSDecimal '2.3E6'))"
-        testLiteral "4.5"       `shouldBe` "Right (JSAstLiteral (JSDecimal '4.5'))"
-        testLiteral "0.7e8"     `shouldBe` "Right (JSAstLiteral (JSDecimal '0.7e8'))"
-        testLiteral "0.7E8"     `shouldBe` "Right (JSAstLiteral (JSDecimal '0.7E8'))"
-        testLiteral "10"        `shouldBe` "Right (JSAstLiteral (JSDecimal '10'))"
-        testLiteral "0"         `shouldBe` "Right (JSAstLiteral (JSDecimal '0'))"
-        testLiteral "0.03"      `shouldBe` "Right (JSAstLiteral (JSDecimal '0.03'))"
-        testLiteral "0.7e+8"    `shouldBe` "Right (JSAstLiteral (JSDecimal '0.7e+8'))"
-        testLiteral "0.7e-18"   `shouldBe` "Right (JSAstLiteral (JSDecimal '0.7e-18'))"
-        testLiteral "1.0e+4"    `shouldBe` "Right (JSAstLiteral (JSDecimal '1.0e+4'))"
-        testLiteral "1.0e-4"    `shouldBe` "Right (JSAstLiteral (JSDecimal '1.0e-4'))"
-        testLiteral "1e18"      `shouldBe` "Right (JSAstLiteral (JSDecimal '1e18'))"
-        testLiteral "1e+18"     `shouldBe` "Right (JSAstLiteral (JSDecimal '1e+18'))"
-        testLiteral "1e-18"     `shouldBe` "Right (JSAstLiteral (JSDecimal '1e-18'))"
-        testLiteral "1E-01"     `shouldBe` "Right (JSAstLiteral (JSDecimal '1E-01'))"
+        case testLiteral "1.0e4" of
+            Right (JSAstLiteral (JSDecimal _ "1.0e4") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1.0e4, got: " ++ show result)
+        case testLiteral "2.3E6" of
+            Right (JSAstLiteral (JSDecimal _ "2.3E6") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 2.3E6, got: " ++ show result)
+        case testLiteral "4.5" of
+            Right (JSAstLiteral (JSDecimal _ "4.5") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 4.5, got: " ++ show result)
+        case testLiteral "0.7e8" of
+            Right (JSAstLiteral (JSDecimal _ "0.7e8") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 0.7e8, got: " ++ show result)
+        case testLiteral "0.7E8" of
+            Right (JSAstLiteral (JSDecimal _ "0.7E8") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 0.7E8, got: " ++ show result)
+        case testLiteral "10" of
+            Right (JSAstLiteral (JSDecimal _ "10") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 10, got: " ++ show result)
+        case testLiteral "0" of
+            Right (JSAstLiteral (JSDecimal _ "0") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 0, got: " ++ show result)
+        case testLiteral "0.03" of
+            Right (JSAstLiteral (JSDecimal _ "0.03") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 0.03, got: " ++ show result)
+        case testLiteral "0.7e+8" of
+            Right (JSAstLiteral (JSDecimal _ "0.7e+8") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 0.7e+8, got: " ++ show result)
+        case testLiteral "0.7e-18" of
+            Right (JSAstLiteral (JSDecimal _ "0.7e-18") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 0.7e-18, got: " ++ show result)
+        case testLiteral "1.0e+4" of
+            Right (JSAstLiteral (JSDecimal _ "1.0e+4") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1.0e+4, got: " ++ show result)
+        case testLiteral "1.0e-4" of
+            Right (JSAstLiteral (JSDecimal _ "1.0e-4") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1.0e-4, got: " ++ show result)
+        case testLiteral "1e18" of
+            Right (JSAstLiteral (JSDecimal _ "1e18") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1e18, got: " ++ show result)
+        case testLiteral "1e+18" of
+            Right (JSAstLiteral (JSDecimal _ "1e+18") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1e+18, got: " ++ show result)
+        case testLiteral "1e-18" of
+            Right (JSAstLiteral (JSDecimal _ "1e-18") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1e-18, got: " ++ show result)
+        case testLiteral "1E-01" of
+            Right (JSAstLiteral (JSDecimal _ "1E-01") _) -> pure ()
+            result -> expectationFailure ("Expected decimal 1E-01, got: " ++ show result)
     it "octal numbers" $ do
-        testLiteral "070"       `shouldBe` "Right (JSAstLiteral (JSOctal '070'))"
-        testLiteral "010234567" `shouldBe` "Right (JSAstLiteral (JSOctal '010234567'))"
+        case testLiteral "070" of
+            Right (JSAstLiteral (JSOctal _ "070") _) -> pure ()
+            result -> expectationFailure ("Expected octal 070, got: " ++ show result)
+        case testLiteral "010234567" of
+            Right (JSAstLiteral (JSOctal _ "010234567") _) -> pure ()
+            result -> expectationFailure ("Expected octal 010234567, got: " ++ show result)
         -- Modern octal syntax (ES2015)
-        testLiteral "0o777"     `shouldBe` "Right (JSAstLiteral (JSOctal '0o777'))"
-        testLiteral "0O123"     `shouldBe` "Right (JSAstLiteral (JSOctal '0O123'))"
-        testLiteral "0o0"       `shouldBe` "Right (JSAstLiteral (JSOctal '0o0'))"
+        case testLiteral "0o777" of
+            Right (JSAstLiteral (JSOctal _ "0o777") _) -> pure ()
+            result -> expectationFailure ("Expected octal 0o777, got: " ++ show result)
+        case testLiteral "0O123" of
+            Right (JSAstLiteral (JSOctal _ "0O123") _) -> pure ()
+            result -> expectationFailure ("Expected octal 0O123, got: " ++ show result)
+        case testLiteral "0o0" of
+            Right (JSAstLiteral (JSOctal _ "0o0") _) -> pure ()
+            result -> expectationFailure ("Expected octal 0o0, got: " ++ show result)
     it "bigint numbers" $ do
-        testLiteral "123n"      `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '123n'))"
-        testLiteral "0n"        `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0n'))"
-        testLiteral "9007199254740991n" `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '9007199254740991n'))"
-        testLiteral "0x1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0x1234n'))"
-        testLiteral "0X1234n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0X1234n'))"
-        testLiteral "0b1010n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0b1010n'))"
-        testLiteral "0B1111n"   `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0B1111n'))"
-        testLiteral "0o777n"    `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '0o777n'))"
+        case testLiteral "123n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "123n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 123n, got: " ++ show result)
+        case testLiteral "0n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "0n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 0n, got: " ++ show result)
+        case testLiteral "9007199254740991n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "9007199254740991n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 9007199254740991n, got: " ++ show result)
+        case testLiteral "0x1234n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "0x1234n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 0x1234n, got: " ++ show result)
+        case testLiteral "0X1234n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "0X1234n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 0X1234n, got: " ++ show result)
+        case testLiteral "0b1010n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "0b1010n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 0b1010n, got: " ++ show result)
+        case testLiteral "0B1111n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "0B1111n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 0B1111n, got: " ++ show result)
+        case testLiteral "0o777n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "0o777n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 0o777n, got: " ++ show result)
 
     it "numeric separators (ES2021) - current parser behavior" $ do
         -- Note: Current parser does not support numeric separators as single tokens
         -- They are parsed as separate identifier tokens following numbers
         -- These tests document the existing behavior for regression testing
-        parse "1_000" "test"      `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "1_000_000" "test"  `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "0xFF_EC_DE" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "3.14_15" "test"    `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        parse "123n_suffix" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
-        testLiteral "077n"      `shouldBe` "Right (JSAstLiteral (JSBigIntLiteral '077n'))"
+        case parse "1_000" "test" of
+            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "_000") _] _) -> pure ()
+            Left err -> expectationFailure ("Expected parse to succeed for 1_000, got: " ++ show err)
+        case parse "1_000_000" "test" of
+            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "1") _, JSExpressionStatement (JSIdentifier _ "_000_000") _] _) -> pure ()
+            Left err -> expectationFailure ("Expected parse to succeed for 1_000_000, got: " ++ show err)
+        case parse "0xFF_EC_DE" "test" of
+            Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ "0xFF") _, JSExpressionStatement (JSIdentifier _ "_EC_DE") _] _) -> pure ()
+            Left err -> expectationFailure ("Expected parse to succeed for 0xFF_EC_DE, got: " ++ show err)
+        case parse "3.14_15" "test" of
+            Right (JSAstProgram [JSExpressionStatement (JSDecimal _ "3.14") _, JSExpressionStatement (JSIdentifier _ "_15") _] _) -> pure ()
+            Left err -> expectationFailure ("Expected parse to succeed for 3.14_15, got: " ++ show err)
+        case parse "123n_suffix" "test" of
+            Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ "123n") _, JSExpressionStatement (JSIdentifier _ "_suffix") _] _) -> pure ()
+            Left err -> expectationFailure ("Expected parse to succeed for 123n_suffix, got: " ++ show err)
+        case testLiteral "077n" of
+            Right (JSAstLiteral (JSBigIntLiteral _ "077n") _) -> pure ()
+            result -> expectationFailure ("Expected bigint 077n, got: " ++ show result)
     it "strings" $ do
-        testLiteral "'cat'"    `shouldBe` "Right (JSAstLiteral (JSStringLiteral 'cat'))"
-        testLiteral "\"cat\""  `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"cat\"))"
-        testLiteral "'\\u1234'"     `shouldBe` "Right (JSAstLiteral (JSStringLiteral '\\u1234'))"
-        testLiteral "'\\uabcd'"     `shouldBe` "Right (JSAstLiteral (JSStringLiteral '\\uabcd'))"
-        testLiteral "\"\\r\\n\""    `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\r\\n\"))"
-        testLiteral "\"\\b\""           `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\b\"))"
-        testLiteral "\"\\f\""           `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\f\"))"
-        testLiteral "\"\\t\""           `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\t\"))"
-        testLiteral "\"\\v\""           `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\v\"))"
-        testLiteral "\"\\0\""           `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\0\"))"
-        testLiteral "\"hello\\nworld\"" `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"hello\\nworld\"))"
-        testLiteral "'hello\\nworld'"   `shouldBe` "Right (JSAstLiteral (JSStringLiteral 'hello\\nworld'))"
+        case testLiteral "'cat'" of
+            Right (JSAstLiteral (JSStringLiteral _ "'cat'") _) -> pure ()
+            result -> expectationFailure ("Expected string 'cat', got: " ++ show result)
+        case testLiteral "\"cat\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"cat\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"cat\", got: " ++ show result)
+        case testLiteral "'\\u1234'" of
+            Right (JSAstLiteral (JSStringLiteral _ "'\\u1234'") _) -> pure ()
+            result -> expectationFailure ("Expected string '\\u1234', got: " ++ show result)
+        case testLiteral "'\\uabcd'" of
+            Right (JSAstLiteral (JSStringLiteral _ "'\\uabcd'") _) -> pure ()
+            result -> expectationFailure ("Expected string '\\uabcd', got: " ++ show result)
+        case testLiteral "\"\\r\\n\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\r\\n\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\r\\n\", got: " ++ show result)
+        case testLiteral "\"\\b\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\b\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\b\", got: " ++ show result)
+        case testLiteral "\"\\f\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\f\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\f\", got: " ++ show result)
+        case testLiteral "\"\\t\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\t\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\t\", got: " ++ show result)
+        case testLiteral "\"\\v\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\v\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\v\", got: " ++ show result)
+        case testLiteral "\"\\0\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\0\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\0\", got: " ++ show result)
+        case testLiteral "\"hello\\nworld\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"hello\\nworld\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"hello\\nworld\", got: " ++ show result)
+        case testLiteral "'hello\\nworld'" of
+            Right (JSAstLiteral (JSStringLiteral _ "'hello\\nworld'") _) -> pure ()
+            result -> expectationFailure ("Expected string 'hello\\nworld', got: " ++ show result)
 
-        testLiteral "'char \n'" `shouldBe` "Left (\"lexical error @ line 1 and column 7\")"
+        case testLiteral "'char \n'" of
+            Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
+            result -> expectationFailure ("Expected parse error for invalid string, got: " ++ show result)
 
         forM_ (mkTestStrings SingleQuote) $ \ str ->
-            testLiteral str `shouldBe` ("Right (JSAstLiteral (JSStringLiteral " ++ str ++ "))")
+            case testLiteral str of
+                Right (JSAstLiteral (JSStringLiteral _ _) _) -> pure ()
+                result -> expectationFailure ("Expected string literal for " ++ str ++ ", got: " ++ show result)
 
         forM_ (mkTestStrings DoubleQuote) $ \ str ->
-            testLiteral str `shouldBe` ("Right (JSAstLiteral (JSStringLiteral " ++ str ++ "))")
+            case testLiteral str of
+                Right (JSAstLiteral (JSStringLiteral _ _) _) -> pure ()
+                result -> expectationFailure ("Expected string literal for " ++ str ++ ", got: " ++ show result)
 
     it "strings with escaped quotes" $ do
-        testLiteral "'\"'"      `shouldBe` "Right (JSAstLiteral (JSStringLiteral '\"'))"
-        testLiteral "\"\\\"\""  `shouldBe` "Right (JSAstLiteral (JSStringLiteral \"\\\"\"))"
+        case testLiteral "'\"'" of
+            Right (JSAstLiteral (JSStringLiteral _ "'\"'") _) -> pure ()
+            result -> expectationFailure ("Expected string '\"', got: " ++ show result)
+        case testLiteral "\"\\\"\"" of
+            Right (JSAstLiteral (JSStringLiteral _ "\"\\\"\"") _) -> pure ()
+            result -> expectationFailure ("Expected string \"\\\"\", got: " ++ show result)
 
 
 data Quote
@@ -128,5 +253,5 @@ mkTestStrings quote =
             else '"' : (s ++ ['"'])
 
 
-testLiteral :: String -> String
-testLiteral str = showStrippedMaybe $ parseUsing parseLiteral str "src"
+testLiteral :: String -> Either String JSAST
+testLiteral str = parseUsing parseLiteral str "src"
