@@ -501,8 +501,8 @@ testAssignmentToReserved :: String -> (JSAnnot -> JSAssignOp) -> String -> Spec
 testAssignmentToReserved word opConstructor desc =
   it ("rejects " ++ word ++ " in " ++ desc) $ do
     let program = createStrictProgram [
-          JSAssignStatement (JSIdentifier noAnnot (BS8.pack word))
-            (opConstructor noAnnot) (JSDecimal noAnnot (BS8.pack "42")) auto
+          JSAssignStatement (JSIdentifier noAnnot word)
+            (opConstructor noAnnot) (JSDecimal noAnnot "42") auto
           ]
     validateProgram program `shouldFailWith` isReservedWordError word
 
@@ -530,8 +530,8 @@ isReservedWordViolation _ = False
 -- | Create variable initialization expression.
 createVarInit :: String -> String -> JSCommaList JSExpression
 createVarInit name value = JSLOne (JSVarInitExpression
-  (JSIdentifier noAnnot (BS8.pack name))
-  (JSVarInit noAnnot (JSDecimal noAnnot (BS8.pack value))))
+  (JSIdentifier noAnnot name)
+  (JSVarInit noAnnot (JSDecimal noAnnot value)))
 
 -- | Create simple object property list with one property.
 createObjPropList :: [(JSPropertyName, [JSExpression])] -> JSObjectPropertyList

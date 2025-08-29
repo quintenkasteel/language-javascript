@@ -15,7 +15,6 @@ import Language.JavaScript.Parser.ParserMonad
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
 import qualified Language.JavaScript.Parser.AST as AST
-import qualified Data.ByteString.Char8 as BS8
 
 }
 
@@ -356,46 +355,46 @@ OpAssign : '*='     { AST.JSTimesAssign  (mkJSAnnot $1) }
 -- TODO: make this include any reserved word too, including future ones
 IdentifierName :: { AST.JSExpression }
 IdentifierName : Identifier {$1}
-             | 'async'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "async") }
-             | 'await'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "await") }
-             | 'break'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "break") }
-             | 'case'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "case") }
-             | 'catch'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "catch") }
-             | 'class'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "class") }
-             | 'const'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "const") }
-             | 'continue'   { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "continue") }
-             | 'debugger'   { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "debugger") }
-             | 'default'    { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "default") }
-             | 'delete'     { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "delete") }
-             | 'do'         { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "do") }
-             | 'else'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "else") }
-             | 'enum'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "enum") }
-             | 'export'     { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "export") }
-             | 'extends'    { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "extends") }
-             | 'false'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "false") }
-             | 'finally'    { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "finally") }
-             | 'for'        { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "for") }
-             | 'function'   { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "function") }
-             | 'if'         { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "if") }
-             | 'in'         { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "in") }
-             | 'instanceof' { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "instanceof") }
-             | 'let'        { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "let") }
-             | 'new'        { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "new") }
-             | 'null'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "null") }
-             | 'of'         { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "of") }
-             | 'return'     { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "return") }
-             | 'static'     { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "static") }
-             | 'super'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "super") }
-             | 'switch'     { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "switch") }
-             | 'this'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "this") }
-             | 'throw'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "throw") }
-             | 'true'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "true") }
-             | 'try'        { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "try") }
-             | 'typeof'     { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "typeof") }
-             | 'var'        { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "var") }
-             | 'void'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "void") }
-             | 'while'      { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "while") }
-             | 'with'       { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "with") }
+             | 'async'      { AST.JSIdentifier (mkJSAnnot $1) ("async") }
+             | 'await'      { AST.JSIdentifier (mkJSAnnot $1) ("await") }
+             | 'break'      { AST.JSIdentifier (mkJSAnnot $1) ("break") }
+             | 'case'       { AST.JSIdentifier (mkJSAnnot $1) ("case") }
+             | 'catch'      { AST.JSIdentifier (mkJSAnnot $1) ("catch") }
+             | 'class'      { AST.JSIdentifier (mkJSAnnot $1) ("class") }
+             | 'const'      { AST.JSIdentifier (mkJSAnnot $1) ("const") }
+             | 'continue'   { AST.JSIdentifier (mkJSAnnot $1) ("continue") }
+             | 'debugger'   { AST.JSIdentifier (mkJSAnnot $1) ("debugger") }
+             | 'default'    { AST.JSIdentifier (mkJSAnnot $1) ("default") }
+             | 'delete'     { AST.JSIdentifier (mkJSAnnot $1) ("delete") }
+             | 'do'         { AST.JSIdentifier (mkJSAnnot $1) ("do") }
+             | 'else'       { AST.JSIdentifier (mkJSAnnot $1) ("else") }
+             | 'enum'       { AST.JSIdentifier (mkJSAnnot $1) ("enum") }
+             | 'export'     { AST.JSIdentifier (mkJSAnnot $1) ("export") }
+             | 'extends'    { AST.JSIdentifier (mkJSAnnot $1) ("extends") }
+             | 'false'      { AST.JSIdentifier (mkJSAnnot $1) ("false") }
+             | 'finally'    { AST.JSIdentifier (mkJSAnnot $1) ("finally") }
+             | 'for'        { AST.JSIdentifier (mkJSAnnot $1) ("for") }
+             | 'function'   { AST.JSIdentifier (mkJSAnnot $1) ("function") }
+             | 'if'         { AST.JSIdentifier (mkJSAnnot $1) ("if") }
+             | 'in'         { AST.JSIdentifier (mkJSAnnot $1) ("in") }
+             | 'instanceof' { AST.JSIdentifier (mkJSAnnot $1) ("instanceof") }
+             | 'let'        { AST.JSIdentifier (mkJSAnnot $1) ("let") }
+             | 'new'        { AST.JSIdentifier (mkJSAnnot $1) ("new") }
+             | 'null'       { AST.JSIdentifier (mkJSAnnot $1) ("null") }
+             | 'of'         { AST.JSIdentifier (mkJSAnnot $1) ("of") }
+             | 'return'     { AST.JSIdentifier (mkJSAnnot $1) ("return") }
+             | 'static'     { AST.JSIdentifier (mkJSAnnot $1) ("static") }
+             | 'super'      { AST.JSIdentifier (mkJSAnnot $1) ("super") }
+             | 'switch'     { AST.JSIdentifier (mkJSAnnot $1) ("switch") }
+             | 'this'       { AST.JSIdentifier (mkJSAnnot $1) ("this") }
+             | 'throw'      { AST.JSIdentifier (mkJSAnnot $1) ("throw") }
+             | 'true'       { AST.JSIdentifier (mkJSAnnot $1) ("true") }
+             | 'try'        { AST.JSIdentifier (mkJSAnnot $1) ("try") }
+             | 'typeof'     { AST.JSIdentifier (mkJSAnnot $1) ("typeof") }
+             | 'var'        { AST.JSIdentifier (mkJSAnnot $1) ("var") }
+             | 'void'       { AST.JSIdentifier (mkJSAnnot $1) ("void") }
+             | 'while'      { AST.JSIdentifier (mkJSAnnot $1) ("while") }
+             | 'with'       { AST.JSIdentifier (mkJSAnnot $1) ("with") }
              | 'future'     { AST.JSIdentifier (mkJSAnnot $1) (tokenLiteral $1) }
 
 Var :: { AST.JSAnnot }
@@ -486,7 +485,7 @@ Static :: { AST.JSAnnot }
 Static : 'static' { mkJSAnnot $1 }
 
 Super :: { AST.JSExpression }
-Super : 'super' { AST.JSLiteral (mkJSAnnot $1) (BS8.pack "super") }
+Super : 'super' { AST.JSLiteral (mkJSAnnot $1) ("super") }
 
 
 Eof :: { AST.JSAnnot }
@@ -505,11 +504,11 @@ Literal : NullLiteral     { $1 }
         | RegularExpressionLiteral { $1 }
 
 NullLiteral :: { AST.JSExpression }
-NullLiteral : 'null' { AST.JSLiteral (mkJSAnnot $1) (BS8.pack "null") }
+NullLiteral : 'null' { AST.JSLiteral (mkJSAnnot $1) ("null") }
 
 BooleanLiteral :: { AST.JSExpression }
-BooleanLiteral : 'true'  { AST.JSLiteral (mkJSAnnot $1) (BS8.pack "true") }
-               | 'false' { AST.JSLiteral (mkJSAnnot $1) (BS8.pack "false") }
+BooleanLiteral : 'true'  { AST.JSLiteral (mkJSAnnot $1) ("true") }
+               | 'false' { AST.JSLiteral (mkJSAnnot $1) ("false") }
 
 -- <Numeric Literal> ::= DecimalLiteral
 --                     | HexIntegerLiteral
@@ -536,7 +535,7 @@ RegularExpressionLiteral : 'regex' { AST.JSRegEx (mkJSAnnot $1) (tokenLiteral $1
 --        ObjectLiteral
 --        ( Expression )
 PrimaryExpression :: { AST.JSExpression }
-PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) (BS8.pack "this") }
+PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) ("this") }
                   | Identifier               { $1 {- 'PrimaryExpression1' -} }
                   | Literal                  { $1 {- 'PrimaryExpression2' -} }
                   | ArrayLiteral             { $1 {- 'PrimaryExpression3' -} }
@@ -551,11 +550,11 @@ PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) (BS8
 --         IdentifierName but not ReservedWord
 Identifier :: { AST.JSExpression }
 Identifier : 'ident' { AST.JSIdentifier (mkJSAnnot $1) (tokenLiteral $1) }
-           | 'as'    { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "as") }
-           | 'get'   { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "get") }
-           | 'set'   { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "set") }
-           | 'from'  { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "from") }
-           | 'yield' { AST.JSIdentifier (mkJSAnnot $1) (BS8.pack "yield") }
+           | 'as'    { AST.JSIdentifier (mkJSAnnot $1) ("as") }
+           | 'get'   { AST.JSIdentifier (mkJSAnnot $1) ("get") }
+           | 'set'   { AST.JSIdentifier (mkJSAnnot $1) ("set") }
+           | 'from'  { AST.JSIdentifier (mkJSAnnot $1) ("from") }
+           | 'yield' { AST.JSIdentifier (mkJSAnnot $1) ("yield") }
 
 -- Must follow Identifier; when ambiguous, `yield` as a keyword should take
 -- precedence over `yield` as an identifier name.
@@ -563,7 +562,7 @@ Yield :: { AST.JSAnnot }
 Yield : 'yield' { mkJSAnnot $1 }
 
 ImportMeta :: { AST.JSExpression }
-ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == (BS8.pack "meta") 
+ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == ("meta") 
                                      then return (AST.JSImportMeta (mkJSAnnot $1) (mkJSAnnot $2))
                                      else parseError $3 }
 
@@ -575,8 +574,8 @@ TemplateLiteral : 'tmplnosub'              { JSUntaggedTemplate (mkJSAnnot $1) (
                 | 'tmplhead' TemplateParts { JSUntaggedTemplate (mkJSAnnot $1) (tokenLiteral $1) $2 }
 
 TemplateParts :: { [AST.JSTemplatePart] }
-TemplateParts : TemplateExpression RBrace 'tmplmiddle' TemplateParts { AST.JSTemplatePart $1 $2 (BS8.cons '}' (tokenLiteral $3)) : $4 }
-              | TemplateExpression RBrace 'tmpltail'                 { AST.JSTemplatePart $1 $2 (BS8.cons '}' (tokenLiteral $3)) : [] }
+TemplateParts : TemplateExpression RBrace 'tmplmiddle' TemplateParts { AST.JSTemplatePart $1 $2 ('}' : (tokenLiteral $3)) : $4 }
+              | TemplateExpression RBrace 'tmpltail'                 { AST.JSTemplatePart $1 $2 ('}' : (tokenLiteral $3)) : [] }
 
 -- This production only exists to ensure that inTemplate is set to True before
 -- a tmplmiddle or tmpltail token is lexed. Since the lexer is always one token
@@ -1289,7 +1288,7 @@ Finally : FinallyL Block { AST.JSFinally $1 $2 {- 'Finally' -} }
 -- DebuggerStatement :                                                        See 12.15
 --        debugger ;
 DebuggerStatement :: { AST.JSStatement }
-DebuggerStatement : 'debugger' MaybeSemi { AST.JSExpressionStatement (AST.JSLiteral (mkJSAnnot $1) (BS8.pack "debugger")) $2 {- 'DebuggerStatement' -} }
+DebuggerStatement : 'debugger' MaybeSemi { AST.JSExpressionStatement (AST.JSLiteral (mkJSAnnot $1) ("debugger")) $2 {- 'DebuggerStatement' -} }
 
 -- FunctionDeclaration :                                                      See clause 13
 --        function Identifier ( FormalParameterListopt ) { FunctionBody }
@@ -1639,7 +1638,7 @@ StatementMain : StatementNoEmpty Eof	{ AST.JSAstStatement $1 $2   	{- 'Statement
 
 -- Need this type while build the AST, but is not actually part of the AST.
 data JSArguments = JSArguments AST.JSAnnot (AST.JSCommaList AST.JSExpression) AST.JSAnnot    -- ^lb, args, rb
-data JSUntaggedTemplate = JSUntaggedTemplate !AST.JSAnnot !BS8.ByteString ![AST.JSTemplatePart] -- lquot, head, parts
+data JSUntaggedTemplate = JSUntaggedTemplate !AST.JSAnnot !String ![AST.JSTemplatePart] -- lquot, head, parts
 
 blockToStatement :: AST.JSBlock -> AST.JSSemi -> AST.JSStatement
 blockToStatement (AST.JSBlock a b c) s = AST.JSStatementBlock a b c s
@@ -1694,8 +1693,8 @@ identName :: AST.JSExpression -> AST.JSIdent
 identName (AST.JSIdentifier a s) = AST.JSIdentName a s
 identName x = error $ "Cannot convert '" ++ show x ++ "' to a JSIdentName."
 
-extractPrivateName :: Token -> BS8.ByteString
-extractPrivateName token = BS8.drop 1 (tokenLiteral token)  -- Remove the '#' prefix
+extractPrivateName :: Token -> String
+extractPrivateName token = drop 1 (tokenLiteral token)  -- Remove the '#' prefix
 
 propName :: AST.JSExpression ->  AST.JSPropertyName
 propName (AST.JSIdentifier a s) = AST.JSPropertyIdent a s

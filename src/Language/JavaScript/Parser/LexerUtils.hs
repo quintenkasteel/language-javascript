@@ -30,18 +30,11 @@ import Language.JavaScript.Parser.Token as Token
 import Language.JavaScript.Parser.SrcLocation
 import Data.List (isInfixOf)
 import Prelude hiding (span)
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 
 -- Functions for building tokens
 
 type StartCode = Int
 
--- Helper function for proper UTF-8 encoding of Haskell String to ByteString
-stringToUtf8ByteString :: String -> ByteString
-stringToUtf8ByteString = Text.encodeUtf8 . Text.pack
 
 symbolToken :: Monad m => (TokenPosn -> [CommentAnnotation] -> Token) -> TokenPosn -> Int -> String -> m Token
 symbolToken mkToken location _ _ = return (mkToken location [])
@@ -49,13 +42,13 @@ symbolToken mkToken location _ _ = return (mkToken location [])
 mkString :: (Monad m) => (TokenPosn -> String -> Token) -> TokenPosn -> Int -> String -> m Token
 mkString toToken loc len str = return (toToken loc (take len str))
 
-mkString' :: (Monad m) => (TokenPosn -> ByteString -> [CommentAnnotation] -> Token) -> TokenPosn -> Int -> String -> m Token
-mkString' toToken loc len str = return (toToken loc (stringToUtf8ByteString (take len str)) [])
+mkString' :: (Monad m) => (TokenPosn -> String -> [CommentAnnotation] -> Token) -> TokenPosn -> Int -> String -> m Token
+mkString' toToken loc len str = return (toToken loc (take len str) [])
 
 decimalToken :: TokenPosn -> String -> Token
 decimalToken loc str 
   -- Validate decimal literal for edge cases
-  | isValidDecimal str = DecimalToken loc (stringToUtf8ByteString str) []
+  | isValidDecimal str = DecimalToken loc (str) []
   | otherwise = error ("Invalid decimal literal: " ++ str ++ " at " ++ show loc)
   where
     -- Check for invalid decimal patterns - very conservative
@@ -69,7 +62,7 @@ decimalToken loc str
 hexIntegerToken :: TokenPosn -> String -> Token
 hexIntegerToken loc str 
   -- Very conservative hex validation - only reject clearly incomplete patterns
-  | isValidHex str = HexIntegerToken loc (stringToUtf8ByteString str) []
+  | isValidHex str = HexIntegerToken loc (str) []
   | otherwise = error ("Invalid hex literal: " ++ str ++ " at " ++ show loc)
   where
     -- Check for invalid hex patterns
@@ -85,7 +78,7 @@ hexIntegerToken loc str
 binaryIntegerToken :: TokenPosn -> String -> Token
 binaryIntegerToken loc str
   -- Very conservative binary validation  
-  | isValidBinary str = BinaryIntegerToken loc (stringToUtf8ByteString str) []
+  | isValidBinary str = BinaryIntegerToken loc (str) []
   | otherwise = error ("Invalid binary literal: " ++ str ++ " at " ++ show loc)
   where
     -- Check for invalid binary patterns
@@ -101,7 +94,7 @@ binaryIntegerToken loc str
 octalToken :: TokenPosn -> String -> Token
 octalToken loc str
   -- Very conservative octal validation
-  | isValidOctal str = OctalToken loc (stringToUtf8ByteString str) []
+  | isValidOctal str = OctalToken loc (str) []
   | otherwise = error ("Invalid octal literal: " ++ str ++ " at " ++ show loc)
   where
     -- Check for invalid octal patterns
@@ -115,16 +108,16 @@ octalToken loc str
     isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
 
 bigIntToken :: TokenPosn -> String -> Token
-bigIntToken loc str = BigIntToken loc (stringToUtf8ByteString str) []
+bigIntToken loc str = BigIntToken loc (str) []
 
 regExToken :: TokenPosn -> String -> Token
-regExToken loc str = RegExToken loc (stringToUtf8ByteString str) []
+regExToken loc str = RegExToken loc (str) []
 
 stringToken :: TokenPosn -> String -> Token
-stringToken loc str = StringToken loc (stringToUtf8ByteString str) []
+stringToken loc str = StringToken loc (str) []
 
 commentToken :: TokenPosn -> String -> Token
-commentToken loc str = CommentToken loc (stringToUtf8ByteString str) []
+commentToken loc str = CommentToken loc (str) []
 
 wsToken :: TokenPosn -> String -> Token
-wsToken loc str = WsToken loc (stringToUtf8ByteString str) []
+wsToken loc str = WsToken loc (str) []

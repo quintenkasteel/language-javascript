@@ -19,8 +19,6 @@ module Language.JavaScript.Parser.Token
     , CommentAnnotation (..)
     -- * String conversion
     , debugTokenString
-    , tokenLiteralToString
-    , commentAnnotationToString
     -- * Classification
     -- TokenClass (..),
     ) where
@@ -29,12 +27,10 @@ import Control.DeepSeq (NFData)
 import Data.Data
 import GHC.Generics (Generic)
 import Language.JavaScript.Parser.SrcLocation
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
 
 data CommentAnnotation
-    = CommentA TokenPosn ByteString
-    | WhiteSpace TokenPosn ByteString
+    = CommentA TokenPosn String
+    | WhiteSpace TokenPosn String
     | NoComment
     deriving (Eq, Generic, NFData, Show, Typeable, Data, Read)
 
@@ -42,83 +38,83 @@ data CommentAnnotation
 -- Each may be annotated with any comment occurring between the prior token and this one
 data Token
     -- Comment
-    = CommentToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation] } -- ^ Single line comment.
-    | WsToken      { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation] } -- ^ White space, for preservation.
+    = CommentToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation] } -- ^ Single line comment.
+    | WsToken      { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation] } -- ^ White space, for preservation.
 
     -- Identifiers
-    | IdentifierToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }    -- ^ Identifier.
-    | PrivateNameToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }    -- ^ Private identifier (#identifier).
+    | IdentifierToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }    -- ^ Identifier.
+    | PrivateNameToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }    -- ^ Private identifier (#identifier).
 
     -- Javascript Literals
 
-    | DecimalToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]   }
+    | DecimalToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Decimal
-    | HexIntegerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]   }
+    | HexIntegerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Hexadecimal Integer
-    | BinaryIntegerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]   }
+    | BinaryIntegerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Binary Integer (ES2015)
-    | OctalToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]   }
+    | OctalToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Octal Integer
-    | StringToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | StringToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
     -- ^ Literal: string, delimited by either single or double quotes
-    | RegExToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]   }
+    | RegExToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]   }
     -- ^ Literal: Regular Expression
-    | BigIntToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation] }
+    | BigIntToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation] }
     -- ^ Literal: BigInt Integer (e.g., 123n)
 
     -- Keywords
-    | AsyncToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | AwaitToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | BreakToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | CaseToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | CatchToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ClassToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ConstToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | LetToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ContinueToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | DebuggerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | DefaultToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | DeleteToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | DoToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ElseToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | EnumToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ExtendsToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | FalseToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | FinallyToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ForToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | FunctionToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | FromToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | IfToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | InToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | InstanceofToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | NewToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | NullToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | OfToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ReturnToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | StaticToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | SuperToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | SwitchToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ThisToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ThrowToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | TrueToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | TryToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | TypeofToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | VarToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | VoidToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | WhileToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | YieldToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ImportToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | WithToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | ExportToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | AsyncToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | AwaitToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | BreakToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | CaseToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | CatchToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ClassToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ConstToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | LetToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ContinueToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | DebuggerToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | DefaultToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | DeleteToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | DoToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ElseToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | EnumToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ExtendsToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | FalseToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | FinallyToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ForToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | FunctionToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | FromToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | IfToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | InToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | InstanceofToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | NewToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | NullToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | OfToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ReturnToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | StaticToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | SuperToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | SwitchToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ThisToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ThrowToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | TrueToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | TryToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | TypeofToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | VarToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | VoidToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | WhileToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | YieldToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ImportToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | WithToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | ExportToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
     -- Future reserved words
-    | FutureToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | FutureToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
     -- Needed, not sure what they are though.
-    | GetToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | SetToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | GetToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | SetToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
 
     -- Delimiters
     -- Operators
-    | AutoSemiToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | AutoSemiToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
     | SemiColonToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | CommaToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
     | HookToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
@@ -182,13 +178,13 @@ data Token
     | CondcommentEndToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }
 
     -- Template literal lexical components
-    | NoSubstitutionTemplateToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | TemplateHeadToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | TemplateMiddleToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
-    | TemplateTailToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | NoSubstitutionTemplateToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | TemplateHeadToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | TemplateMiddleToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
+    | TemplateTailToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
 
     -- Special cases
-    | AsToken { tokenSpan :: !TokenPosn, tokenLiteral :: !ByteString, tokenComment :: ![CommentAnnotation]  }
+    | AsToken { tokenSpan :: !TokenPosn, tokenLiteral :: !String, tokenComment :: ![CommentAnnotation]  }
     | TailToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  } -- ^ Stuff between last JS and EOF
     | EOFToken { tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]  }  -- ^ End of file
     deriving (Eq, Generic, NFData, Show, Typeable)
@@ -198,12 +194,3 @@ data Token
 debugTokenString :: Token -> String
 debugTokenString = takeWhile (/= ' ') . show
 
--- | Convert token literal ByteString to String - single conversion point
-tokenLiteralToString :: Token -> String
-tokenLiteralToString = BS8.unpack . tokenLiteral
-
--- | Convert comment annotation ByteString to String
-commentAnnotationToString :: CommentAnnotation -> String
-commentAnnotationToString (CommentA _ bs) = BS8.unpack bs
-commentAnnotationToString (WhiteSpace _ bs) = BS8.unpack bs
-commentAnnotationToString NoComment = ""

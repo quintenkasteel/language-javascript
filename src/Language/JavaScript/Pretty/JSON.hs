@@ -54,16 +54,6 @@ import qualified Data.Text as Text
 import qualified Language.JavaScript.Parser.AST as AST
 import qualified Language.JavaScript.Parser.Token as Token
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..))
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-
--- | Helper function to safely decode UTF-8 ByteString to String
--- Falls back to Latin-1 decoding if UTF-8 fails
-utf8ToString :: BS8.ByteString -> String
-utf8ToString bs = case Text.decodeUtf8' bs of
-  Right text -> Text.unpack text
-  Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
 
 -- | Convert a JavaScript AST to JSON string representation.
 --
@@ -136,42 +126,42 @@ renderExpressionToJSON expr = case expr of
     renderDecimalLiteral annot value = formatJSONObject
         [ ("type", "\"JSDecimal\"")
         , ("annotation", renderAnnotation annot)
-        , ("value", escapeJSONString (utf8ToString value))
+        , ("value", escapeJSONString value)
         ]
     renderHexLiteral annot value = formatJSONObject
         [ ("type", "\"JSHexInteger\"")
         , ("annotation", renderAnnotation annot)
-        , ("value", escapeJSONString (utf8ToString value))
+        , ("value", escapeJSONString value)
         ]
     renderOctalLiteral annot value = formatJSONObject
         [ ("type", "\"JSOctal\"")
         , ("annotation", renderAnnotation annot)
-        , ("value", escapeJSONString (utf8ToString value))
+        , ("value", escapeJSONString value)
         ]
     renderBigIntLiteral annot value = formatJSONObject
         [ ("type", "\"JSBigIntLiteral\"")
         , ("annotation", renderAnnotation annot)
-        , ("value", escapeJSONString (utf8ToString value))
+        , ("value", escapeJSONString value)
         ]
     renderStringLiteral annot value = formatJSONObject
         [ ("type", "\"JSStringLiteral\"")
         , ("annotation", renderAnnotation annot)
-        , ("value", escapeJSONString (utf8ToString value))
+        , ("value", escapeJSONString value)
         ]
     renderIdentifier annot name = formatJSONObject
         [ ("type", "\"JSIdentifier\"")
         , ("annotation", renderAnnotation annot)
-        , ("name", escapeJSONString (utf8ToString name))
+        , ("name", escapeJSONString name)
         ]
     renderGenericLiteral annot value = formatJSONObject
         [ ("type", "\"JSLiteral\"")
         , ("annotation", renderAnnotation annot)
-        , ("value", escapeJSONString (utf8ToString value))
+        , ("value", escapeJSONString value)
         ]
     renderRegexLiteral annot pattern = formatJSONObject
         [ ("type", "\"JSRegEx\"")
         , ("annotation", renderAnnotation annot)
-        , ("pattern", escapeJSONString (utf8ToString pattern))
+        , ("pattern", escapeJSONString pattern)
         ]
     renderBinaryExpression left op right = formatJSONObject
         [ ("type", "\"JSExpressionBinary\"")
@@ -273,12 +263,12 @@ renderBinOpToJSON op = case op of
     AST.JSBinOpInstanceOf _ -> renderKeywordOp "instanceof"
     AST.JSBinOpOf _ -> renderKeywordOp "of"
   where
-    renderLogicalOp opStr = "\"" <> Text.pack opStr <> "\""
-    renderArithmeticOp opStr = "\"" <> Text.pack opStr <> "\""
-    renderEqualityOp opStr = "\"" <> Text.pack opStr <> "\""
-    renderComparisonOp opStr = "\"" <> Text.pack opStr <> "\""
-    renderBitwiseOp opStr = "\"" <> Text.pack opStr <> "\""
-    renderKeywordOp opStr = "\"" <> Text.pack opStr <> "\""
+    renderLogicalOp opStr = "\"" <> opStr <> "\""
+    renderArithmeticOp opStr = "\"" <> opStr <> "\""
+    renderEqualityOp opStr = "\"" <> opStr <> "\""
+    renderComparisonOp opStr = "\"" <> opStr <> "\""
+    renderBitwiseOp opStr = "\"" <> opStr <> "\""
+    renderKeywordOp opStr = "\"" <> opStr <> "\""
 
 -- | Render module item to JSON.
 renderModuleItemToJSON :: AST.JSModuleItem -> Text
@@ -414,7 +404,7 @@ renderIdentToJSON :: AST.JSIdent -> Text
 renderIdentToJSON (AST.JSIdentName ann name) = formatJSONObject
     [ ("type", "\"Identifier\"")
     , ("annotation", renderAnnotation ann)
-    , ("name", "\"" <> Text.pack (utf8ToString name) <> "\"")
+    , ("name", escapeJSONString name)
     ]
 renderIdentToJSON AST.JSIdentNone = formatJSONObject
     [ ("type", "\"EmptyIdentifier\"")
@@ -445,7 +435,7 @@ renderImportDeclarationToJSON decl = case decl of
     AST.JSImportDeclarationBare ann moduleName attrs semi -> formatJSONObject $
         [ ("type", "\"ImportBareDeclaration\"")
         , ("annotation", renderAnnotation ann)
-        , ("module", "\"" <> Text.pack (utf8ToString moduleName) <> "\"")
+        , ("module", escapeJSONString moduleName)
         , ("semicolon", renderSemiColonToJSON semi)
         ] ++ case attrs of
             Just attributes -> [("attributes", renderImportAttributesToJSON attributes)]
@@ -475,7 +465,7 @@ renderFromClauseToJSON (AST.JSFromClause ann1 ann2 moduleName) = formatJSONObjec
     [ ("type", "\"FromClause\"")
     , ("fromAnnotation", renderAnnotation ann1)
     , ("moduleAnnotation", renderAnnotation ann2)
-    , ("module", "\"" <> Text.pack (BS8.unpack moduleName) <> "\"")
+    , ("module", escapeJSONString moduleName)
     ]
 
 -- | Render import namespace to JSON.
@@ -528,12 +518,12 @@ renderComment comment = case comment of
     Token.CommentA pos text -> formatJSONObject
         [ ("type", "\"Comment\"")
         , ("position", renderPosition pos)
-        , ("text", escapeJSONString (BS8.unpack text))
+        , ("text", escapeJSONString text)
         ]
     Token.WhiteSpace pos text -> formatJSONObject
         [ ("type", "\"WhiteSpace\"")
         , ("position", renderPosition pos)
-        , ("text", escapeJSONString (BS8.unpack text))
+        , ("text", escapeJSONString text)
         ]
     Token.NoComment -> formatJSONObject
         [ ("type", "\"NoComment\"")

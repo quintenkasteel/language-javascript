@@ -24,10 +24,7 @@ import Language.JavaScript.Parser.ParserMonad
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
 import qualified Data.Map as Map
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
+import qualified Data.List as List
 
 }
 
@@ -244,7 +241,7 @@ tokens :-
 <reg,divide> @IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> keywordOrIdent (take len str) (toTokenPosn loc) }
 
 -- Private identifier (#identifier)
-<reg,divide> "#"@IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> return $ PrivateNameToken (toTokenPosn loc) (Text.encodeUtf8 (Text.pack (take len str))) [] }
+<reg,divide> "#"@IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> return $ PrivateNameToken (toTokenPosn loc) (take len str) [] }
 
 -- ECMA-262 : Section 7.8.4 String Literals
 -- StringLiteral = '"' ( {String Chars1} | '\' {Printable} )* '"'
@@ -506,12 +503,13 @@ alexTestTokeniserASI input =
     maybeAutoSemiTest tok acc = loop (tok:acc)
     
     -- Check for newlines including all JavaScript line terminators
-    hasNewlineTest :: ByteString -> Bool
-    hasNewlineTest bs = BS8.any (`elem` ['\n', '\r']) bs || 
-                        BS8.isInfixOf u2028 bs || BS8.isInfixOf u2029 bs
+    hasNewlineTest :: String -> Bool
+    hasNewlineTest s = any (`elem` ['\n', '\r']) s || 
+                       u2028 `isInfixOf` s || u2029 `isInfixOf` s
       where
-        u2028 = BS8.pack "\226\128\168"  -- UTF-8 encoding of U+2028 (Line Separator)
-        u2029 = BS8.pack "\226\128\169"  -- UTF-8 encoding of U+2029 (Paragraph Separator)
+        u2028 = "\x2028"  -- U+2028 (Line Separator)
+        u2029 = "\x2029"  -- U+2029 (Paragraph Separator)
+        isInfixOf = List.isInfixOf
     
     -- Check if we should trigger ASI by looking for recent return/break/continue tokens
     shouldTriggerASI :: [Token] -> Bool
@@ -565,12 +563,13 @@ lexCont cont =
     maybeAutoSemi _ = lexLoop
 
     -- Check for newlines including all JavaScript line terminators
-    hasNewline :: ByteString -> Bool
-    hasNewline bs = BS8.any (`elem` ['\n', '\r']) bs || 
-                    BS8.isInfixOf u2028 bs || BS8.isInfixOf u2029 bs
+    hasNewline :: String -> Bool
+    hasNewline s = any (`elem` ['\n', '\r']) s || 
+                   u2028 `isInfixOf` s || u2029 `isInfixOf` s
       where
-        u2028 = BS8.pack "\226\128\168"  -- UTF-8 encoding of U+2028 (Line Separator)
-        u2029 = BS8.pack "\226\128\169"  -- UTF-8 encoding of U+2029 (Paragraph Separator)
+        u2028 = "\x2028"  -- U+2028 (Line Separator)
+        u2029 = "\x2029"  -- U+2029 (Paragraph Separator)
+        isInfixOf = List.isInfixOf
 
 
 toCommentAnnotation :: [Token] -> [CommentAnnotation]
@@ -634,18 +633,14 @@ toTokenPosn (AlexPn offset line col) = (TokenPn offset line col)
 keywordOrIdent :: String -> TokenPosn -> Alex Token
 keywordOrIdent str location =
     return $ case Map.lookup str keywords of
-                Just symbol -> symbol location (stringToUtf8ByteString str) []
-                Nothing -> IdentifierToken location (stringToUtf8ByteString str) []
-  where
-    -- Helper function for proper UTF-8 encoding of Haskell String to ByteString
-    stringToUtf8ByteString :: String -> ByteString
-    stringToUtf8ByteString = Text.encodeUtf8 . Text.pack
+                Just symbol -> symbol location str []
+                Nothing -> IdentifierToken location str []
 
 -- mapping from strings to keywords
-keywords :: Map.Map String (TokenPosn -> ByteString -> [CommentAnnotation] -> Token)
+keywords :: Map.Map String (TokenPosn -> String -> [CommentAnnotation] -> Token)
 keywords = Map.fromList keywordNames
 
-keywordNames :: [(String, TokenPosn -> ByteString -> [CommentAnnotation] -> Token)]
+keywordNames :: [(String, TokenPosn -> String -> [CommentAnnotation] -> Token)]
 keywordNames =
     [ ( "async", AsyncToken )
     , ( "await", AwaitToken )

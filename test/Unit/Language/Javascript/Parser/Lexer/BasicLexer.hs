@@ -128,18 +128,16 @@ testLex str =
 
     -- | Helper function to safely decode UTF-8 ByteString to String
     -- Falls back to Latin-1 decoding if UTF-8 fails
-    utf8ToString :: ByteString -> String
-    utf8ToString bs = case Text.decodeUtf8' bs of
-      Right text -> Text.unpack text
-      Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
+    utf8ToString :: String -> String
+    utf8ToString = id
     
     showToken :: Token -> String
-    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape (utf8ToString lit)
-    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape (utf8ToString lit) ++ "'"
-    showToken (DecimalToken _ lit _) = "DecimalToken " ++ utf8ToString lit
-    showToken (OctalToken _ lit _) = "OctalToken " ++ utf8ToString lit
-    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ utf8ToString lit
-    showToken (BigIntToken _ lit _) = "BigIntToken " ++ utf8ToString lit
+    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
+    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
+    showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
+    showToken (OctalToken _ lit _) = "OctalToken " ++ lit
+    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ lit
+    showToken (BigIntToken _ lit _) = "BigIntToken " ++ lit
     showToken token = takeWhile (/= ' ') $ show token
 
     stringEscape [] = []
@@ -160,18 +158,16 @@ testLexASI str =
 
     -- | Helper function to safely decode UTF-8 ByteString to String
     -- Falls back to Latin-1 decoding if UTF-8 fails
-    utf8ToString :: ByteString -> String
-    utf8ToString bs = case Text.decodeUtf8' bs of
-      Right text -> Text.unpack text
-      Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
+    utf8ToString :: String -> String
+    utf8ToString = id
     
     showToken :: Token -> String
-    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape (utf8ToString lit)
-    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape (utf8ToString lit) ++ "'"
-    showToken (DecimalToken _ lit _) = "DecimalToken " ++ utf8ToString lit
-    showToken (OctalToken _ lit _) = "OctalToken " ++ utf8ToString lit
-    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ utf8ToString lit
-    showToken (BigIntToken _ lit _) = "BigIntToken " ++ utf8ToString lit
+    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
+    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
+    showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
+    showToken (OctalToken _ lit _) = "OctalToken " ++ lit
+    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ lit
+    showToken (BigIntToken _ lit _) = "BigIntToken " ++ lit
     showToken token = takeWhile (/= ' ') $ show token
 
     stringEscape [] = []

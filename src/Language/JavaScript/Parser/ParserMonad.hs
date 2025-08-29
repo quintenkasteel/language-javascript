@@ -17,7 +17,6 @@ module Language.JavaScript.Parser.ParserMonad
 
 import Language.JavaScript.Parser.Token
 import Language.JavaScript.Parser.SrcLocation
-import qualified Data.ByteString.Char8 as BS8
 
 data AlexUserState = AlexUserState
     { previousToken :: !Token   -- ^the previous token
@@ -33,4 +32,4 @@ alexInitUserState = AlexUserState
     }
 
 initToken :: Token
-initToken = CommentToken tokenPosnEmpty BS8.empty []
+initToken = CommentToken tokenPosnEmpty "" []

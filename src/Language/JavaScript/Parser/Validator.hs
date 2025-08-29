@@ -48,9 +48,8 @@ module Language.JavaScript.Parser.Validator
 import Control.DeepSeq (NFData)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.ByteString.Char8 as BS8
 import Data.List (group, isSuffixOf, nub, sort)
+import qualified Data.List as List
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.Char (isDigit)
 import qualified Data.Map.Strict as Map
@@ -631,7 +630,7 @@ validateDuplicateLabelsInStatements stmts =
     extractLabelFromStatement stmt = case stmt of
       JSLabelled label _colon _stmt -> case label of
         JSIdentName _annot labelName -> 
-          [(Text.decodeUtf8 labelName, extractIdentPos label)]
+          [(Text.pack labelName, extractIdentPos label)]
         JSIdentNone -> []
       _ -> []
     
@@ -1054,9 +1053,9 @@ validateBreakStatement ctx ident = case ident of
       then []
       else [BreakOutsideLoop (extractIdentPos ident)]
   JSIdentName _annot label ->
-    if Text.decodeUtf8 label `elem` contextLabels ctx
+    if Text.pack label `elem` contextLabels ctx
       then []
-      else [LabelNotFound (Text.decodeUtf8 label) (extractIdentPos ident)]
+      else [LabelNotFound (Text.pack label) (extractIdentPos ident)]
 
 -- | Validate continue statement context.
 validateContinueStatement :: ValidationContext -> JSIdent -> [ValidationError]
@@ -1066,9 +1065,9 @@ validateContinueStatement ctx ident = case ident of
       then []
       else [ContinueOutsideLoop (extractIdentPos ident)]
   JSIdentName _annot label ->
-    if Text.decodeUtf8 label `elem` contextLabels ctx
+    if Text.pack label `elem` contextLabels ctx
       then []
-      else [LabelNotFound (Text.decodeUtf8 label) (extractIdentPos ident)]
+      else [LabelNotFound (Text.pack label) (extractIdentPos ident)]
 
 -- | Validate return statement context.
 validateReturnStatement :: ValidationContext -> Maybe JSExpression -> [ValidationError]
@@ -1096,7 +1095,7 @@ validateConstDeclarations :: ValidationContext -> [JSExpression] -> [ValidationE
 validateConstDeclarations _ctx exprs = concatMap checkConstInit exprs
   where
     checkConstInit (JSVarInitExpression (JSIdentifier _annot name) JSVarInitNone) =
-      [ConstWithoutInitializer (Text.decodeUtf8 name) (TokenPn 0 0 0)]
+      [ConstWithoutInitializer (Text.pack name) (TokenPn 0 0 0)]
     checkConstInit _ = []
 
 -- | Validate let declarations.
@@ -1109,7 +1108,7 @@ validateFunctionParameters ctx params =
   let paramNames = extractParameterNames params
       duplicates = findDuplicates paramNames
       duplicateErrors = map (\name -> DuplicateParameter name (TokenPn 0 0 0)) duplicates
-      strictModeErrors = concatMap (validateIdentifier ctx . Text.encodeUtf8) paramNames
+      strictModeErrors = concatMap (validateIdentifier ctx . Text.unpack) paramNames
       defaultValueErrors = concatMap (validateParameterDefault ctx) params
       restParamErrors = validateRestParameters params
   in duplicateErrors ++ strictModeErrors ++ defaultValueErrors ++ restParamErrors
@@ -1182,17 +1181,17 @@ extractExpressionPosition expr = case expr of
 extractParameterNames :: [JSExpression] -> [Text]
 extractParameterNames = concatMap extractParamName
   where
-    extractParamName (JSIdentifier _annot name) = [Text.decodeUtf8 name]
-    extractParamName (JSSpreadExpression _spread (JSIdentifier _annot name)) = [Text.decodeUtf8 name]
-    extractParamName (JSVarInitExpression (JSIdentifier _annot name) _init) = [Text.decodeUtf8 name]
+    extractParamName (JSIdentifier _annot name) = [Text.pack name]
+    extractParamName (JSSpreadExpression _spread (JSIdentifier _annot name)) = [Text.pack name]
+    extractParamName (JSVarInitExpression (JSIdentifier _annot name) _init) = [Text.pack name]
     extractParamName _ = [] -- Handle destructuring patterns, defaults, etc.
 
 -- | Extract binding names from variable declarations.
 extractBindingNames :: [JSExpression] -> [Text]
 extractBindingNames = concatMap extractBindingName
   where
-    extractBindingName (JSVarInitExpression (JSIdentifier _annot name) _) = [Text.decodeUtf8 name]
-    extractBindingName (JSIdentifier _annot name) = [Text.decodeUtf8 name]
+    extractBindingName (JSVarInitExpression (JSIdentifier _annot name) _) = [Text.pack name]
+    extractBindingName (JSIdentifier _annot name) = [Text.pack name]
     extractBindingName _ = []
 
 -- | Find duplicate names in a list.
@@ -1214,13 +1213,13 @@ validateUnaryExpression ctx (JSUnaryOpDelete annot) expr
 validateUnaryExpression _ctx _op _expr = []
 
 -- | Validate identifier in strict mode context.
-validateIdentifier :: ValidationContext -> BS8.ByteString -> [ValidationError]
+validateIdentifier :: ValidationContext -> String -> [ValidationError]
 validateIdentifier ctx name
-  | contextStrictMode ctx == StrictModeOn && BS8.unpack name `elem` strictModeReserved =
-      [ReservedWordAsIdentifier (Text.pack (BS8.unpack name)) (TokenPn 0 0 0)]
-  | BS8.unpack name `elem` futureReserved =
-      [FutureReservedWord (Text.pack (BS8.unpack name)) (TokenPn 0 0 0)]
-  | name == BS8.pack "super" = validateSuperUsage ctx
+  | contextStrictMode ctx == StrictModeOn && name `elem` strictModeReserved =
+      [ReservedWordAsIdentifier (Text.pack name) (TokenPn 0 0 0)]
+  | name `elem` futureReserved =
+      [FutureReservedWord (Text.pack name) (TokenPn 0 0 0)]
+  | name == "super" = validateSuperUsage ctx
   | otherwise = []
 
 -- | Validate super keyword usage context.
@@ -1239,44 +1238,44 @@ futureReserved :: [String]
 futureReserved = ["await", "enum", "implements", "interface", "package", "private", "protected", "public"]
 
 -- | Validate numeric literals.
-validateNumericLiteral :: BS8.ByteString -> [ValidationError]
+validateNumericLiteral :: String -> [ValidationError]
 validateNumericLiteral literal
-  | BS8.all isValidNumChar literal = []
-  | otherwise = [InvalidNumericLiteral (Text.pack (BS8.unpack literal)) (TokenPn 0 0 0)]
+  | all isValidNumChar literal = []
+  | otherwise = [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
   where
     isValidNumChar c = isDigit c || c `elem` (".-+eE" :: String)
 
 -- | Validate hex literals.
-validateHexLiteral :: BS8.ByteString -> [ValidationError]
+validateHexLiteral :: String -> [ValidationError]
 validateHexLiteral literal
-  | BS8.pack "0x" `BS8.isPrefixOf` literal || BS8.pack "0X" `BS8.isPrefixOf` literal = []
-  | otherwise = [InvalidNumericLiteral (Text.pack (BS8.unpack literal)) (TokenPn 0 0 0)]
+  | "0x" `List.isPrefixOf` literal || "0X" `List.isPrefixOf` literal = []
+  | otherwise = [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
 
 -- | Validate binary literals (ES2015).
-validateBinaryLiteral :: BS8.ByteString -> [ValidationError]
+validateBinaryLiteral :: String -> [ValidationError]
 validateBinaryLiteral literal
-  | BS8.pack "0b" `BS8.isPrefixOf` literal || BS8.pack "0B" `BS8.isPrefixOf` literal = 
-      let digits = BS8.drop 2 literal
-      in if BS8.all (\c -> c == '0' || c == '1') digits
+  | "0b" `List.isPrefixOf` literal || "0B" `List.isPrefixOf` literal = 
+      let digits = drop 2 literal
+      in if all (\c -> c == '0' || c == '1') digits
          then []
-         else [InvalidNumericLiteral (Text.pack (BS8.unpack literal)) (TokenPn 0 0 0)]
-  | otherwise = [InvalidNumericLiteral (Text.pack (BS8.unpack literal)) (TokenPn 0 0 0)]
+         else [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
+  | otherwise = [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
 
 -- | Validate octal literals in strict mode.
-validateOctalLiteral :: ValidationContext -> BS8.ByteString -> [ValidationError] 
+validateOctalLiteral :: ValidationContext -> String -> [ValidationError] 
 validateOctalLiteral ctx literal
-  | contextStrictMode ctx == StrictModeOn = [InvalidOctalInStrict (Text.pack (BS8.unpack literal)) (TokenPn 0 0 0)]
+  | contextStrictMode ctx == StrictModeOn = [InvalidOctalInStrict (Text.pack literal) (TokenPn 0 0 0)]
   | otherwise = []
 
 -- | Validate BigInt literals.
-validateBigIntLiteral :: BS8.ByteString -> [ValidationError]
+validateBigIntLiteral :: String -> [ValidationError]
 validateBigIntLiteral literal
-  | BS8.pack "n" `BS8.isSuffixOf` literal = []
-  | otherwise = [InvalidBigIntLiteral (Text.pack (BS8.unpack literal)) (TokenPn 0 0 0)]
+  | "n" `isSuffixOf` literal = []
+  | otherwise = [InvalidBigIntLiteral (Text.pack literal) (TokenPn 0 0 0)]
 
 -- | Validate string literals.
-validateStringLiteral :: BS8.ByteString -> [ValidationError]
-validateStringLiteral literal = validateStringEscapes (BS8.unpack literal)
+validateStringLiteral :: String -> [ValidationError]
+validateStringLiteral literal = validateStringEscapes literal
 
 -- | Validate escape sequences in string literals.
 validateStringEscapes :: String -> [ValidationError]
@@ -1349,9 +1348,9 @@ validateStringEscapes = go
     isOctalDigit c = c >= '0' && c <= '7'
 
 -- | Validate regex literals.
-validateRegexLiteral :: BS8.ByteString -> [ValidationError]
+validateRegexLiteral :: String -> [ValidationError]
 validateRegexLiteral regex = 
-  case parseRegexLiteral (BS8.unpack regex) of
+  case parseRegexLiteral regex of
     Left err -> [err]
     Right (pattern, flags) -> validateRegexPattern pattern ++ validateRegexFlags flags
 
@@ -1429,19 +1428,19 @@ findDuplicateFlags flags =
   in [c | (c, count) <- flagCounts, count > 1]
 
 -- | Validate general literals.
-validateLiteral :: ValidationContext -> BS8.ByteString -> [ValidationError]
+validateLiteral :: ValidationContext -> String -> [ValidationError]
 validateLiteral ctx literal = 
   -- Detect literal type and validate accordingly
-  if BS8.pack "n" `BS8.isSuffixOf` literal
+  if "n" `isSuffixOf` literal
   then validateBigIntLiteral literal
   else if isNumericLiteral literal
   then validateNumericLiteral literal
   else validateStringLiteral literal
   where
-    isNumericLiteral :: BS8.ByteString -> Bool
-    isNumericLiteral s = case BS8.uncons s of
-      Nothing -> False
-      Just (c, _) -> isDigit c || c == '.'
+    isNumericLiteral :: String -> Bool
+    isNumericLiteral s = case s of
+      [] -> False
+      (c:_) -> isDigit c || c == '.'
 
 -- Validation functions remain focused on semantic validation of parsed ASTs
 
@@ -1473,10 +1472,10 @@ validateMemberExpression ctx obj prop =
   where
     validatePrivateFieldAccess :: ValidationContext -> JSExpression -> [ValidationError]
     validatePrivateFieldAccess context propExpr = case propExpr of
-      JSIdentifier _annot name | isPrivateIdentifier (BS8.unpack name) ->
+      JSIdentifier _annot name | isPrivateIdentifier name ->
         if contextInClass context
         then []
-        else [PrivateFieldOutsideClass (Text.decodeUtf8 name) (extractExpressionPos propExpr)]
+        else [PrivateFieldOutsideClass (Text.pack name) (extractExpressionPos propExpr)]
       _ -> []
     
     validateNewTargetAccess :: ValidationContext -> JSExpression -> JSExpression -> [ValidationError]
@@ -1506,15 +1505,15 @@ validateObjectLiteral ctx props =
     extractPropertyName :: JSObjectProperty -> Text
     extractPropertyName prop = case prop of
       JSPropertyNameandValue propName _ _ -> getPropertyNameText propName
-      JSPropertyIdentRef _ ident -> getIdentText (BS8.unpack ident)
+      JSPropertyIdentRef _ ident -> getIdentText ident
       JSObjectMethod method -> getMethodNameText method
       JSObjectSpread _ _ -> Text.empty -- Spread properties don't have names
     
     getPropertyNameText :: JSPropertyName -> Text
     getPropertyNameText propName = case propName of
-      JSPropertyIdent _ name -> Text.decodeUtf8 name
-      JSPropertyString _ str -> Text.decodeUtf8 str
-      JSPropertyNumber _ num -> Text.pack (BS8.unpack num)
+      JSPropertyIdent _ name -> Text.pack name
+      JSPropertyString _ str -> Text.pack str
+      JSPropertyNumber _ num -> Text.pack num
       JSPropertyComputed _ _ _ -> Text.pack "[computed]"
     
     getIdentText :: String -> Text
@@ -1621,9 +1620,9 @@ validateClassElements elements =
           JSClassInstanceMethod method -> [getMethodName method]
           JSClassStaticMethod _ method -> [getMethodName method]
           JSClassSemi _ -> []
-          JSPrivateField _ name _ _ _ -> [Text.pack ("#" <> BS8.unpack name)]
-          JSPrivateMethod _ name _ _ _ _ -> [Text.pack ("#" <> BS8.unpack name)]
-          JSPrivateAccessor _ _ name _ _ _ _ -> [Text.pack ("#" <> BS8.unpack name)]
+          JSPrivateField _ name _ _ _ -> [Text.pack ("#" <> name)]
+          JSPrivateMethod _ name _ _ _ _ -> [Text.pack ("#" <> name)]
+          JSPrivateAccessor _ _ name _ _ _ _ -> [Text.pack ("#" <> name)]
         
         getMethodName :: JSMethodDefinition -> Text
         getMethodName method = case method of
@@ -1633,9 +1632,9 @@ validateClassElements elements =
         
         getPropertyNameFromMethod :: JSPropertyName -> Text
         getPropertyNameFromMethod propName = case propName of
-          JSPropertyIdent _ name -> Text.decodeUtf8 name
-          JSPropertyString _ str -> Text.decodeUtf8 str
-          JSPropertyNumber _ num -> Text.pack (BS8.unpack num)
+          JSPropertyIdent _ name -> Text.pack name
+          JSPropertyString _ str -> Text.pack str
+          JSPropertyNumber _ num -> Text.pack num
           JSPropertyComputed _ _ _ -> Text.pack "[computed]"
     
     countConstructors :: [JSClassElement] -> Int
@@ -1751,13 +1750,13 @@ validateLabelledStatement ctx label stmt =
   let labelErrors = case label of
         JSIdentNone -> []
         JSIdentName _annot labelName -> 
-          let labelText = Text.pack (BS8.unpack labelName)
+          let labelText = Text.pack labelName
           in if labelText `elem` contextLabels ctx
              then [DuplicateLabel labelText (extractIdentPos label)]
              else []
       stmtCtx = case label of
         JSIdentName _annot labelName -> 
-          ctx { contextLabels = Text.pack (BS8.unpack labelName) : contextLabels ctx }
+          ctx { contextLabels = Text.pack labelName : contextLabels ctx }
         JSIdentNone -> ctx
   in labelErrors ++ validateStatement stmtCtx stmt
 
@@ -1896,7 +1895,7 @@ validateNoDuplicateFunctionDeclarations stmts =
         getIdentName :: JSIdent -> [Text]
         getIdentName ident = case ident of
           JSIdentNone -> []
-          JSIdentName _ name -> [Text.pack (BS8.unpack name)]
+          JSIdentName _ name -> [Text.pack name]
 
 validateNoDuplicateExports :: [JSModuleItem] -> [ValidationError]
 validateNoDuplicateExports items = 
@@ -1924,23 +1923,23 @@ validateNoDuplicateExports items =
         extractExportSpecNames specs = concatMap extractSpecName (fromCommaList specs)
           where
             extractSpecName spec = case spec of
-              JSExportSpecifier (JSIdentName _ name) -> [Text.pack (BS8.unpack name)]
-              JSExportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ asName) -> [Text.pack (BS8.unpack asName)]
+              JSExportSpecifier (JSIdentName _ name) -> [Text.pack name]
+              JSExportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ asName) -> [Text.pack asName]
               _ -> []
         
         extractStatementBindings :: JSStatement -> [Text]
         extractStatementBindings stmt = case stmt of
-          JSFunction _ (JSIdentName _ name) _ _ _ _ _ -> [Text.pack (BS8.unpack name)]
+          JSFunction _ (JSIdentName _ name) _ _ _ _ _ -> [Text.pack name]
           JSVariable _ vars _ -> extractVarBindings vars
-          JSClass _ (JSIdentName _ name) _ _ _ _ _ -> [Text.pack (BS8.unpack name)]
+          JSClass _ (JSIdentName _ name) _ _ _ _ _ -> [Text.pack name]
           _ -> []
         
         extractVarBindings :: JSCommaList JSExpression -> [Text]
         extractVarBindings vars = concatMap extractVarBinding (fromCommaList vars)
           where
             extractVarBinding expr = case expr of
-              JSVarInitExpression (JSIdentifier _ name) _ -> [Text.pack (BS8.unpack name)]
-              JSIdentifier _ name -> [Text.pack (BS8.unpack name)]
+              JSVarInitExpression (JSIdentifier _ name) _ -> [Text.pack name]
+              JSIdentifier _ name -> [Text.pack name]
               _ -> []
 
 validateNoDuplicateImports :: [JSModuleItem] -> [ValidationError]
@@ -1964,28 +1963,28 @@ validateNoDuplicateImports items =
         
         extractImportClauseNames :: JSImportClause -> [Text]
         extractImportClauseNames clause = case clause of
-          JSImportClauseDefault (JSIdentName _ name) -> [Text.pack (BS8.unpack name)]
+          JSImportClauseDefault (JSIdentName _ name) -> [Text.pack name]
           JSImportClauseDefault JSIdentNone -> []
-          JSImportClauseNameSpace (JSImportNameSpace _ _ (JSIdentName _ name)) -> [Text.pack (BS8.unpack name)]
+          JSImportClauseNameSpace (JSImportNameSpace _ _ (JSIdentName _ name)) -> [Text.pack name]
           JSImportClauseNameSpace (JSImportNameSpace _ _ JSIdentNone) -> []
           JSImportClauseNamed (JSImportsNamed _ specs _) -> extractImportSpecNames specs
           JSImportClauseDefaultNamed (JSIdentName _ defName) _ (JSImportsNamed _ specs _) -> 
-            Text.pack (BS8.unpack defName) : extractImportSpecNames specs
+            Text.pack defName : extractImportSpecNames specs
           JSImportClauseDefaultNamed JSIdentNone _ (JSImportsNamed _ specs _) -> extractImportSpecNames specs
           JSImportClauseDefaultNameSpace (JSIdentName _ defName) _ (JSImportNameSpace _ _ (JSIdentName _ nsName)) ->
-            [Text.pack (BS8.unpack defName), Text.pack (BS8.unpack nsName)]
+            [Text.pack defName, Text.pack nsName]
           JSImportClauseDefaultNameSpace JSIdentNone _ (JSImportNameSpace _ _ (JSIdentName _ nsName)) ->
-            [Text.pack (BS8.unpack nsName)]
+            [Text.pack nsName]
           JSImportClauseDefaultNameSpace (JSIdentName _ defName) _ (JSImportNameSpace _ _ JSIdentNone) ->
-            [Text.pack (BS8.unpack defName)]
+            [Text.pack defName]
           JSImportClauseDefaultNameSpace JSIdentNone _ (JSImportNameSpace _ _ JSIdentNone) -> []
         
         extractImportSpecNames :: JSCommaList JSImportSpecifier -> [Text]
         extractImportSpecNames specs = concatMap extractImportSpecName (fromCommaList specs)
           where
             extractImportSpecName spec = case spec of
-              JSImportSpecifier (JSIdentName _ name) -> [Text.pack (BS8.unpack name)]
-              JSImportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ asName) -> [Text.pack (BS8.unpack asName)]
+              JSImportSpecifier (JSIdentName _ name) -> [Text.pack name]
+              JSImportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ asName) -> [Text.pack asName]
               _ -> []
 
 -- Position extraction helpers

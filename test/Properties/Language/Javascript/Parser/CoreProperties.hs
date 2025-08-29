@@ -746,20 +746,20 @@ genValidExpression = oneof
   ]
 
 -- | Generate ByteString numbers
-genNumber :: Gen BS8.ByteString
-genNumber = BS8.pack . show <$> (arbitrary :: Gen Int)
+genNumber :: Gen String
+genNumber = show <$> (arbitrary :: Gen Int)
 
 -- | Generate ByteString quoted strings
-genQuotedString :: Gen BS8.ByteString  
-genQuotedString = BS8.pack <$> elements ["\"test\"", "\"hello\"", "'world'", "'value'"]
+genQuotedString :: Gen String  
+genQuotedString = elements ["\"test\"", "\"hello\"", "'world'", "'value'"]
 
 -- | Generate ByteString boolean literals
-genBoolean :: Gen BS8.ByteString
-genBoolean = BS8.pack <$> elements ["true", "false"]
+genBoolean :: Gen String
+genBoolean = elements ["true", "false"]
 
 -- | Generate valid ByteString identifiers
-genValidIdentifier :: Gen BS8.ByteString
-genValidIdentifier = BS8.pack <$> elements ["x", "y", "value", "result", "temp", "item"]
+genValidIdentifier :: Gen String
+genValidIdentifier = elements ["x", "y", "value", "result", "temp", "item"]
 
 -- | Generate literal expressions
 genLiteralExpression :: Gen AST.JSExpression
@@ -1036,7 +1036,7 @@ genFunctionWithVars = do
   func <- genValidFunction
   oldVar <- genValidIdentifier
   newVar <- genValidIdentifier
-  return (func, BS8.unpack oldVar, BS8.unpack newVar)
+  return (func, oldVar, newVar)
 
 -- | Generate function with bound and free variables
 genFunctionWithBoundAndFree :: Gen (AST.JSStatement, String, String, String)
@@ -1045,7 +1045,7 @@ genFunctionWithBoundAndFree = do
   boundVar <- genValidIdentifier
   freeVar <- genValidIdentifier
   newName <- genValidIdentifier
-  return (func, BS8.unpack boundVar, BS8.unpack freeVar, BS8.unpack newName)
+  return (func, boundVar, freeVar, newName)
 
 -- | Generate alpha equivalent functions
 genAlphaEquivalentFunctions :: Gen (AST.JSStatement, AST.JSStatement)
@@ -1078,7 +1078,7 @@ genFunctionWithNoCapture = do
   func <- genValidFunction
   oldName <- genValidIdentifier
   newName <- genValidIdentifier
-  return (func, BS8.unpack oldName, BS8.unpack newName)
+  return (func, oldName, newName)
 
 -- | Generate program with renaming map
 genProgramWithRenamingMap :: Gen (AST.JSAST, [(String, String)])
@@ -1199,7 +1199,7 @@ genRenamePair :: Gen (String, String)
 genRenamePair = do
   oldName <- genValidIdentifier
   newName <- genValidIdentifier
-  return (BS8.unpack oldName, BS8.unpack newName)
+  return (oldName, newName)
 
 -- | Generate valid JSIdent
 genValidIdent :: Gen AST.JSIdent
@@ -1753,10 +1753,10 @@ simpleExprStmt :: AST.JSExpression -> AST.JSStatement
 simpleExprStmt expr = AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
 
 literalNumber :: String -> AST.JSExpression  
-literalNumber num = AST.JSDecimal AST.JSNoAnnot (BS8.pack num)
+literalNumber num = AST.JSDecimal AST.JSNoAnnot num
 
 literalString :: String -> AST.JSExpression
-literalString str = AST.JSStringLiteral AST.JSNoAnnot (BS8.pack ("\"" ++ str ++ "\""))
+literalString str = AST.JSStringLiteral AST.JSNoAnnot ("\"" ++ str ++ "\"")
 
 createEquivalent :: AST.JSAST -> AST.JSAST
 createEquivalent = id  -- Simplified for now

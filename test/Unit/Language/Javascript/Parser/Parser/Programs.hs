@@ -99,7 +99,7 @@ testProgramParser = describe "Program parser:" $ do
 
     it "unicode" $ do
         case testProg "àáâãäå = 1;" of
-            Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "\195\160\195\161\195\162\195\163\195\164\195\165") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
+            Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "àáâãäå") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
             result -> expectationFailure ("Expected unicode assignment, got: " ++ show result)
         case testProg "//comment\x000Ax=1;" of
             Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
@@ -114,10 +114,10 @@ testProgramParser = describe "Program parser:" $ do
             Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
             result -> expectationFailure ("Expected assignment with paragraph separator, got: " ++ show result)
         case testProg "$aà = 1;_b=2;\0065a=2" of
-            Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "$a\195\160") (JSAssign _) (JSDecimal _ "1") _,JSAssignStatement (JSIdentifier _ "_b") (JSAssign _) (JSDecimal _ "2") _,JSAssignStatement (JSIdentifier _ "Aa") (JSAssign _) (JSDecimal _ "2") _] _) -> pure ()
+            Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "$aà") (JSAssign _) (JSDecimal _ "1") _,JSAssignStatement (JSIdentifier _ "_b") (JSAssign _) (JSDecimal _ "2") _,JSAssignStatement (JSIdentifier _ "Aa") (JSAssign _) (JSDecimal _ "2") _] _) -> pure ()
             result -> expectationFailure ("Expected three assignments, got: " ++ show result)
         case testProg "x=\"àáâãäå\";y='\3012a\0068'" of
-            Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSStringLiteral _ "\"\195\160\195\161\195\162\195\163\195\164\195\165\"") _,JSAssignStatement (JSIdentifier _ "y") (JSAssign _) (JSStringLiteral _ "'\224\175\132aD'") _] _) -> pure ()
+            Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSStringLiteral _ "\"àáâãäå\"") _,JSAssignStatement (JSIdentifier _ "y") (JSAssign _) (JSStringLiteral _ "'\3012aD'") _] _) -> pure ()
             result -> expectationFailure ("Expected two assignments with unicode strings, got: " ++ show result)
         case testProg "a \f\v\t\r\n=\x00a0\x1680\x180e\x2000\x2001\x2002\x2003\x2004\x2005\x2006\x2007\x2008\x2009\x200a\x2028\x2029\x202f\x205f\x3000\&1;" of
             Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
@@ -125,7 +125,7 @@ testProgramParser = describe "Program parser:" $ do
         case testProg "/* * geolocation. пытаемся определить свое местоположение * если не получается то используем defaultLocation * @Param {object} map экземпляр карты * @Param {object LatLng} defaultLocation Координаты центра по умолчанию * @Param {function} callbackAfterLocation Фу-ия которая вызывается после * геолокации. Т.к запрос геолокации асинхронен */x" of
             Right (JSAstProgram [JSExpressionStatement (JSIdentifier _ "x") _] _) -> pure ()
             result -> expectationFailure ("Expected expression statement with identifier and russian comment, got: " ++ show result)
-        testFileUtf8 "./test/Unicode.js" `shouldReturn` "JSAstProgram [JSOpAssign ('=',JSIdentifier '\195\160\195\161\195\162\195\163\195\164\195\165',JSDecimal '1'),JSSemicolon]"
+        testFileUtf8 "./test/Unicode.js" `shouldReturn` "JSAstProgram [JSOpAssign ('=',JSIdentifier 'àáâãäå',JSDecimal '1'),JSSemicolon]"
 
     it "strings" $ do
         -- Working in ECMASCRIPT 5.1 changes

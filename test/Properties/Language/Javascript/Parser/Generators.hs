@@ -448,14 +448,14 @@ genBoundaryConditions = oneof
 -- Creates identifiers following JavaScript naming rules including
 -- Unicode letter starts, alphanumeric continuation, and reserved
 -- word avoidance for realistic identifier generation.
-genValidIdentifier :: Gen BS8.ByteString
+genValidIdentifier :: Gen String
 genValidIdentifier = do
   first <- genIdentifierStart
   rest <- listOf genIdentifierPart
   let identifier = first : rest
   if identifier `elem` reservedWords
     then genValidIdentifier
-    else return (BS8.pack identifier)
+    else return identifier
   where
     genIdentifierStart = oneof
       [ choose ('a', 'z')
@@ -485,7 +485,7 @@ genValidIdentifier = do
 -- Creates numeric literals including integers, floats, scientific
 -- notation, hexadecimal, binary, and octal formats following
 -- JavaScript numeric literal syntax rules.
-genValidNumber :: Gen BS8.ByteString
+genValidNumber :: Gen String
 genValidNumber = oneof
   [ genDecimalInteger
   , genDecimalFloat
@@ -495,29 +495,29 @@ genValidNumber = oneof
   , genOctal
   ]
   where
-    genDecimalInteger = BS8.pack . show <$> (arbitrary :: Gen Integer)
+    genDecimalInteger = show <$> (arbitrary :: Gen Integer)
     genDecimalFloat = do
       integral <- abs <$> (arbitrary :: Gen Integer) 
       fractional <- abs <$> (arbitrary :: Gen Integer)
-      return (BS8.pack (show integral ++ "." ++ show fractional))
+      return (show integral ++ "." ++ show fractional)
     genScientificNotation = do
       base <- genDecimalFloat
       exponent <- arbitrary :: Gen Int
-      return (BS8.append base (BS8.pack ("e" ++ show exponent)))
+      return (base ++ "e" ++ show exponent)
     genHexadecimal = do
       num <- abs <$> (arbitrary :: Gen Integer)
-      return (BS8.pack ("0x" ++ showHex num ""))
+      return ("0x" ++ showHex num "")
       where showHex 0 acc = if null acc then "0" else acc
             showHex n acc = showHex (n `div` 16) (hexDigit (n `mod` 16) : acc)
             hexDigit d = "0123456789abcdef" !! fromInteger d
     genBinary = do
       num <- abs <$> (arbitrary :: Gen Int)
-      return (BS8.pack ("0b" ++ showBin num ""))
+      return ("0b" ++ showBin num "")
       where showBin 0 acc = if null acc then "0" else acc
             showBin n acc = showBin (n `div` 2) (show (n `mod` 2) ++ acc)
     genOctal = do
       num <- abs <$> (arbitrary :: Gen Int)
-      return (BS8.pack ("0o" ++ showOct num ""))
+      return ("0o" ++ showOct num "")
       where showOct 0 acc = if null acc then "0" else acc
             showOct n acc = showOct (n `div` 8) (show (n `mod` 8) ++ acc)
 
@@ -526,7 +526,7 @@ genValidNumber = oneof
 -- Creates string literals with proper escaping, quote handling,
 -- and special character support including Unicode escapes
 -- and template literal syntax.
-genValidString :: Gen BS8.ByteString
+genValidString :: Gen String
 genValidString = oneof
   [ genSingleQuotedString
   , genDoubleQuotedString
@@ -535,13 +535,13 @@ genValidString = oneof
   where
     genSingleQuotedString = do
       content <- genStringContent '\''
-      return (BS8.pack ("'" ++ content ++ "'"))
+      return ("'" ++ content ++ "'")
     genDoubleQuotedString = do
       content <- genStringContent '"'
-      return (BS8.pack ("\"" ++ content ++ "\""))
+      return ("\"" ++ content ++ "\"")
     genTemplateLiteral = do
       content <- genTemplateContent
-      return (BS8.pack ("`" ++ content ++ "`"))
+      return ("`" ++ content ++ "`")
     genStringContent quote = listOf (genStringChar quote)
     genStringChar quote = oneof
       [ choose ('a', 'z')
@@ -633,14 +633,14 @@ genLiteralExpression = oneof
   ]
   where
     genBooleanLiteral = elements ["true", "false", "null", "undefined"]
-    genHexNumber = BS8.pack . ("0x" ++) <$> genHexDigits
-    genBinaryNumber = BS8.pack . ("0b" ++) <$> genBinaryDigits
-    genOctalNumber = BS8.pack . ("0o" ++) <$> genOctalDigits
-    genBigIntNumber = (`BS8.append` BS8.pack "n") <$> genValidNumber
+    genHexNumber = ("0x" ++) <$> genHexDigits
+    genBinaryNumber = ("0b" ++) <$> genBinaryDigits
+    genOctalNumber = ("0o" ++) <$> genOctalDigits
+    genBigIntNumber = (++ "n") <$> genValidNumber
     genRegexLiteral = do
       pattern <- genRegexPattern
       flags <- genRegexFlags
-      return (BS8.pack ("/" ++ pattern ++ "/" ++ flags))
+      return ("/" ++ pattern ++ "/" ++ flags)
     genHexDigits = listOf1 (elements "0123456789abcdefABCDEF")
     genBinaryDigits = listOf1 (elements "01")
     genOctalDigits = listOf1 (elements "01234567")

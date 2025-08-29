@@ -20,7 +20,6 @@ import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
 import qualified Blaze.ByteString.Builder.Char.Utf8 as BS
 import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Lazy.Encoding as LT
@@ -138,8 +137,6 @@ instance RenderJS String where
         go (rx,cx) '\t' = (rx,cx+8)
         go (rx,cx) _    = (rx,cx+1)
 
-instance RenderJS BS8.ByteString where
-    (|>) pacc s = pacc |> (Text.unpack . Text.decodeUtf8) s
 
 instance RenderJS TokenPosn where
     (|>)  (PosAccum (lcur,ccur) bb) (TokenPn _ ltgt ctgt) = PosAccum (lnew,cnew) (bb <> bb')

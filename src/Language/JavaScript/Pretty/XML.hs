@@ -56,16 +56,6 @@ import qualified Data.Text as Text
 import qualified Language.JavaScript.Parser.AST as AST
 import qualified Language.JavaScript.Parser.Token as Token
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..))
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-
--- | Helper function to safely decode UTF-8 ByteString to String
--- Falls back to Latin-1 decoding if UTF-8 fails
-utf8ToString :: BS8.ByteString -> String
-utf8ToString bs = case Text.decodeUtf8' bs of
-  Right text -> Text.unpack text
-  Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
 
 -- | Convert a JavaScript AST to XML string representation.
 renderToXML :: AST.JSAST -> Text
@@ -105,39 +95,39 @@ renderProgramToXML statements = formatXMLElement "JSProgram" [] $
 renderExpressionToXML :: AST.JSExpression -> Text
 renderExpressionToXML expr = case expr of
     AST.JSDecimal annot value -> 
-        formatXMLElement "JSDecimal" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSDecimal" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSHexInteger annot value -> 
-        formatXMLElement "JSHexInteger" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSHexInteger" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSOctal annot value -> 
-        formatXMLElement "JSOctal" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSOctal" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSBinaryInteger annot value -> 
-        formatXMLElement "JSBinaryInteger" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSBinaryInteger" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSBigIntLiteral annot value -> 
-        formatXMLElement "JSBigIntLiteral" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSBigIntLiteral" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSStringLiteral annot value -> 
-        formatXMLElement "JSStringLiteral" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSStringLiteral" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSIdentifier annot name -> 
-        formatXMLElement "JSIdentifier" [("name", escapeXMLString (utf8ToString name))] $
+        formatXMLElement "JSIdentifier" [("name", escapeXMLString name)] $
             renderAnnotation annot
     
     AST.JSLiteral annot value -> 
-        formatXMLElement "JSLiteral" [("value", escapeXMLString (utf8ToString value))] $
+        formatXMLElement "JSLiteral" [("value", escapeXMLString value)] $
             renderAnnotation annot
     
     AST.JSRegEx annot pattern -> 
-        formatXMLElement "JSRegEx" [("pattern", escapeXMLString (utf8ToString pattern))] $
+        formatXMLElement "JSRegEx" [("pattern", escapeXMLString pattern)] $
             renderAnnotation annot
     
     AST.JSExpressionBinary left op right -> 
@@ -313,10 +303,10 @@ renderCommentToXML :: Token.CommentAnnotation -> Text
 renderCommentToXML comment = case comment of
     Token.CommentA pos content -> formatXMLElement "comment" [] $
         renderPositionToXML pos <>
-        formatXMLElement "content" [("value", escapeXMLString (utf8ToString content))] mempty
+        formatXMLElement "content" [("value", escapeXMLString content)] mempty
     Token.WhiteSpace pos content -> formatXMLElement "whitespace" [] $
         renderPositionToXML pos <>
-        formatXMLElement "content" [("value", escapeXMLString (utf8ToString content))] mempty
+        formatXMLElement "content" [("value", escapeXMLString content)] mempty
     Token.NoComment -> formatXMLElement "no-comment" [] mempty
 
 -- | Render binary operator to XML
@@ -398,7 +388,7 @@ renderArrowBodyToXML body = case body of
 renderIdentToXML :: AST.JSIdent -> Text
 renderIdentToXML ident = case ident of
     AST.JSIdentName annot name -> 
-        formatXMLElement "JSIdentName" [("name", escapeXMLString (utf8ToString name))] $
+        formatXMLElement "JSIdentName" [("name", escapeXMLString name)] $
             renderAnnotation annot
     AST.JSIdentNone -> 
         formatXMLElement "JSIdentNone" [] mempty
@@ -434,7 +424,7 @@ formatXMLElement name attrs content
 
 -- | Format XML attributes
 formatXMLAttributes :: [(Text, Text)] -> Text
-formatXMLAttributes [] = ""
+formatXMLAttributes [] = Text.empty
 formatXMLAttributes attrs = " " <> Text.intercalate " " (map formatXMLAttribute attrs)
 
 -- | Format a single XML attribute

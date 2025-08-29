@@ -409,28 +409,25 @@ testLexASI str =
   where
     stringify tokens = "[" ++ intercalate "," (map showToken tokens) ++ "]"
 
--- | Helper function to safely decode UTF-8 ByteString to String
--- Falls back to Latin-1 decoding if UTF-8 fails
-utf8ToString :: ByteString -> String
-utf8ToString bs = case Text.decodeUtf8' bs of
-  Right text -> Text.unpack text
-  Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
+-- | Helper function - now just identity since tokens use String
+utf8ToString :: String -> String
+utf8ToString = id
 
 -- | Format token for test output
 showToken :: Token -> String
 showToken token = case token of
-  Token.StringToken _ lit _ -> "StringToken " ++ stringEscape (utf8ToString lit)
-  Token.IdentifierToken _ lit _ -> "IdentifierToken '" ++ stringEscape (utf8ToString lit) ++ "'"
-  Token.DecimalToken _ lit _ -> "DecimalToken " ++ utf8ToString lit
-  Token.OctalToken _ lit _ -> "OctalToken " ++ utf8ToString lit
-  Token.HexIntegerToken _ lit _ -> "HexIntegerToken " ++ utf8ToString lit
-  Token.BinaryIntegerToken _ lit _ -> "BinaryIntegerToken " ++ utf8ToString lit
-  Token.BigIntToken _ lit _ -> "BigIntToken " ++ utf8ToString lit
-  Token.RegExToken _ lit _ -> "RegExToken " ++ utf8ToString lit
-  Token.NoSubstitutionTemplateToken _ lit _ -> "NoSubstitutionTemplateToken " ++ utf8ToString lit
-  Token.TemplateHeadToken _ lit _ -> "TemplateHeadToken " ++ utf8ToString lit  
-  Token.TemplateMiddleToken _ lit _ -> "TemplateMiddleToken " ++ utf8ToString lit
-  Token.TemplateTailToken _ lit _ -> "TemplateTailToken " ++ utf8ToString lit
+  Token.StringToken _ lit _ -> "StringToken " ++ stringEscape lit
+  Token.IdentifierToken _ lit _ -> "IdentifierToken '" ++ stringEscape lit ++ "'"
+  Token.DecimalToken _ lit _ -> "DecimalToken " ++ lit
+  Token.OctalToken _ lit _ -> "OctalToken " ++ lit
+  Token.HexIntegerToken _ lit _ -> "HexIntegerToken " ++ lit
+  Token.BinaryIntegerToken _ lit _ -> "BinaryIntegerToken " ++ lit
+  Token.BigIntToken _ lit _ -> "BigIntToken " ++ lit
+  Token.RegExToken _ lit _ -> "RegExToken " ++ lit
+  Token.NoSubstitutionTemplateToken _ lit _ -> "NoSubstitutionTemplateToken " ++ lit
+  Token.TemplateHeadToken _ lit _ -> "TemplateHeadToken " ++ lit  
+  Token.TemplateMiddleToken _ lit _ -> "TemplateMiddleToken " ++ lit
+  Token.TemplateTailToken _ lit _ -> "TemplateTailToken " ++ lit
   _ -> takeWhile (/= ' ') $ show token
 
 -- | Escape string literals for display

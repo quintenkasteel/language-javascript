@@ -415,7 +415,7 @@ testLongStringPerformance = describe "Long String Performance" $ do
     let longString = generateLongString 1000 '\''
     case testStringLiteral longString of
       Right (JSAstLiteral (JSStringLiteral _ content) _) -> 
-        if BS8.unpack content == longString then pure ()
+        if content == longString then pure ()
         else expectationFailure ("Expected content to match input string")
       result -> expectationFailure ("Expected long string literal, got: " ++ show result)
 
@@ -423,7 +423,7 @@ testLongStringPerformance = describe "Long String Performance" $ do
     let longString = generateLongString 1000 '"'
     case testStringLiteral longString of
       Right (JSAstLiteral (JSStringLiteral _ content) _) -> 
-        if BS8.unpack content == longString then pure ()
+        if content == longString then pure ()
         else expectationFailure ("Expected content to match input string")
       result -> expectationFailure ("Expected long string literal, got: " ++ show result)
 

@@ -43,7 +43,7 @@ testGenerators = describe "QuickCheck Generators" $ do
     
     it "generates valid identifier strings" $ property $ do
       ident <- genValidIdentifier
-      return $ not (BS8.null ident) && BS8.all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$")) ident
+      return $ not (null ident) && all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$")) ident
 
   describe "Complex structure generators" $ do
     it "generates JSObjectProperty instances" $ property $

@@ -143,15 +143,13 @@ testLex str =
       where
         -- | Helper function to safely decode UTF-8 ByteString to String
         -- Falls back to Latin-1 decoding if UTF-8 fails
-        utf8ToString :: ByteString -> String
-        utf8ToString bs = case Text.decodeUtf8' bs of
-          Right text -> Text.unpack text
-          Left _ -> BS8.unpack bs  -- Fallback to Latin-1 for invalid UTF-8
+        utf8ToString :: String -> String
+        utf8ToString = id
         
         showToken :: Token -> String
-        showToken (StringToken _ lit _) = "StringToken " ++ stringEscape (utf8ToString lit)
-        showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape (utf8ToString lit) ++ "'"
-        showToken (DecimalToken _ lit _) = "DecimalToken " ++ utf8ToString lit
+        showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
+        showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
+        showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
         showToken (CommentToken _ _ _) = "CommentToken"
         showToken (AutoSemiToken _ _ _) = "AutoSemiToken"
         showToken (WsToken _ _ _) = "WsToken"
