@@ -9,7 +9,7 @@
 --
 -- The test suite is organized into phases:
 --   * Phase 1: Extended string literal tests (all escape sequences, unicode, cross-quotes, errors)
---   * Phase 2: Template literal comprehensive tests (interpolation, nesting, escapes, tagged)  
+--   * Phase 2: Template literal comprehensive tests (interpolation, nesting, escapes, tagged)
 --   * Phase 3: Edge cases and performance (long strings, complex escapes, boundaries)
 --
 -- Test coverage targets 200+ expression paths across:
@@ -21,33 +21,33 @@
 --
 -- @since 0.7.1.0
 module Unit.Language.Javascript.Parser.Lexer.StringLiterals
-  ( testStringLiteralComplexity
-  ) where
-
-import Test.Hspec
-import Control.Monad (forM_)
-import Data.List (isInfixOf)
-import qualified Data.ByteString.Char8 as BS8
-
-import Language.JavaScript.Parser
-import Language.JavaScript.Parser.Grammar7
-import Language.JavaScript.Parser.Parser (parseUsing)
-import Language.JavaScript.Parser.Lexer (alexTestTokeniser)
-import qualified Language.JavaScript.Parser.Token as Token
-import Language.JavaScript.Parser.AST
-  ( JSAST(..) 
-  , JSStatement(..)
-  , JSExpression(..)
-  , JSTemplatePart(..)
-  , JSAnnot
-  , JSSemi
+  ( testStringLiteralComplexity,
   )
+where
+
+import Control.Monad (forM_)
+import qualified Data.ByteString.Char8 as BS8
+import Data.List (isInfixOf)
+import Language.JavaScript.Parser
+import Language.JavaScript.Parser.AST
+  ( JSAST (..),
+    JSAnnot,
+    JSExpression (..),
+    JSSemi,
+    JSStatement (..),
+    JSTemplatePart (..),
+  )
+import Language.JavaScript.Parser.Grammar7
+import Language.JavaScript.Parser.Lexer (alexTestTokeniser)
+import Language.JavaScript.Parser.Parser (parseUsing)
+import qualified Language.JavaScript.Parser.Token as Token
+import Test.Hspec
 
 -- | Main test suite entry point
 testStringLiteralComplexity :: Spec
 testStringLiteralComplexity = describe "String Literal Complexity Tests" $ do
   testPhase1ExtendedStringLiterals
-  testPhase2TemplateLiteralComprehensive  
+  testPhase2TemplateLiteralComprehensive
   testPhase3EdgeCasesAndPerformance
 
 -- | Phase 1: Extended string literal tests covering all escape sequences,
@@ -62,7 +62,7 @@ testPhase1ExtendedStringLiterals = describe "Phase 1: Extended String Literals" 
 
 -- | Phase 2: Template literal comprehensive tests including interpolation,
 -- nesting, complex escapes, and tagged template scenarios
-testPhase2TemplateLiteralComprehensive :: Spec 
+testPhase2TemplateLiteralComprehensive :: Spec
 testPhase2TemplateLiteralComprehensive = describe "Phase 2: Template Literal Comprehensive" $ do
   testBasicTemplateLiterals
   testTemplateInterpolation
@@ -246,7 +246,7 @@ testStringErrorRecovery :: Spec
 testStringErrorRecovery = describe "String Error Recovery" $ do
   it "detects unclosed single quoted strings" $ do
     case testStringLiteral "'unclosed" of
-      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`) 
+      Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
       result -> expectationFailure ("Expected parse error, got: " ++ show result)
     case testStringLiteral "'partial\n" of
       Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
@@ -268,7 +268,7 @@ testStringErrorRecovery = describe "String Error Recovery" $ do
       Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
       Right result -> expectationFailure ("Expected parse error for incomplete hex escape '\\x', got: " ++ show result)
 
-  it "should reject invalid unicode escapes" $ do  
+  it "should reject invalid unicode escapes" $ do
     case testStringLiteral "'\\u'" of
       Left err -> err `shouldSatisfy` ("lexical error" `isInfixOf`)
       Right result -> expectationFailure ("Expected parse error for incomplete unicode escape '\\u', got: " ++ show result)
@@ -280,7 +280,7 @@ testStringErrorRecovery = describe "String Error Recovery" $ do
       Right result -> expectationFailure ("Expected parse error for invalid unicode escape '\\uGHIJ', got: " ++ show result)
 
 -- ---------------------------------------------------------------------
--- Phase 2 Implementation  
+-- Phase 2 Implementation
 -- ---------------------------------------------------------------------
 
 -- | Test basic template literal functionality
@@ -414,23 +414,25 @@ testLongStringPerformance = describe "Long String Performance" $ do
   it "parses very long single quoted strings" $ do
     let longString = generateLongString 1000 '\''
     case testStringLiteral longString of
-      Right (JSAstLiteral (JSStringLiteral _ content) _) -> 
-        if content == longString then pure ()
-        else expectationFailure ("Expected content to match input string")
+      Right (JSAstLiteral (JSStringLiteral _ content) _) ->
+        if content == longString
+          then pure ()
+          else expectationFailure ("Expected content to match input string")
       result -> expectationFailure ("Expected long string literal, got: " ++ show result)
 
   it "parses very long double quoted strings" $ do
     let longString = generateLongString 1000 '"'
     case testStringLiteral longString of
-      Right (JSAstLiteral (JSStringLiteral _ content) _) -> 
-        if content == longString then pure ()
-        else expectationFailure ("Expected content to match input string")
+      Right (JSAstLiteral (JSStringLiteral _ content) _) ->
+        if content == longString
+          then pure ()
+          else expectationFailure ("Expected content to match input string")
       result -> expectationFailure ("Expected long string literal, got: " ++ show result)
 
   it "parses very long template literals" $ do
     let longTemplate = generateLongTemplate 1000
     case alexTestTokeniser longTemplate of
-      Right [Token.NoSubstitutionTemplateToken _ _ _] -> pure ()  -- Accept successful tokenization
+      Right [Token.NoSubstitutionTemplateToken _ _ _] -> pure () -- Accept successful tokenization
       Right tokens -> expectationFailure ("Expected single NoSubstitutionTemplateToken, got: " ++ show tokens)
       Left err -> expectationFailure ("Expected successful tokenization, got error: " ++ show err)
 
@@ -517,7 +519,7 @@ generateLongString len quoteChar =
 
 -- | Generate a long template literal for testing
 generateLongTemplate :: Int -> String
-generateLongTemplate len = 
+generateLongTemplate len =
   "`" ++ replicate len 'a' ++ "`"
 
 -- Note: Removed weak assertion helper functions (containsInterpolation, isValidTagged, isSuccessful)
@@ -529,42 +531,41 @@ generateLongTemplate len =
 
 -- | Generate ASCII unicode test cases (0000-007F)
 asciiUnicodeTestCases :: [(String, String)]
-asciiUnicodeTestCases = 
-  [ ("'\\u0041'", "Right (JSAstLiteral (JSStringLiteral '\\u0041'))")  -- A
-  , ("'\\u0048'", "Right (JSAstLiteral (JSStringLiteral '\\u0048'))")  -- H  
-  , ("'\\u0065'", "Right (JSAstLiteral (JSStringLiteral '\\u0065'))")  -- e
-  , ("'\\u006C'", "Right (JSAstLiteral (JSStringLiteral '\\u006C'))")  -- l
-  , ("'\\u006F'", "Right (JSAstLiteral (JSStringLiteral '\\u006F'))")  -- o
-  , ("'\\u0020'", "Right (JSAstLiteral (JSStringLiteral '\\u0020'))")  -- space
-  , ("'\\u0021'", "Right (JSAstLiteral (JSStringLiteral '\\u0021'))")  -- !
-  , ("'\\u003F'", "Right (JSAstLiteral (JSStringLiteral '\\u003F'))")  -- ?
+asciiUnicodeTestCases =
+  [ ("'\\u0041'", "Right (JSAstLiteral (JSStringLiteral '\\u0041'))"), -- A
+    ("'\\u0048'", "Right (JSAstLiteral (JSStringLiteral '\\u0048'))"), -- H
+    ("'\\u0065'", "Right (JSAstLiteral (JSStringLiteral '\\u0065'))"), -- e
+    ("'\\u006C'", "Right (JSAstLiteral (JSStringLiteral '\\u006C'))"), -- l
+    ("'\\u006F'", "Right (JSAstLiteral (JSStringLiteral '\\u006F'))"), -- o
+    ("'\\u0020'", "Right (JSAstLiteral (JSStringLiteral '\\u0020'))"), -- space
+    ("'\\u0021'", "Right (JSAstLiteral (JSStringLiteral '\\u0021'))"), -- !
+    ("'\\u003F'", "Right (JSAstLiteral (JSStringLiteral '\\u003F'))") -- ?
   ]
 
 -- | Generate Latin-1 unicode test cases (0080-00FF)
 latin1UnicodeTestCases :: [(String, String)]
 latin1UnicodeTestCases =
-  [ ("'\\u00A0'", "Right (JSAstLiteral (JSStringLiteral '\\u00A0'))")  -- non-breaking space
-  , ("'\\u00C0'", "Right (JSAstLiteral (JSStringLiteral '\\u00C0'))")  -- À
-  , ("'\\u00E9'", "Right (JSAstLiteral (JSStringLiteral '\\u00E9'))")  -- é  
-  , ("'\\u00F1'", "Right (JSAstLiteral (JSStringLiteral '\\u00F1'))")  -- ñ
-  , ("'\\u00FC'", "Right (JSAstLiteral (JSStringLiteral '\\u00FC'))")  -- ü
+  [ ("'\\u00A0'", "Right (JSAstLiteral (JSStringLiteral '\\u00A0'))"), -- non-breaking space
+    ("'\\u00C0'", "Right (JSAstLiteral (JSStringLiteral '\\u00C0'))"), -- À
+    ("'\\u00E9'", "Right (JSAstLiteral (JSStringLiteral '\\u00E9'))"), -- é
+    ("'\\u00F1'", "Right (JSAstLiteral (JSStringLiteral '\\u00F1'))"), -- ñ
+    ("'\\u00FC'", "Right (JSAstLiteral (JSStringLiteral '\\u00FC'))") -- ü
   ]
 
 -- | Generate Latin Extended-A test cases (0100-017F)
 latinExtendedTestCases :: [(String, String)]
 latinExtendedTestCases =
-  [ ("'\\u0100'", "Right (JSAstLiteral (JSStringLiteral '\\u0100'))")  -- Ā
-  , ("'\\u0101'", "Right (JSAstLiteral (JSStringLiteral '\\u0101'))")  -- ā
-  , ("'\\u0150'", "Right (JSAstLiteral (JSStringLiteral '\\u0150'))")  -- Ő
-  , ("'\\u0151'", "Right (JSAstLiteral (JSStringLiteral '\\u0151'))")  -- ő
+  [ ("'\\u0100'", "Right (JSAstLiteral (JSStringLiteral '\\u0100'))"), -- Ā
+    ("'\\u0101'", "Right (JSAstLiteral (JSStringLiteral '\\u0101'))"), -- ā
+    ("'\\u0150'", "Right (JSAstLiteral (JSStringLiteral '\\u0150'))"), -- Ő
+    ("'\\u0151'", "Right (JSAstLiteral (JSStringLiteral '\\u0151'))") -- ő
   ]
 
 -- | Generate control character test cases
 controlCharTestCases :: [(String, String)]
 controlCharTestCases =
-  [ ("'\\u0001'", "Right (JSAstLiteral (JSStringLiteral '\\u0001'))")  -- SOH
-  , ("'\\u0002'", "Right (JSAstLiteral (JSStringLiteral '\\u0002'))")  -- STX
-  , ("'\\u0003'", "Right (JSAstLiteral (JSStringLiteral '\\u0003'))")  -- ETX
-  , ("'\\u001F'", "Right (JSAstLiteral (JSStringLiteral '\\u001F'))")  -- US
+  [ ("'\\u0001'", "Right (JSAstLiteral (JSStringLiteral '\\u0001'))"), -- SOH
+    ("'\\u0002'", "Right (JSAstLiteral (JSStringLiteral '\\u0002'))"), -- STX
+    ("'\\u0003'", "Right (JSAstLiteral (JSStringLiteral '\\u0003'))"), -- ETX
+    ("'\\u001F'", "Right (JSAstLiteral (JSStringLiteral '\\u001F'))") -- US
   ]
-
