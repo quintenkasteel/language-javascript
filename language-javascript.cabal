@@ -1,5 +1,5 @@
 Name:                language-javascript
-Version:             0.7.1.0
+Version:             0.8.0.0
 Synopsis:            Parser for JavaScript
 Description:         Parses Javascript into an Abstract Syntax Tree (AST).  Initially intended as frontend to hjsmin.
                      .
@@ -106,7 +106,7 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Parser.Lexer.NumericLiterals
                     Unit.Language.Javascript.Parser.Lexer.StringLiterals
                     Unit.Language.Javascript.Parser.Lexer.UnicodeSupport
-                    
+
                     -- Unit Tests - Parser
                     Unit.Language.Javascript.Parser.Parser.Expressions
                     Unit.Language.Javascript.Parser.Parser.Statements
@@ -114,52 +114,52 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Parser.Parser.Modules
                     Unit.Language.Javascript.Parser.Parser.ExportStar
                     Unit.Language.Javascript.Parser.Parser.Literals
-                    
+
                     -- Unit Tests - AST
                     Unit.Language.Javascript.Parser.AST.Construction
                     Unit.Language.Javascript.Parser.AST.Generic
                     Unit.Language.Javascript.Parser.AST.SrcLocation
-                    
+
                     -- Unit Tests - Pretty Printing
                     Unit.Language.Javascript.Parser.Pretty.JSONTest
                     Unit.Language.Javascript.Parser.Pretty.XMLTest
                     Unit.Language.Javascript.Parser.Pretty.SExprTest
-                    
+
                     -- Unit Tests - Validation
                     Unit.Language.Javascript.Parser.Validation.Core
                     Unit.Language.Javascript.Parser.Validation.ES6Features
                     Unit.Language.Javascript.Parser.Validation.StrictMode
                     Unit.Language.Javascript.Parser.Validation.Modules
                     Unit.Language.Javascript.Parser.Validation.ControlFlow
-                    
+
                     -- Unit Tests - Error
                     Unit.Language.Javascript.Parser.Error.Recovery
                     Unit.Language.Javascript.Parser.Error.AdvancedRecovery
                     Unit.Language.Javascript.Parser.Error.Quality
                     Unit.Language.Javascript.Parser.Error.Negative
-                    
+
                     -- Integration Tests
                     Integration.Language.Javascript.Parser.RoundTrip
                     -- Integration.Language.Javascript.Parser.AdvancedFeatures  -- Temporarily disabled
                     Integration.Language.Javascript.Parser.Minification
                     Integration.Language.Javascript.Parser.Compatibility
-                    
+
                     -- Golden Tests
                     Golden.Language.Javascript.Parser.GoldenTests
-                    
+
                     -- Property Tests
                     Properties.Language.Javascript.Parser.CoreProperties
                     Properties.Language.Javascript.Parser.Generators
                     Properties.Language.Javascript.Parser.GeneratorsTest
                     Properties.Language.Javascript.Parser.Fuzzing
-                    
+
                     -- Fuzz Tests
                     Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
                     Properties.Language.Javascript.Parser.Fuzz.DifferentialTesting
                     Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
                     Properties.Language.Javascript.Parser.Fuzz.FuzzHarness
                     Properties.Language.Javascript.Parser.Fuzz.FuzzTest
-                    
+
                     -- Benchmark Tests
                     Benchmarks.Language.Javascript.Parser.Performance
                     Benchmarks.Language.Javascript.Parser.Memory
@@ -188,7 +188,7 @@ Executable coverage-gen
                , Coverage.Corpus
                , Coverage.Integration
 
- 
+
 
 source-repository head
   type:     git
