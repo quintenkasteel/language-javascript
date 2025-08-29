@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      : Language.JavaScript.LexerUtils
 -- Based on language-python version by Bernie Pope
@@ -8,33 +11,31 @@
 -- Portability : ghc
 --
 -- Various utilities to support the JavaScript lexer.
------------------------------------------------------------------------------
-
 module Language.JavaScript.Parser.LexerUtils
-    ( StartCode
-    , symbolToken
-    , mkString
-    , mkString'
-    , commentToken
-    , wsToken
-    , regExToken
-    , decimalToken
-    , hexIntegerToken
-    , binaryIntegerToken
-    , octalToken
-    , bigIntToken
-    , stringToken
-    ) where
+  ( StartCode,
+    symbolToken,
+    mkString,
+    mkString',
+    commentToken,
+    wsToken,
+    regExToken,
+    decimalToken,
+    hexIntegerToken,
+    binaryIntegerToken,
+    octalToken,
+    bigIntToken,
+    stringToken,
+  )
+where
 
-import Language.JavaScript.Parser.Token as Token
-import Language.JavaScript.Parser.SrcLocation
 import Data.List (isInfixOf)
+import Language.JavaScript.Parser.SrcLocation
+import Language.JavaScript.Parser.Token as Token
 import Prelude hiding (span)
 
 -- Functions for building tokens
 
 type StartCode = Int
-
 
 symbolToken :: Monad m => (TokenPosn -> [CommentAnnotation] -> Token) -> TokenPosn -> Int -> String -> m Token
 symbolToken mkToken location _ _ = return (mkToken location [])
@@ -46,7 +47,7 @@ mkString' :: (Monad m) => (TokenPosn -> String -> [CommentAnnotation] -> Token) 
 mkString' toToken loc len str = return (toToken loc (take len str) [])
 
 decimalToken :: TokenPosn -> String -> Token
-decimalToken loc str 
+decimalToken loc str
   -- Validate decimal literal for edge cases
   | isValidDecimal str = DecimalToken loc (str) []
   | otherwise = error ("Invalid decimal literal: " ++ str ++ " at " ++ show loc)
@@ -54,13 +55,12 @@ decimalToken loc str
     -- Check for invalid decimal patterns - very conservative
     isValidDecimal s
       -- Only reject clearly invalid patterns
-      | ".." `isInfixOf` s = False  -- Reject incomplete decimals like "1.."
-      | s `elem` [".", ".."] = False  -- Reject standalone dots  
-      | otherwise = True  -- Accept everything else for now
-    
+      | ".." `isInfixOf` s = False -- Reject incomplete decimals like "1.."
+      | s `elem` [".", ".."] = False -- Reject standalone dots
+      | otherwise = True -- Accept everything else for now
 
 hexIntegerToken :: TokenPosn -> String -> Token
-hexIntegerToken loc str 
+hexIntegerToken loc str
   -- Very conservative hex validation - only reject clearly incomplete patterns
   | isValidHex str = HexIntegerToken loc (str) []
   | otherwise = error ("Invalid hex literal: " ++ str ++ " at " ++ show loc)
@@ -69,15 +69,14 @@ hexIntegerToken loc str
     isValidHex s
       -- Only reject incomplete hex prefixes like "0x" or "0X" with no digits
       | s `elem` ["0x", "0X"] = False
-      | otherwise = True  -- Accept everything else
-    
+      | otherwise = True -- Accept everything else
     isPrefixOf [] _ = True
     isPrefixOf _ [] = False
-    isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
+    isPrefixOf (x : xs) (y : ys) = x == y && isPrefixOf xs ys
 
 binaryIntegerToken :: TokenPosn -> String -> Token
 binaryIntegerToken loc str
-  -- Very conservative binary validation  
+  -- Very conservative binary validation
   | isValidBinary str = BinaryIntegerToken loc (str) []
   | otherwise = error ("Invalid binary literal: " ++ str ++ " at " ++ show loc)
   where
@@ -85,11 +84,10 @@ binaryIntegerToken loc str
     isValidBinary s
       -- Only reject incomplete prefixes like "0b" or "0B" with no digits
       | s `elem` ["0b", "0B"] = False
-      | otherwise = True  -- Accept everything else
-    
+      | otherwise = True -- Accept everything else
     isPrefixOf [] _ = True
     isPrefixOf _ [] = False
-    isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
+    isPrefixOf (x : xs) (y : ys) = x == y && isPrefixOf xs ys
 
 octalToken :: TokenPosn -> String -> Token
 octalToken loc str
@@ -101,11 +99,10 @@ octalToken loc str
     isValidOctal s
       -- Only reject incomplete prefixes like "0o" or "0O" with no digits
       | s `elem` ["0o", "0O"] = False
-      | otherwise = True  -- Accept everything else
-    
+      | otherwise = True -- Accept everything else
     isPrefixOf [] _ = True
     isPrefixOf _ [] = False
-    isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
+    isPrefixOf (x : xs) (y : ys) = x == y && isPrefixOf xs ys
 
 bigIntToken :: TokenPosn -> String -> Token
 bigIntToken loc str = BigIntToken loc (str) []

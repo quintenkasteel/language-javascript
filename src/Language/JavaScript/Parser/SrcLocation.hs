@@ -1,4 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 -- | Source location tracking for JavaScript parsing.
 --
 -- This module provides comprehensive position tracking functionality for
@@ -26,37 +29,45 @@
 -- > positionOffset pos advanced       -- 5
 --
 -- @since 0.7.1.0
-module Language.JavaScript.Parser.SrcLocation (
-  -- * Position Types
-    TokenPosn(..)
-  , tokenPosnEmpty
-  -- * Position Accessors
-  , getAddress
-  , getLineNumber
-  , getColumn
-  -- * Position Arithmetic
-  , advancePosition
-  , advanceTab
-  , advanceToNewline
-  , positionOffset
-  -- * Position Utilities
-  , makePosition
-  , normalizePosition
-  , isValidPosition
-  , isStartOfLine
-  , isEmptyPosition
-  -- * Position Formatting
-  , formatPosition
-  , formatPositionForError
-  -- * Position Comparison
-  , compareByAddress
-  , comparePositionsOnLine
-  -- * Position Validation
-  , isConsistentPosition
-  -- * Safe Position Operations
-  , safeAdvancePosition
-  , safePositionOffset
-  ) where
+module Language.JavaScript.Parser.SrcLocation
+  ( -- * Position Types
+    TokenPosn (..),
+    tokenPosnEmpty,
+
+    -- * Position Accessors
+    getAddress,
+    getLineNumber,
+    getColumn,
+
+    -- * Position Arithmetic
+    advancePosition,
+    advanceTab,
+    advanceToNewline,
+    positionOffset,
+
+    -- * Position Utilities
+    makePosition,
+    normalizePosition,
+    isValidPosition,
+    isStartOfLine,
+    isEmptyPosition,
+
+    -- * Position Formatting
+    formatPosition,
+    formatPositionForError,
+
+    -- * Position Comparison
+    compareByAddress,
+    comparePositionsOnLine,
+
+    -- * Position Validation
+    isConsistentPosition,
+
+    -- * Safe Position Operations
+    safeAdvancePosition,
+    safePositionOffset,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.Data
@@ -66,11 +77,12 @@ import GHC.Generics (Generic)
 -- fields: the address (number of characters preceding the token), line number
 -- and column of a token within the file.
 -- Note: The lexer assumes the usual eight character tab stops.
-
-data TokenPosn = TokenPn !Int -- address (number of characters preceding the token)
-                         !Int -- line number
-                         !Int -- column
-        deriving (Eq, Generic, NFData, Show, Read, Data, Typeable)
+data TokenPosn
+  = TokenPn
+      !Int -- address (number of characters preceding the token)
+      !Int -- line number
+      !Int -- column
+  deriving (Eq, Generic, NFData, Show, Read, Data, Typeable)
 
 -- | Empty position at the start of input.
 --
@@ -141,9 +153,9 @@ advancePosition (TokenPn addr line col) n = TokenPn (addr + n) line (col + n)
 --
 -- @since 0.7.1.0
 advanceTab :: TokenPosn -> TokenPosn
-advanceTab (TokenPn addr line col) = 
+advanceTab (TokenPn addr line col) =
   let newCol = ((col `div` 8) + 1) * 8
-  in TokenPn (addr + 1) line newCol
+   in TokenPn (addr + 1) line newCol
 
 -- | Advance to a new line.
 --
@@ -191,7 +203,7 @@ makePosition line col = TokenPn 0 line col
 --
 -- @since 0.7.1.0
 normalizePosition :: TokenPosn -> TokenPosn
-normalizePosition (TokenPn addr line col) = 
+normalizePosition (TokenPn addr line col) =
   TokenPn (max 0 addr) (max 0 line) (max 0 col)
 
 -- | Check if a position has valid (non-negative) components.
@@ -206,7 +218,7 @@ normalizePosition (TokenPn addr line col) =
 --
 -- @since 0.7.1.0
 isValidPosition :: TokenPosn -> Bool
-isValidPosition (TokenPn addr line col) = 
+isValidPosition (TokenPn addr line col) =
   addr >= 0 && line >= 0 && col >= 0
 
 -- | Check if position is at the start of a line.
@@ -246,7 +258,7 @@ isEmptyPosition pos = pos == tokenPosnEmpty
 --
 -- @since 0.7.1.0
 formatPosition :: TokenPosn -> String
-formatPosition (TokenPn addr line col) = 
+formatPosition (TokenPn addr line col) =
   "address " ++ show addr ++ ", line " ++ show line ++ ", column " ++ show col
 
 -- | Format position for error messages.
@@ -259,7 +271,7 @@ formatPosition (TokenPn addr line col) =
 --
 -- @since 0.7.1.0
 formatPositionForError :: TokenPosn -> String
-formatPositionForError (TokenPn _ line col) = 
+formatPositionForError (TokenPn _ line col) =
   "line " ++ show line ++ ", column " ++ show col
 
 -- | Compare positions by address.
@@ -326,4 +338,3 @@ safeAdvancePosition (TokenPn addr line col) n
 -- @since 0.7.1.0
 safePositionOffset :: TokenPosn -> TokenPosn -> Int
 safePositionOffset pos1 pos2 = max 0 (positionOffset pos1 pos2)
-
