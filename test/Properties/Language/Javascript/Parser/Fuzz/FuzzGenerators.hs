@@ -1,6 +1,6 @@
+{-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ExtendedDefaultRules #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | Advanced JavaScript input generators for comprehensive fuzzing.
@@ -44,42 +44,43 @@
 --
 -- @since 0.7.1.0
 module Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
-    ( -- * Malformed Input Generation
-      generateMalformedJS
-    , generateSyntaxErrors
-    , generateIncompleteConstructs
-    , generateInvalidCharacters
-    
+  ( -- * Malformed Input Generation
+    generateMalformedJS,
+    generateSyntaxErrors,
+    generateIncompleteConstructs,
+    generateInvalidCharacters,
+
     -- * Edge Case Generation
-    , generateEdgeCaseJS
-    , generateDeepNesting
-    , generateLongIdentifiers
-    , generateUnicodeEdgeCases
-    , generateLargeNumbers
-    
+    generateEdgeCaseJS,
+    generateDeepNesting,
+    generateLongIdentifiers,
+    generateUnicodeEdgeCases,
+    generateLargeNumbers,
+
     -- * Mutation-Based Fuzzing
-    , mutateFuzzInput
-    , applyRandomMutations
-    , applyCharacterMutations
-    , applyStructuralMutations
-    
+    mutateFuzzInput,
+    applyRandomMutations,
+    applyCharacterMutations,
+    applyStructuralMutations,
+
     -- * Grammar-Based Generation
-    , generateRandomJS
-    , generateValidPrograms
-    , generateExpressionChains
-    , generateControlFlowNesting
-    
+    generateRandomJS,
+    generateValidPrograms,
+    generateExpressionChains,
+    generateControlFlowNesting,
+
     -- * Mutation Strategies
-    , MutationStrategy(..)
-    , applyMutationStrategy
-    , combineMutationStrategies
-    ) where
+    MutationStrategy (..),
+    applyMutationStrategy,
+    combineMutationStrategies,
+  )
+where
 
 import Control.Monad (forM, replicateM)
-import Data.Char (chr, ord, isAscii, isPrint)
-import System.Random (randomIO, randomRIO)
+import Data.Char (chr, isAscii, isPrint, ord)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import System.Random (randomIO, randomRIO)
 
 -- ---------------------------------------------------------------------
 -- Malformed Input Generation
@@ -88,11 +89,11 @@ import qualified Data.Text.Encoding as Text
 -- | Generate collection of malformed JavaScript inputs
 generateMalformedJS :: Int -> IO [Text.Text]
 generateMalformedJS count = do
-  let strategies = 
-        [ generateSyntaxErrors
-        , generateIncompleteConstructs  
-        , generateInvalidCharacters
-        , generateBrokenTokens
+  let strategies =
+        [ generateSyntaxErrors,
+          generateIncompleteConstructs,
+          generateInvalidCharacters,
+          generateBrokenTokens
         ]
   let perStrategy = count `div` length strategies
   results <- forM strategies $ \strategy -> strategy perStrategy
@@ -108,14 +109,14 @@ generateSingleSyntaxError = do
   base <- chooseBase
   errorType <- randomRIO (1, 8)
   case errorType of
-    1 -> return $ base <> "((((("  -- Unmatched parentheses
-    2 -> return $ base <> "{{{{{"  -- Unmatched braces
-    3 -> return $ base <> "if ("   -- Incomplete condition
-    4 -> return $ base <> "var ;"  -- Missing identifier
-    5 -> return $ base <> "function"  -- Incomplete function
-    6 -> return $ base <> "return;"  -- Missing return value context
-    7 -> return $ base <> "+++"     -- Invalid operator sequence
-    _ -> return $ base <> "var x = ,"  -- Missing expression
+    1 -> return $ base <> "(((((" -- Unmatched parentheses
+    2 -> return $ base <> "{{{{{" -- Unmatched braces
+    3 -> return $ base <> "if (" -- Incomplete condition
+    4 -> return $ base <> "var ;" -- Missing identifier
+    5 -> return $ base <> "function" -- Incomplete function
+    6 -> return $ base <> "return;" -- Missing return value context
+    7 -> return $ base <> "+++" -- Invalid operator sequence
+    _ -> return $ base <> "var x = ," -- Missing expression
   where
     chooseBase = do
       bases <- return ["", "var x = 1; ", "function f() {", "("]
@@ -131,16 +132,16 @@ generateIncompleteConstruct :: IO Text.Text
 generateIncompleteConstruct = do
   constructType <- randomRIO (1, 10)
   case constructType of
-    1 -> return "function f("        -- Incomplete parameter list
-    2 -> return "if (true"           -- Incomplete condition
-    3 -> return "for (var i = 0"     -- Incomplete for loop
-    4 -> return "switch (x) {"       -- Incomplete switch
-    5 -> return "try {"              -- Incomplete try block
-    6 -> return "var x = {"          -- Incomplete object literal
-    7 -> return "var arr = ["        -- Incomplete array literal
-    8 -> return "x."                 -- Incomplete member access
-    9 -> return "new "               -- Incomplete constructor call
-    _ -> return "/^"                 -- Incomplete regex
+    1 -> return "function f(" -- Incomplete parameter list
+    2 -> return "if (true" -- Incomplete condition
+    3 -> return "for (var i = 0" -- Incomplete for loop
+    4 -> return "switch (x) {" -- Incomplete switch
+    5 -> return "try {" -- Incomplete try block
+    6 -> return "var x = {" -- Incomplete object literal
+    7 -> return "var arr = [" -- Incomplete array literal
+    8 -> return "x." -- Incomplete member access
+    9 -> return "new " -- Incomplete constructor call
+    _ -> return "/^" -- Incomplete regex
 
 -- | Generate inputs with invalid character sequences
 generateInvalidCharacters :: Int -> IO [Text.Text]
@@ -167,29 +168,29 @@ generateBrokenTokenInput :: IO Text.Text
 generateBrokenTokenInput = do
   tokenType <- randomRIO (1, 8)
   case tokenType of
-    1 -> return "\"unclosed string"    -- Unclosed string
+    1 -> return "\"unclosed string" -- Unclosed string
     2 -> return "/* unclosed comment" -- Unclosed comment
-    3 -> return "0x"                 -- Incomplete hex number
-    4 -> return "1e"                 -- Incomplete scientific notation
-    5 -> return "\\u"                -- Incomplete unicode escape
-    6 -> return "var 123abc"         -- Invalid identifier
-    7 -> return "'\\x"               -- Incomplete hex escape
-    _ -> return "//\n\r\n"           -- Mixed line endings
+    3 -> return "0x" -- Incomplete hex number
+    4 -> return "1e" -- Incomplete scientific notation
+    5 -> return "\\u" -- Incomplete unicode escape
+    6 -> return "var 123abc" -- Invalid identifier
+    7 -> return "'\\x" -- Incomplete hex escape
+    _ -> return "//\n\r\n" -- Mixed line endings
 
 -- ---------------------------------------------------------------------
--- Edge Case Generation  
+-- Edge Case Generation
 -- ---------------------------------------------------------------------
 
 -- | Generate JavaScript edge cases testing parser limits
 generateEdgeCaseJS :: Int -> IO [Text.Text]
 generateEdgeCaseJS count = do
   let strategies =
-        [ generateDeepNesting
-        , generateLongIdentifiers
-        , generateUnicodeEdgeCases
-        , generateLargeNumbers
-        , generateComplexRegex
-        , generateEscapeSequences
+        [ generateDeepNesting,
+          generateLongIdentifiers,
+          generateUnicodeEdgeCases,
+          generateLargeNumbers,
+          generateComplexRegex,
+          generateEscapeSequences
         ]
   let perStrategy = count `div` length strategies
   results <- forM strategies $ \strategy -> strategy perStrategy
@@ -247,18 +248,22 @@ generateLargeNumber :: IO Text.Text
 generateLargeNumber = do
   numberType <- randomRIO (1, 4)
   case numberType of
-    1 -> do  -- Very large integer
+    1 -> do
+      -- Very large integer
       digits <- randomRIO (100, 1000)
       digitString <- replicateM digits (randomRIO ('0', '9'))
       return $ "var x = " <> Text.pack digitString <> ";"
-    2 -> do  -- Number with many decimal places
+    2 -> do
+      -- Number with many decimal places
       decimals <- randomRIO (100, 500)
       decimalString <- replicateM decimals (randomRIO ('0', '9'))
       return $ "var x = 1." <> Text.pack decimalString <> ";"
-    3 -> do  -- Scientific notation with large exponent
+    3 -> do
+      -- Scientific notation with large exponent
       exp' <- randomRIO (100, 308)
       return $ "var x = 1e" <> Text.pack (show exp') <> ";"
-    _ -> do  -- Hex number with many digits
+    _ -> do
+      -- Hex number with many digits
       hexDigits <- randomRIO (50, 100)
       hexString <- replicateM hexDigits generateHexChar
       return $ "var x = 0x" <> Text.pack hexString <> ";"
@@ -272,11 +277,11 @@ generateComplexRegexSingle :: IO Text.Text
 generateComplexRegexSingle = do
   complexity <- randomRIO (1, 5)
   case complexity of
-    1 -> return "/(.{0,1000}){50}/g"          -- Exponential backtracking
-    2 -> return "/[\\u0000-\\uFFFF]{1000}/u"  -- Large Unicode range
-    3 -> return "/(a+)+b/"                   -- Nested quantifiers
-    4 -> return "/(?=.*){100}/m"             -- Many lookaheads
-    _ -> return "/\\x00\\x01\\xFF/g"         -- Hex escapes
+    1 -> return "/(.{0,1000}){50}/g" -- Exponential backtracking
+    2 -> return "/[\\u0000-\\uFFFF]{1000}/u" -- Large Unicode range
+    3 -> return "/(a+)+b/" -- Nested quantifiers
+    4 -> return "/(?=.*){100}/m" -- Many lookaheads
+    _ -> return "/\\x00\\x01\\xFF/g" -- Hex escapes
 
 -- | Generate complex escape sequences
 generateEscapeSequences :: Int -> IO [Text.Text]
@@ -287,11 +292,11 @@ generateEscapeSequence :: IO Text.Text
 generateEscapeSequence = do
   escapeType <- randomRIO (1, 6)
   case escapeType of
-    1 -> return "\"\\u{10FFFF}\""    -- Max Unicode code point
-    2 -> return "\"\\x00\\xFF\""     -- Null and max byte
-    3 -> return "\"\\0\\1\\2\""      -- Octal escapes
-    4 -> return "\"\\\\\\/\""        -- Escaped backslashes
-    5 -> return "\"\\r\\n\\t\""      -- Control characters
+    1 -> return "\"\\u{10FFFF}\"" -- Max Unicode code point
+    2 -> return "\"\\x00\\xFF\"" -- Null and max byte
+    3 -> return "\"\\0\\1\\2\"" -- Octal escapes
+    4 -> return "\"\\\\\\/\"" -- Escaped backslashes
+    5 -> return "\"\\r\\n\\t\"" -- Control characters
     _ -> return "\"\\uD800\\uDC00\"" -- Surrogate pair
 
 -- ---------------------------------------------------------------------
@@ -300,12 +305,18 @@ generateEscapeSequence = do
 
 -- | Mutation strategies for input transformation
 data MutationStrategy
-  = CharacterSubstitution  -- ^Replace random characters
-  | CharacterInsertion     -- ^Insert random characters
-  | CharacterDeletion      -- ^Delete random characters
-  | TokenReordering        -- ^Reorder language tokens
-  | StructuralMutation     -- ^Modify AST structure
-  | UnicodeCorruption      -- ^Corrupt Unicode sequences
+  = -- | Replace random characters
+    CharacterSubstitution
+  | -- | Insert random characters
+    CharacterInsertion
+  | -- | Delete random characters
+    CharacterDeletion
+  | -- | Reorder language tokens
+    TokenReordering
+  | -- | Modify AST structure
+    StructuralMutation
+  | -- | Corrupt Unicode sequences
+    UnicodeCorruption
   deriving (Eq, Show, Enum)
 
 -- | Apply random mutations to input text
@@ -324,7 +335,7 @@ applyRandomMutations n input = do
 
 -- | Apply specific mutation strategy
 applyMutationStrategy :: MutationStrategy -> Text.Text -> IO Text.Text
-applyMutationStrategy CharacterSubstitution input = 
+applyMutationStrategy CharacterSubstitution input =
   applyCharacterMutations input substituteRandomChar
 applyMutationStrategy CharacterInsertion input =
   applyCharacterMutations input insertRandomChar
@@ -348,16 +359,16 @@ applyStructuralMutations :: Text.Text -> IO Text.Text
 applyStructuralMutations input = do
   mutationType <- randomRIO (1, 5)
   case mutationType of
-    1 -> return $ input <> " {"          -- Add unmatched brace
-    2 -> return $ "(" <> input           -- Add unmatched paren
-    3 -> return $ input <> ";"           -- Add extra semicolon
-    4 -> return $ "/*" <> input <> "*/"  -- Wrap in comment
-    _ -> return $ input <> input         -- Duplicate content
+    1 -> return $ input <> " {" -- Add unmatched brace
+    2 -> return $ "(" <> input -- Add unmatched paren
+    3 -> return $ input <> ";" -- Add extra semicolon
+    4 -> return $ "/*" <> input <> "*/" -- Wrap in comment
+    _ -> return $ input <> input -- Duplicate content
 
 -- | Combine multiple mutation strategies
 combineMutationStrategies :: [MutationStrategy] -> Text.Text -> IO Text.Text
 combineMutationStrategies [] input = return input
-combineMutationStrategies (s:ss) input = do
+combineMutationStrategies (s : ss) input = do
   mutated <- applyMutationStrategy s input
   combineMutationStrategies ss mutated
 
@@ -418,7 +429,7 @@ generateNestedControlFlow = do
 
 -- | Generate nested parentheses
 generateNestedParens :: Int -> Text.Text
-generateNestedParens depth = 
+generateNestedParens depth =
   Text.replicate depth "(" <> "x" <> Text.replicate depth ")"
 
 -- | Generate nested braces
@@ -438,10 +449,10 @@ generateNestedObjects depth =
 
 -- | Generate nested functions
 generateNestedFunctions :: Int -> Text.Text
-generateNestedFunctions depth = 
-  let prefix = Text.replicate depth "function f(){" 
+generateNestedFunctions depth =
+  let prefix = Text.replicate depth "function f(){"
       suffix = Text.replicate depth "}"
-  in prefix <> "return 1;" <> suffix
+   in prefix <> "return 1;" <> suffix
 
 -- | Generate bidirectional override characters
 generateBidiOverride :: Text.Text
@@ -480,11 +491,11 @@ substituteRandomChar :: Text.Text -> IO Text.Text
 substituteRandomChar input
   | Text.null input = return input
   | otherwise = do
-      pos <- randomRIO (0, Text.length input - 1)
-      newChar <- randomRIO ('\0', '\127')
-      let (prefix, suffix) = Text.splitAt pos input
-          remaining = Text.drop 1 suffix
-      return $ prefix <> Text.singleton newChar <> remaining
+    pos <- randomRIO (0, Text.length input - 1)
+    newChar <- randomRIO ('\0', '\127')
+    let (prefix, suffix) = Text.splitAt pos input
+        remaining = Text.drop 1 suffix
+    return $ prefix <> Text.singleton newChar <> remaining
 
 -- | Insert random character
 insertRandomChar :: Text.Text -> IO Text.Text
@@ -499,10 +510,10 @@ deleteRandomChar :: Text.Text -> IO Text.Text
 deleteRandomChar input
   | Text.null input = return input
   | otherwise = do
-      pos <- randomRIO (0, Text.length input - 1)
-      let (prefix, suffix) = Text.splitAt pos input
-          remaining = Text.drop 1 suffix
-      return $ prefix <> remaining
+    pos <- randomRIO (0, Text.length input - 1)
+    let (prefix, suffix) = Text.splitAt pos input
+        remaining = Text.drop 1 suffix
+    return $ prefix <> remaining
 
 -- | Apply token reordering
 applyTokenReordering :: Text.Text -> IO Text.Text
@@ -521,14 +532,14 @@ applyUnicodeCorruption :: Text.Text -> IO Text.Text
 applyUnicodeCorruption input
   | Text.null input = return input
   | otherwise = do
-      pos <- randomRIO (0, Text.length input - 1)
-      let (prefix, suffix) = Text.splitAt pos input
-          corrupted = case Text.uncons suffix of
-            Nothing -> suffix
-            Just (c, rest) -> 
-              let corruptedChar = chr ((ord c + 1) `mod` 0x10000)
-              in Text.cons corruptedChar rest
-      return $ prefix <> corrupted
+    pos <- randomRIO (0, Text.length input - 1)
+    let (prefix, suffix) = Text.splitAt pos input
+        corrupted = case Text.uncons suffix of
+          Nothing -> suffix
+          Just (c, rest) ->
+            let corruptedChar = chr ((ord c + 1) `mod` 0x10000)
+             in Text.cons corruptedChar rest
+    return $ prefix <> corrupted
 
 -- | Generate random statement
 generateRandomStatement :: IO Text.Text
@@ -594,12 +605,21 @@ swapElements :: Int -> Int -> [a] -> [a]
 swapElements i j xs
   | i == j = xs
   | i >= 0 && j >= 0 && i < length xs && j < length xs =
-      let elemI = xs !! i
-          elemJ = xs !! j
-          swapped = zipWith (\idx x -> if idx == i then elemJ
-                                      else if idx == j then elemI
-                                      else x) [0..] xs
-      in swapped
+    let elemI = xs !! i
+        elemJ = xs !! j
+        swapped =
+          zipWith
+            ( \idx x ->
+                if idx == i
+                  then elemJ
+                  else
+                    if idx == j
+                      then elemI
+                      else x
+            )
+            [0 ..]
+            xs
+     in swapped
   | otherwise = xs
 
 -- | Generate null bytes in string
@@ -612,11 +632,11 @@ generateControlChars = return "var x = \"\1\2\3\127\";"
 
 -- | Generate invalid Unicode sequences
 generateInvalidUnicode :: IO Text.Text
-generateInvalidUnicode = return "var x = \"\\uD800\\uD800\";"  -- Invalid surrogate pair
+generateInvalidUnicode = return "var x = \"\\uD800\\uD800\";" -- Invalid surrogate pair
 
 -- | Generate surrogate pairs
 generateSurrogatePairs :: IO Text.Text
-generateSurrogatePairs = return "var x = \"\\uD83D\\uDE00\";"  -- Valid emoji
+generateSurrogatePairs = return "var x = \"\\uD83D\\uDE00\";" -- Valid emoji
 
 -- | Generate very long lines
 generateLongLines :: IO Text.Text

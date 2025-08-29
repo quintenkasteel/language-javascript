@@ -48,37 +48,36 @@
 --
 -- @since 0.7.1.0
 module Properties.Language.Javascript.Parser.CoreProperties
-    ( testPropertyInvariants
-    ) where
+  ( testPropertyInvariants,
+  )
+where
 
-import Test.Hspec
-import Test.QuickCheck
 import Control.DeepSeq (deepseq)
 import Control.Monad (forM_)
-import Data.Data (toConstr, dataTypeOf)
+import qualified Data.ByteString.Char8 as BS8
+import Data.Data (dataTypeOf, toConstr)
 import Data.List (nub, sort)
 import qualified Data.Text as Text
-import qualified Data.ByteString.Char8 as BS8
-
 import Language.JavaScript.Parser
 import qualified Language.JavaScript.Parser as Language.JavaScript.Parser
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation
-  ( TokenPosn(..)
-  , tokenPosnEmpty
-  , getLineNumber
-  , getColumn
-  , getAddress
+  ( TokenPosn (..),
+    getAddress,
+    getColumn,
+    getLineNumber,
+    tokenPosnEmpty,
   )
 import Language.JavaScript.Pretty.Printer
-  ( renderToString
-  , renderToText
+  ( renderToString,
+    renderToText,
   )
+import Test.Hspec
+import Test.QuickCheck
 
 -- | Comprehensive AST invariant property testing
 testPropertyInvariants :: Spec
 testPropertyInvariants = describe "AST Invariant Properties" $ do
-
   describe "Round-trip properties" $ do
     testRoundTripPreservation
     testRoundTripSemanticEquivalence
@@ -110,7 +109,6 @@ testPropertyInvariants = describe "AST Invariant Properties" $ do
 -- | Test that parsing and pretty-printing preserve program semantics
 testRoundTripPreservation :: Spec
 testRoundTripPreservation = describe "Round-trip preservation" $ do
-
   it "preserves simple expressions" $ do
     -- Test with valid expression examples
     let validExprs = ["42", "true", "\"hello\"", "x", "x + y", "(1 + 2)"]
@@ -124,7 +122,7 @@ testRoundTripPreservation = describe "Round-trip preservation" $ do
     let validFuncs = ["function f() { return 1; }", "function add(a, b) { return a + b; }"]
     forM_ validFuncs $ \input -> do
       case parseStatement input of
-        Right _ -> return ()  -- Successfully parsed
+        Right _ -> return () -- Successfully parsed
         Left err -> expectationFailure $ "Failed to parse function: " ++ err
 
   it "preserves control flow statements" $ do
@@ -132,7 +130,7 @@ testRoundTripPreservation = describe "Round-trip preservation" $ do
     let validStmts = ["if (true) { return; }", "while (x > 0) { x--; }", "for (i = 0; i < 10; i++) { console.log(i); }"]
     forM_ validStmts $ \input -> do
       case parseStatement input of
-        Right _ -> return ()  -- Successfully parsed
+        Right _ -> return () -- Successfully parsed
         Left err -> expectationFailure $ "Failed to parse statement: " ++ err
 
   it "preserves complete programs" $ do
@@ -140,18 +138,17 @@ testRoundTripPreservation = describe "Round-trip preservation" $ do
     let validProgs = ["var x = 1;", "function f() { return 2; } f();", "if (true) { console.log('ok'); }"]
     forM_ validProgs $ \input -> do
       case Language.JavaScript.Parser.parse input "test" of
-        Right _ -> return ()  -- Successfully parsed
+        Right _ -> return () -- Successfully parsed
         Left err -> expectationFailure $ "Failed to parse program: " ++ err
 
 -- | Test semantic equivalence through round-trip parsing
 testRoundTripSemanticEquivalence :: Spec
 testRoundTripSemanticEquivalence = describe "Semantic equivalence" $ do
-
   it "maintains expression evaluation semantics" $ do
     -- Test semantic equivalence with deterministic examples
     let expr = "1 + 2"
     case parseExpression expr of
-      Right parsed -> 
+      Right parsed ->
         case parseExpression expr of
           Right reparsed -> semanticallyEquivalent parsed reparsed `shouldBe` True
           Left _ -> expectationFailure "Re-parsing failed"
@@ -161,7 +158,7 @@ testRoundTripSemanticEquivalence = describe "Semantic equivalence" $ do
     -- Test semantic equivalence with deterministic examples
     let stmt = "var x = 1;"
     case parseStatement stmt of
-      Right parsed -> 
+      Right parsed ->
         case parseStatement stmt of
           Right reparsed -> semanticallyEquivalentStatements parsed reparsed `shouldBe` True
           Left _ -> expectationFailure "Re-parsing failed"
@@ -181,73 +178,70 @@ testRoundTripSemanticEquivalence = describe "Semantic equivalence" $ do
 -- | Test comment preservation through round-trip
 testRoundTripCommentsPreservation :: Spec
 testRoundTripCommentsPreservation = describe "Comment preservation" $ do
-
   it "preserves line comments" $ do
     -- Comment preservation is not fully implemented, so test basic parsing
     let input = "// comment\nvar x = 1;"
     case Language.JavaScript.Parser.parse input "test" of
-      Right _ -> return ()  -- Successfully parsed
+      Right _ -> return () -- Successfully parsed
       Left err -> expectationFailure $ "Failed to parse with comments: " ++ err
 
   it "preserves block comments" $ do
     -- Comment preservation is not fully implemented, so test basic parsing
     let input = "/* comment */ var x = 1;"
     case Language.JavaScript.Parser.parse input "test" of
-      Right _ -> return ()  -- Successfully parsed
+      Right _ -> return () -- Successfully parsed
       Left err -> expectationFailure $ "Failed to parse with block comments: " ++ err
 
   it "preserves comment positions" $ do
     -- Position preservation is not fully implemented, so test basic parsing
     let input = "var x = 1; // end comment"
     case Language.JavaScript.Parser.parse input "test" of
-      Right _ -> return ()  -- Successfully parsed
+      Right _ -> return () -- Successfully parsed
       Left err -> expectationFailure $ "Failed to parse with positioned comments: " ++ err
 
 -- | Test position consistency through round-trip
 testRoundTripPositionConsistency :: Spec
 testRoundTripPositionConsistency = describe "Position consistency" $ do
-
   it "maintains source position mappings" $
     -- Since parser uses JSNoAnnot, test position consistency by ensuring
     -- that parsing round-trip preserves essential information
-    let simplePrograms = 
-          [ ("var x = 42;", "x")
-          , ("function test() { return 1; }", "test")
-          , ("if (true) { console.log('hello'); }", "hello")
+    let simplePrograms =
+          [ ("var x = 42;", "x"),
+            ("function test() { return 1; }", "test"),
+            ("if (true) { console.log('hello'); }", "hello")
           ]
-    in forM_ simplePrograms $ \(input, keyword) -> do
-         case Language.JavaScript.Parser.parse input "test" of
-           Right parsed -> renderToString parsed `shouldContain` keyword
-           Left err -> expectationFailure ("Parse failed: " ++ show err)
+     in forM_ simplePrograms $ \(input, keyword) -> do
+          case Language.JavaScript.Parser.parse input "test" of
+            Right parsed -> renderToString parsed `shouldContain` keyword
+            Left err -> expectationFailure ("Parse failed: " ++ show err)
 
   it "preserves relative position relationships" $
     -- Test that statement ordering is preserved through parse/render cycles
-    let multiStatements = 
-          [ "var x = 1; var y = 2;"
-          , "function f() {} var x = 42;"
-          , "if (true) {} return false;"
+    let multiStatements =
+          [ "var x = 1; var y = 2;",
+            "function f() {} var x = 42;",
+            "if (true) {} return false;"
           ]
-    in forM_ multiStatements $ \input -> do
-         case Language.JavaScript.Parser.parse input "test" of
-           Right (AST.JSAstProgram stmts _) -> length stmts `shouldSatisfy` (>= 2)
-           Right _ -> expectationFailure "Expected program AST"
-           Left err -> expectationFailure ("Parse failed: " ++ show err)
+     in forM_ multiStatements $ \input -> do
+          case Language.JavaScript.Parser.parse input "test" of
+            Right (AST.JSAstProgram stmts _) -> length stmts `shouldSatisfy` (>= 2)
+            Right _ -> expectationFailure "Expected program AST"
+            Left err -> expectationFailure ("Parse failed: " ++ show err)
 
 -- ---------------------------------------------------------------------
--- Validation Monotonicity Properties  
+-- Validation Monotonicity Properties
 -- ---------------------------------------------------------------------
 
 -- | Test that valid ASTs remain valid after transformations
 testValidationMonotonicity :: Spec
 testValidationMonotonicity = describe "Validation monotonicity" $ do
-
   it "valid AST remains valid after pretty-printing" $ do
     -- Test with specific known valid programs instead of generated ones
-    let testCases = 
-          [ "var x = 42;"
-          , "function test() { return 1 + 2; }"
-          , "if (x > 0) { console.log('positive'); }"
-          , "var obj = { key: 'value', num: 123 };"
+    let testCases =
+          [ "var x = 42;",
+            "function test() { return 1 + 2; }",
+            "if (x > 0) { console.log('positive'); }",
+            "var obj = { key: 'value', num: 123 };"
           ]
     forM_ testCases $ \original -> do
       case Language.JavaScript.Parser.parse original "test" of
@@ -258,71 +252,77 @@ testValidationMonotonicity = describe "Validation monotonicity" $ do
             Left err -> expectationFailure ("Reparse failed for: " ++ original ++ ", error: " ++ show err)
         Left err -> expectationFailure ("Initial parse failed for: " ++ original ++ ", error: " ++ show err)
 
-  it "valid expression remains valid after transformation" $ property $
-    \(ValidJSExpression validExpr) ->
-      -- Apply a simple transformation and verify it remains valid
-      let transformed = realTransformExpression validExpr
-      in isValidExpression transformed  -- Check the transformed expression is valid
-
-  it "valid statement remains valid after simplification" $ property $
-    \(ValidJSStatement validStmt) ->
-      let simplified = simplifyStatement validStmt
-      in isValidStatement simplified
+  it "valid expression remains valid after transformation" $
+    property $
+      \(ValidJSExpression validExpr) ->
+        -- Apply a simple transformation and verify it remains valid
+        let transformed = realTransformExpression validExpr
+         in isValidExpression transformed -- Check the transformed expression is valid
+  it "valid statement remains valid after simplification" $
+    property $
+      \(ValidJSStatement validStmt) ->
+        let simplified = simplifyStatement validStmt
+         in isValidStatement simplified
 
 -- | Test transformation invariants
 testTransformationInvariants :: Spec
 testTransformationInvariants = describe "Transformation invariants" $ do
+  it "expression transformations preserve type" $
+    property $
+      \(ValidJSExpression expr) ->
+        let transformed = transformExpression expr
+         in expressionType expr == expressionType transformed
 
-  it "expression transformations preserve type" $ property $
-    \(ValidJSExpression expr) ->
-      let transformed = transformExpression expr
-      in expressionType expr == expressionType transformed
+  it "statement transformations preserve control flow" $
+    property $
+      \(ValidJSStatement stmt) ->
+        let transformed = simplifyStatement stmt
+         in controlFlowEquivalent stmt transformed
 
-  it "statement transformations preserve control flow" $ property $
-    \(ValidJSStatement stmt) ->
-      let transformed = simplifyStatement stmt
-      in controlFlowEquivalent stmt transformed
-
-  it "AST transformations preserve structure" $ property $
-    \(ValidJSProgram prog) ->
-      -- Apply normalization and verify basic structural properties are preserved
-      let normalized = realNormalizeAST prog
-      in case (prog, normalized) of
-           (AST.JSAstProgram stmts1 _, AST.JSAstProgram stmts2 _) ->
-             length stmts1 == length stmts2  -- Statement count preserved
-           _ -> False
+  it "AST transformations preserve structure" $
+    property $
+      \(ValidJSProgram prog) ->
+        -- Apply normalization and verify basic structural properties are preserved
+        let normalized = realNormalizeAST prog
+         in case (prog, normalized) of
+              (AST.JSAstProgram stmts1 _, AST.JSAstProgram stmts2 _) ->
+                length stmts1 == length stmts2 -- Statement count preserved
+              _ -> False
 
 -- | Test AST manipulation safety
 testASTManipulationSafety :: Spec
 testASTManipulationSafety = describe "AST manipulation safety" $ do
+  it "node replacement preserves validity" $
+    property $
+      \(ValidJSProgram prog) (ValidJSExpression newExpr) ->
+        let modified = replaceFirstExpression prog newExpr
+         in isValidAST modified
 
-  it "node replacement preserves validity" $ property $
-    \(ValidJSProgram prog) (ValidJSExpression newExpr) ->
-      let modified = replaceFirstExpression prog newExpr
-      in isValidAST modified
+  it "node insertion preserves validity" $
+    property $
+      \(ValidJSProgram prog) (ValidJSStatement newStmt) ->
+        let modified = insertStatement prog newStmt
+         in isValidAST modified
 
-  it "node insertion preserves validity" $ property $
-    \(ValidJSProgram prog) (ValidJSStatement newStmt) ->
-      let modified = insertStatement prog newStmt
-      in isValidAST modified
-
-  it "node deletion preserves validity" $ property $
-    \(ValidJSProgramWithDeletableNode (prog, nodeId)) ->
-      let modified = deleteNode prog nodeId
-      in isValidAST modified
+  it "node deletion preserves validity" $
+    property $
+      \(ValidJSProgramWithDeletableNode (prog, nodeId)) ->
+        let modified = deleteNode prog nodeId
+         in isValidAST modified
 
 -- | Test validation consistency across operations
 testValidationConsistency :: Spec
 testValidationConsistency = describe "Validation consistency" $ do
+  it "validation is deterministic" $
+    property $
+      \(ValidJSProgram prog) ->
+        isValidAST prog == isValidAST prog
 
-  it "validation is deterministic" $ property $
-    \(ValidJSProgram prog) ->
-      isValidAST prog == isValidAST prog
-
-  it "validation respects AST equality" $ property $
-    \(ValidJSProgram prog1) ->
-      let prog2 = parseAndReparse prog1
-      in isValidAST prog1 == isValidAST prog2
+  it "validation respects AST equality" $
+    property $
+      \(ValidJSProgram prog1) ->
+        let prog2 = parseAndReparse prog1
+         in isValidAST prog1 == isValidAST prog2
 
 -- ---------------------------------------------------------------------
 -- Position Information Consistency
@@ -332,7 +332,6 @@ testValidationConsistency = describe "Validation consistency" $ do
 -- Since our parser currently uses JSNoAnnot, we test structural consistency
 testPositionPreservation :: Spec
 testPositionPreservation = describe "Position preservation" $ do
-
   it "preserves AST structure through parsing round-trip" $ do
     let original = "var x = 42;"
     case Language.JavaScript.Parser.parse original "test" of
@@ -349,9 +348,9 @@ testPositionPreservation = describe "Position preservation" $ do
       Right (AST.JSAstProgram stmts _) -> do
         let reparsed = renderToString (AST.JSAstProgram stmts AST.JSNoAnnot)
         case Language.JavaScript.Parser.parse reparsed "test" of
-          Right (AST.JSAstProgram stmts2 _) -> 
+          Right (AST.JSAstProgram stmts2 _) ->
             length stmts `shouldBe` length stmts2
-          Left err -> expectationFailure ("Reparse failed: " ++ show err) 
+          Left err -> expectationFailure ("Reparse failed: " ++ show err)
       Left err -> expectationFailure ("Parse failed: " ++ show err)
 
   it "maintains AST node types through parsing" $ do
@@ -365,20 +364,19 @@ testPositionPreservation = describe "Position preservation" $ do
       Left err -> expectationFailure ("Parse failed: " ++ show err)
   where
     astTypesMatch (AST.JSAstProgram stmts1 _) (AST.JSAstProgram stmts2 _) =
-      length stmts1 == length stmts2 &&
-      all (uncurry statementTypesEqual) (zip stmts1 stmts2)
+      length stmts1 == length stmts2
+        && all (uncurry statementTypesEqual) (zip stmts1 stmts2)
     astTypesMatch _ _ = False
-    
+
     statementTypesEqual (AST.JSExpressionStatement {}) (AST.JSExpressionStatement {}) = True
     statementTypesEqual (AST.JSVariable {}) (AST.JSVariable {}) = True
     statementTypesEqual (AST.JSFunction {}) (AST.JSFunction {}) = True
     statementTypesEqual _ _ = False
 
--- | Test token to AST position mapping  
+-- | Test token to AST position mapping
 -- Since our parser uses JSNoAnnot, we test logical mapping consistency
 testTokenToASTPositionMapping :: Spec
 testTokenToASTPositionMapping = describe "Token to AST position mapping" $ do
-
   it "maps simple expressions to correct AST nodes" $ do
     let original = "42"
     case Language.JavaScript.Parser.parse original "test" of
@@ -397,27 +395,28 @@ testTokenToASTPositionMapping = describe "Token to AST position mapping" $ do
     expressionComplexity _ = 1
 
 -- | Test source location invariants
--- Since we use JSNoAnnot, we test structural invariants instead  
+-- Since we use JSNoAnnot, we test structural invariants instead
 testSourceLocationInvariants :: Spec
 testSourceLocationInvariants = describe "Source location invariants" $ do
-
   it "AST maintains logical structure ordering" $ do
-    let program = AST.JSAstProgram 
-          [ AST.JSExpressionStatement (literalNumber "1") (AST.JSSemi AST.JSNoAnnot)
-          , AST.JSExpressionStatement (literalNumber "2") (AST.JSSemi AST.JSNoAnnot)
-          ] AST.JSNoAnnot
+    let program =
+          AST.JSAstProgram
+            [ AST.JSExpressionStatement (literalNumber "1") (AST.JSSemi AST.JSNoAnnot),
+              AST.JSExpressionStatement (literalNumber "2") (AST.JSSemi AST.JSNoAnnot)
+            ]
+            AST.JSNoAnnot
     -- Test that both individual statements are valid
     let AST.JSAstProgram stmts _ = program
     all isValidStatement stmts `shouldBe` True
 
-  it "block statements contain their child statements" $ do  
+  it "block statements contain their child statements" $ do
     let childStmt = AST.JSExpressionStatement (literalNumber "42") (AST.JSSemi AST.JSNoAnnot)
         blockStmt = AST.JSStatementBlock AST.JSNoAnnot [childStmt] AST.JSNoAnnot AST.JSSemiAuto
     -- Child statements are contained within blocks (structural containment)
     statementContainsStatement blockStmt childStmt `shouldBe` True
-    
+
   it "expression statements don't contain other statements" $ do
-    let stmt1 = AST.JSExpressionStatement (literalNumber "1") (AST.JSSemi AST.JSNoAnnot) 
+    let stmt1 = AST.JSExpressionStatement (literalNumber "1") (AST.JSSemi AST.JSNoAnnot)
         stmt2 = AST.JSExpressionStatement (literalNumber "2") (AST.JSSemi AST.JSNoAnnot)
     -- Expression statements are siblings, not containing each other
     statementContainsStatement stmt1 stmt2 `shouldBe` False
@@ -430,7 +429,6 @@ testSourceLocationInvariants = describe "Source location invariants" $ do
 -- Since we use JSNoAnnot, we test position utilities with known values
 testPositionCalculationCorrectness :: Spec
 testPositionCalculationCorrectness = describe "Position calculation correctness" $ do
-
   it "empty positions are handled correctly" $ do
     let emptyPos = tokenPosnEmpty
     emptyPos `shouldBe` tokenPosnEmpty
@@ -438,7 +436,7 @@ testPositionCalculationCorrectness = describe "Position calculation correctness"
 
   it "position offsets work with concrete examples" $ do
     let pos1 = TokenPn 10 1 10
-        pos2 = TokenPn 25 1 10  -- Same line and column, only address changes
+        pos2 = TokenPn 25 1 10 -- Same line and column, only address changes
         offset = calculatePositionOffset pos1 pos2
         reconstructed = applyPositionOffset pos1 offset
     reconstructed `shouldBe` pos2
@@ -450,47 +448,50 @@ testPositionCalculationCorrectness = describe "Position calculation correctness"
 -- | Test alpha equivalence (variable renaming)
 testAlphaEquivalence :: Spec
 testAlphaEquivalence = describe "Alpha equivalence" $ do
+  it "variable renaming preserves semantics" $
+    property $
+      \(ValidJSFunctionWithVars (func, oldVar, newVar)) ->
+        oldVar /= newVar
+          ==> let renamed = renameVariable func oldVar newVar
+               in alphaEquivalent func renamed
 
-  it "variable renaming preserves semantics" $ property $
-    \(ValidJSFunctionWithVars (func, oldVar, newVar)) ->
-      oldVar /= newVar ==>
-        let renamed = renameVariable func oldVar newVar
-        in alphaEquivalent func renamed
+  it "bound variable renaming doesn't affect free variables" $
+    property $
+      \(ValidJSFunctionWithBoundAndFree (func, boundVar, freeVar, newName)) ->
+        boundVar /= freeVar && newName /= freeVar
+          ==> let renamed = renameVariable func boundVar newName
+                  freeVarsOriginal = extractFreeVariables func
+                  freeVarsRenamed = extractFreeVariables renamed
+               in freeVarsOriginal == freeVarsRenamed
 
-  it "bound variable renaming doesn't affect free variables" $ property $
-    \(ValidJSFunctionWithBoundAndFree (func, boundVar, freeVar, newName)) ->
-      boundVar /= freeVar && newName /= freeVar ==>
-        let renamed = renameVariable func boundVar newName
-            freeVarsOriginal = extractFreeVariables func
-            freeVarsRenamed = extractFreeVariables renamed
-        in freeVarsOriginal == freeVarsRenamed
-
-  it "alpha equivalent functions have same behavior" $ property $
-    \(AlphaEquivalentFunctions (func1, func2)) ->
-      semanticallyEquivalentFunctions func1 func2
+  it "alpha equivalent functions have same behavior" $
+    property $
+      \(AlphaEquivalentFunctions (func1, func2)) ->
+        semanticallyEquivalentFunctions func1 func2
 
 -- | Test structural equivalence
 testStructuralEquivalence :: Spec
 testStructuralEquivalence = describe "Structural equivalence" $ do
+  it "structurally equivalent ASTs have same shape" $
+    property $
+      \(StructurallyEquivalentASTs (ast1, ast2)) ->
+        astShape ast1 == astShape ast2
 
-  it "structurally equivalent ASTs have same shape" $ property $
-    \(StructurallyEquivalentASTs (ast1, ast2)) ->
-      astShape ast1 == astShape ast2
-
-  it "structural equivalence is symmetric" $ property $
-    \(ValidJSProgram prog1) (ValidJSProgram prog2) ->
-      structurallyEquivalent prog1 prog2 ==
-      structurallyEquivalent prog2 prog1
+  it "structural equivalence is symmetric" $
+    property $
+      \(ValidJSProgram prog1) (ValidJSProgram prog2) ->
+        structurallyEquivalent prog1 prog2
+          == structurallyEquivalent prog2 prog1
 
   it "structural equivalence is transitive" $ do
     -- Test with specific known cases instead of random generation
     let prog1 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot
-        prog2 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot  
+        prog2 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot
         prog3 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot
     structurallyEquivalent prog1 prog2 `shouldBe` True
-    structurallyEquivalent prog2 prog3 `shouldBe` True  
+    structurallyEquivalent prog2 prog3 `shouldBe` True
     structurallyEquivalent prog1 prog3 `shouldBe` True
-    
+
     -- Test different programs are not equivalent
     let prog4 = AST.JSAstProgram [simpleExprStmt (literalString "hello")] AST.JSNoAnnot
     structurallyEquivalent prog1 prog4 `shouldBe` False
@@ -498,43 +499,47 @@ testStructuralEquivalence = describe "Structural equivalence" $ do
 -- | Test canonicalization properties
 testCanonicalizationProperties :: Spec
 testCanonicalizationProperties = describe "Canonicalization properties" $ do
+  it "canonicalization is idempotent" $
+    property $
+      \(ValidJSProgram prog) ->
+        let canonical1 = canonicalizeAST prog
+            canonical2 = canonicalizeAST canonical1
+         in canonical1 == canonical2
 
-  it "canonicalization is idempotent" $ property $
-    \(ValidJSProgram prog) ->
-      let canonical1 = canonicalizeAST prog
-          canonical2 = canonicalizeAST canonical1
-      in canonical1 == canonical2
+  it "equivalent ASTs canonicalize to same form" $
+    property $
+      \(EquivalentASTs (ast1, ast2)) ->
+        canonicalizeAST ast1 == canonicalizeAST ast2
 
-  it "equivalent ASTs canonicalize to same form" $ property $
-    \(EquivalentASTs (ast1, ast2)) ->
-      canonicalizeAST ast1 == canonicalizeAST ast2
-
-  it "canonicalization preserves semantics" $ property $
-    \(ValidJSProgram prog) ->
-      let canonical = canonicalizeAST prog
-      in semanticallyEquivalentPrograms prog canonical
+  it "canonicalization preserves semantics" $
+    property $
+      \(ValidJSProgram prog) ->
+        let canonical = canonicalizeAST prog
+         in semanticallyEquivalentPrograms prog canonical
 
 -- | Test variable renaming invariants
 testVariableRenamingInvariants :: Spec
 testVariableRenamingInvariants = describe "Variable renaming invariants" $ do
+  it "renaming preserves variable binding structure" $
+    property $
+      \(ValidJSFunctionWithVariables (func, oldName, newName)) ->
+        oldName /= newName
+          ==> let renamed = renameVariable func oldName newName
+                  originalBindings = extractBindingStructure func
+                  renamedBindings = extractBindingStructure renamed
+               in bindingStructuresEquivalent originalBindings renamedBindings
 
-  it "renaming preserves variable binding structure" $ property $
-    \(ValidJSFunctionWithVariables (func, oldName, newName)) ->
-      oldName /= newName ==>
+  it "renaming doesn't create variable capture" $
+    property $
+      \(ValidJSFunctionWithNoCapture (func, oldName, newName)) ->
         let renamed = renameVariable func oldName newName
-            originalBindings = extractBindingStructure func
-            renamedBindings = extractBindingStructure renamed
-        in bindingStructuresEquivalent originalBindings renamedBindings
+         in not (hasVariableCapture renamed)
 
-  it "renaming doesn't create variable capture" $ property $
-    \(ValidJSFunctionWithNoCapture (func, oldName, newName)) ->
-      let renamed = renameVariable func oldName newName
-      in not (hasVariableCapture renamed)
-
-  it "systematic renaming preserves program semantics" $ property $
-    \(ValidJSProgramWithRenamingMap (prog, renamingMap)) ->
-      let renamed = applyRenamingMap prog renamingMap
-      in semanticallyEquivalentPrograms prog renamed
+  it "systematic renaming preserves program semantics" $
+    property $
+      \(ValidJSProgramWithRenamingMap (prog, renamingMap)) ->
+        let renamed = applyRenamingMap prog renamingMap
+         in semanticallyEquivalentPrograms prog renamed
 
 -- ---------------------------------------------------------------------
 -- QuickCheck Generators and Arbitrary Instances
@@ -547,7 +552,7 @@ newtype ValidJSExpression = ValidJSExpression AST.JSExpression
 instance Arbitrary ValidJSExpression where
   arbitrary = ValidJSExpression <$> genValidExpression
 
--- | Generator for valid JavaScript statements  
+-- | Generator for valid JavaScript statements
 newtype ValidJSStatement = ValidJSStatement AST.JSStatement
   deriving (Show)
 
@@ -737,20 +742,21 @@ instance Arbitrary ValidJSProgramWithDeletableNode where
 
 -- | Generate valid JavaScript expressions
 genValidExpression :: Gen AST.JSExpression
-genValidExpression = oneof
-  [ genLiteralExpression
-  , genIdentifierExpression
-  , genBinaryExpression
-  , genUnaryExpression
-  , genCallExpression
-  ]
+genValidExpression =
+  oneof
+    [ genLiteralExpression,
+      genIdentifierExpression,
+      genBinaryExpression,
+      genUnaryExpression,
+      genCallExpression
+    ]
 
 -- | Generate ByteString numbers
 genNumber :: Gen String
 genNumber = show <$> (arbitrary :: Gen Int)
 
 -- | Generate ByteString quoted strings
-genQuotedString :: Gen String  
+genQuotedString :: Gen String
 genQuotedString = elements ["\"test\"", "\"hello\"", "'world'", "'value'"]
 
 -- | Generate ByteString boolean literals
@@ -763,15 +769,16 @@ genValidIdentifier = elements ["x", "y", "value", "result", "temp", "item"]
 
 -- | Generate literal expressions
 genLiteralExpression :: Gen AST.JSExpression
-genLiteralExpression = oneof
-  [ AST.JSDecimal <$> genAnnot <*> genNumber
-  , AST.JSStringLiteral <$> genAnnot <*> genQuotedString
-  , AST.JSLiteral <$> genAnnot <*> genBoolean
-  ]
+genLiteralExpression =
+  oneof
+    [ AST.JSDecimal <$> genAnnot <*> genNumber,
+      AST.JSStringLiteral <$> genAnnot <*> genQuotedString,
+      AST.JSLiteral <$> genAnnot <*> genBoolean
+    ]
 
 -- | Generate identifier expressions
 genIdentifierExpression :: Gen AST.JSExpression
-genIdentifierExpression = 
+genIdentifierExpression =
   AST.JSIdentifier <$> genAnnot <*> genValidIdentifier
 
 -- | Generate binary expressions
@@ -798,20 +805,22 @@ genCallExpression = do
 
 -- | Generate simple expressions (non-recursive)
 genSimpleExpression :: Gen AST.JSExpression
-genSimpleExpression = oneof
-  [ genLiteralExpression
-  , genIdentifierExpression
-  ]
+genSimpleExpression =
+  oneof
+    [ genLiteralExpression,
+      genIdentifierExpression
+    ]
 
 -- | Generate valid JavaScript statements
 genValidStatement :: Gen AST.JSStatement
-genValidStatement = oneof
-  [ genExpressionStatement
-  , genVariableStatement
-  , genIfStatement
-  , genReturnStatement
-  , genBlockStatement
-  ]
+genValidStatement =
+  oneof
+    [ genExpressionStatement,
+      genVariableStatement,
+      genIfStatement,
+      genReturnStatement,
+      genBlockStatement
+    ]
 
 -- | Generate expression statements
 genExpressionStatement :: Gen AST.JSStatement
@@ -856,11 +865,12 @@ genBlockStatement = do
 
 -- | Generate simple statements (non-recursive)
 genSimpleStatement :: Gen AST.JSStatement
-genSimpleStatement = oneof
-  [ genExpressionStatement
-  , genVariableStatement
-  , genReturnStatement
-  ]
+genSimpleStatement =
+  oneof
+    [ genExpressionStatement,
+      genVariableStatement,
+      genReturnStatement
+    ]
 
 -- | Generate valid JavaScript programs
 genValidProgram :: Gen AST.JSAST
@@ -883,11 +893,12 @@ genValidFunction = do
 
 -- | Generate semantically meaningful expressions
 genSemanticExpression :: Gen AST.JSExpression
-genSemanticExpression = oneof
-  [ genArithmeticExpression
-  , genComparisonExpression
-  , genLogicalExpression
-  ]
+genSemanticExpression =
+  oneof
+    [ genArithmeticExpression,
+      genComparisonExpression,
+      genLogicalExpression
+    ]
 
 -- | Generate arithmetic expressions
 genArithmeticExpression :: Gen AST.JSExpression
@@ -915,10 +926,11 @@ genLogicalExpression = do
 
 -- | Generate semantically meaningful statements
 genSemanticStatement :: Gen AST.JSStatement
-genSemanticStatement = oneof
-  [ genAssignmentStatement
-  , genConditionalStatement
-  ]
+genSemanticStatement =
+  oneof
+    [ genAssignmentStatement,
+      genConditionalStatement
+    ]
 
 -- | Generate assignment statements
 genAssignmentStatement :: Gen AST.JSStatement
@@ -926,8 +938,11 @@ genAssignmentStatement = do
   var <- genValidIdentifier
   value <- genValidExpression
   semi <- genSemicolon
-  let assignment = AST.JSAssignExpression (AST.JSIdentifier AST.JSNoAnnot var) 
-                                         (AST.JSAssign AST.JSNoAnnot) value
+  let assignment =
+        AST.JSAssignExpression
+          (AST.JSIdentifier AST.JSNoAnnot var)
+          (AST.JSAssign AST.JSNoAnnot)
+          value
   return (AST.JSExpressionStatement assignment semi)
 
 -- | Generate conditional statements
@@ -937,9 +952,9 @@ genConditionalStatement = do
   thenStmt <- genSimpleStatement
   elseStmt <- oneof [return Nothing, Just <$> genSimpleStatement]
   case elseStmt of
-    Nothing -> 
+    Nothing ->
       return (AST.JSIf AST.JSNoAnnot AST.JSNoAnnot cond AST.JSNoAnnot thenStmt)
-    Just estmt -> 
+    Just estmt ->
       return (AST.JSIfElse AST.JSNoAnnot AST.JSNoAnnot cond AST.JSNoAnnot thenStmt AST.JSNoAnnot estmt)
 
 -- Additional generator implementations for specialized types...
@@ -1104,20 +1119,22 @@ genAnnot = return AST.JSNoAnnot
 
 -- | Generate binary operator
 genBinaryOperator :: Gen AST.JSBinOp
-genBinaryOperator = elements
-  [ AST.JSBinOpPlus AST.JSNoAnnot
-  , AST.JSBinOpMinus AST.JSNoAnnot
-  , AST.JSBinOpTimes AST.JSNoAnnot
-  , AST.JSBinOpDivide AST.JSNoAnnot
-  ]
+genBinaryOperator =
+  elements
+    [ AST.JSBinOpPlus AST.JSNoAnnot,
+      AST.JSBinOpMinus AST.JSNoAnnot,
+      AST.JSBinOpTimes AST.JSNoAnnot,
+      AST.JSBinOpDivide AST.JSNoAnnot
+    ]
 
 -- | Generate unary operator
 genUnaryOperator :: Gen AST.JSUnaryOp
-genUnaryOperator = elements
-  [ AST.JSUnaryOpMinus AST.JSNoAnnot
-  , AST.JSUnaryOpPlus AST.JSNoAnnot
-  , AST.JSUnaryOpNot AST.JSNoAnnot
-  ]
+genUnaryOperator =
+  elements
+    [ AST.JSUnaryOpMinus AST.JSNoAnnot,
+      AST.JSUnaryOpPlus AST.JSNoAnnot,
+      AST.JSUnaryOpNot AST.JSNoAnnot
+    ]
 
 -- | Generate argument list
 genArgumentList :: Gen (AST.JSAnnot, AST.JSCommaList AST.JSExpression, AST.JSAnnot)
@@ -1129,15 +1146,18 @@ genArgumentList = do
 
 -- | Generate comma list
 genCommaList :: Gen (AST.JSCommaList AST.JSExpression)
-genCommaList = oneof
-  [ return (AST.JSLNil)
-  , do expr <- genValidExpression
-       return (AST.JSLOne expr)
-  , do expr1 <- genValidExpression
-       comma <- genAnnot
-       expr2 <- genValidExpression
-       return (AST.JSLCons (AST.JSLOne expr1) comma expr2)
-  ]
+genCommaList =
+  oneof
+    [ return (AST.JSLNil),
+      do
+        expr <- genValidExpression
+        return (AST.JSLOne expr),
+      do
+        expr1 <- genValidExpression
+        comma <- genAnnot
+        expr2 <- genValidExpression
+        return (AST.JSLCons (AST.JSLOne expr1) comma expr2)
+    ]
 
 -- | Generate semicolon
 genSemicolon :: Gen AST.JSSemi
@@ -1152,11 +1172,13 @@ genVariableDeclaration = do
 
 -- | Generate parameter list
 genParameterList :: Gen (AST.JSCommaList AST.JSExpression)
-genParameterList = oneof
-  [ return AST.JSLNil
-  , do ident <- genValidIdentifier
-       return (AST.JSLOne (AST.JSIdentifier AST.JSNoAnnot ident))
-  ]
+genParameterList =
+  oneof
+    [ return AST.JSLNil,
+      do
+        ident <- genValidIdentifier
+        return (AST.JSLOne (AST.JSIdentifier AST.JSNoAnnot ident))
+    ]
 
 -- | Generate numeric literal
 genNumericLiteral :: Gen AST.JSExpression
@@ -1245,8 +1267,8 @@ isValidExpression expr = case expr of
   AST.JSObjectLiteral _ _ _ -> True
   AST.JSUnaryExpression _ _ -> True
   AST.JSVarInitExpression _ _ -> True
-  AST.JSDecimal _ _ -> True  -- Add missing numeric literals
-  AST.JSStringLiteral _ _ -> True  -- Add missing string literals
+  AST.JSDecimal _ _ -> True -- Add missing numeric literals
+  AST.JSStringLiteral _ _ -> True -- Add missing string literals
   _ -> False
 
 -- | Check if statement is valid
@@ -1287,7 +1309,7 @@ realTransformExpression expr = case expr of
   -- Parenthesize binary expressions to preserve semantics but change structure
   e@(AST.JSExpressionBinary {}) -> AST.JSExpressionParen AST.JSNoAnnot e AST.JSNoAnnot
   -- For already parenthesized expressions, keep them as-is
-  e@(AST.JSExpressionParen {}) -> e 
+  e@(AST.JSExpressionParen {}) -> e
   -- For literals and identifiers, they don't need transformation
   e@(AST.JSDecimal {}) -> e
   e@(AST.JSStringLiteral {}) -> e
@@ -1307,15 +1329,15 @@ normalizeAST = id
 -- | Real normalization that preserves structure
 realNormalizeAST :: AST.JSAST -> AST.JSAST
 realNormalizeAST ast = case ast of
-  AST.JSAstProgram stmts annot -> 
+  AST.JSAstProgram stmts annot ->
     -- Normalize by ensuring consistent semicolon usage
     AST.JSAstProgram (map normalizeStatement stmts) annot
   where
     normalizeStatement stmt = case stmt of
-      AST.JSExpressionStatement expr (AST.JSSemi _) -> 
+      AST.JSExpressionStatement expr (AST.JSSemi _) ->
         -- Keep explicit semicolons as-is
         AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
-      AST.JSExpressionStatement expr AST.JSSemiAuto -> 
+      AST.JSExpressionStatement expr AST.JSSemiAuto ->
         -- Convert auto semicolons to explicit
         AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
       AST.JSVariable annot1 vars (AST.JSSemi _) ->
@@ -1334,64 +1356,64 @@ expressionType _ = "other"
 
 -- | Check control flow equivalence
 controlFlowEquivalent :: AST.JSStatement -> AST.JSStatement -> Bool
-controlFlowEquivalent ast1 ast2 = show ast1 == show ast2  -- Basic comparison
+controlFlowEquivalent ast1 ast2 = show ast1 == show ast2 -- Basic comparison
 
 -- | Check structural equivalence
 structurallyEquivalent :: AST.JSAST -> AST.JSAST -> Bool
 structurallyEquivalent ast1 ast2 = case (ast1, ast2) of
-  (AST.JSAstProgram s1 _, AST.JSAstProgram s2 _) -> 
+  (AST.JSAstProgram s1 _, AST.JSAstProgram s2 _) ->
     length s1 == length s2 && all (uncurry statementStructurallyEqual) (zip s1 s2)
   _ -> False
 
 -- | Replace first expression in AST
 replaceFirstExpression :: AST.JSAST -> AST.JSExpression -> AST.JSAST
 replaceFirstExpression ast newExpr = case ast of
-  AST.JSAstProgram stmts annot -> 
+  AST.JSAstProgram stmts annot ->
     AST.JSAstProgram (replaceFirstExprInStatements stmts newExpr) annot
-  AST.JSAstStatement stmt annot -> 
+  AST.JSAstStatement stmt annot ->
     AST.JSAstStatement (replaceFirstExprInStatement stmt newExpr) annot
-  AST.JSAstExpression _ annot -> 
+  AST.JSAstExpression _ annot ->
     AST.JSAstExpression newExpr annot
   _ -> ast
 
 -- | Insert statement into AST
 insertStatement :: AST.JSAST -> AST.JSStatement -> AST.JSAST
-insertStatement (AST.JSAstProgram stmts annot) newStmt = 
+insertStatement (AST.JSAstProgram stmts annot) newStmt =
   AST.JSAstProgram (newStmt : stmts) annot
 
 -- | Delete node from AST
 deleteNode :: AST.JSAST -> Int -> AST.JSAST
 deleteNode ast index = case ast of
-  AST.JSAstProgram stmts annot -> 
+  AST.JSAstProgram stmts annot ->
     if index >= 0 && index < length stmts
-    then AST.JSAstProgram (deleteAtIndex index stmts) annot
-    else ast
-  _ -> ast  -- Cannot delete from non-program AST
+      then AST.JSAstProgram (deleteAtIndex index stmts) annot
+      else ast
+  _ -> ast -- Cannot delete from non-program AST
 
 -- | Parse and reparse AST (safe version)
 parseAndReparse :: AST.JSAST -> AST.JSAST
-parseAndReparse ast = 
+parseAndReparse ast =
   case Language.JavaScript.Parser.parse (renderToString ast) "test" of
     Right result -> result
-    Left _ -> 
+    Left _ ->
       -- If reparse fails, return a minimal valid AST instead of original
       -- This ensures the test actually validates parsing behavior
       AST.JSAstProgram [] AST.JSNoAnnot
 
 -- | Check semantic equivalence between expressions
 semanticallyEquivalent :: AST.JSExpression -> AST.JSExpression -> Bool
-semanticallyEquivalent ast1 ast2 = 
+semanticallyEquivalent ast1 ast2 =
   -- Compare AST structure rather than string representation
   expressionStructurallyEqual ast1 ast2
 
 -- | Check semantic equivalence between statements
 semanticallyEquivalentStatements :: AST.JSStatement -> AST.JSStatement -> Bool
-semanticallyEquivalentStatements stmt1 stmt2 = 
+semanticallyEquivalentStatements stmt1 stmt2 =
   statementStructurallyEqual stmt1 stmt2
 
 -- | Check semantic equivalence between programs
 semanticallyEquivalentPrograms :: AST.JSAST -> AST.JSAST -> Bool
-semanticallyEquivalentPrograms prog1 prog2 = 
+semanticallyEquivalentPrograms prog1 prog2 =
   astStructurallyEqual prog1 prog2
 
 -- | Check if functions are semantically similar (for property tests)
@@ -1403,8 +1425,8 @@ functionsSemanticallySimilar func1 func2 = case (func1, func2) of
   where
     identNamesEqual (AST.JSIdentName _ n1) (AST.JSIdentName _ n2) = n1 == n2
     identNamesEqual _ _ = False
-    
-    parameterListsEqual params1 params2 = 
+
+    parameterListsEqual params1 params2 =
       length (commaListToList params1) == length (commaListToList params2)
 
 -- | Structural equality for expressions (ignoring annotations)
@@ -1415,9 +1437,9 @@ expressionStructurallyEqual expr1 expr2 = case (expr1, expr2) of
   (AST.JSLiteral _ l1, AST.JSLiteral _ l2) -> l1 == l2
   (AST.JSIdentifier _ i1, AST.JSIdentifier _ i2) -> i1 == i2
   (AST.JSExpressionBinary left1 op1 right1, AST.JSExpressionBinary left2 op2 right2) ->
-    binOpEqual op1 op2 && 
-    expressionStructurallyEqual left1 left2 && 
-    expressionStructurallyEqual right1 right2
+    binOpEqual op1 op2
+      && expressionStructurallyEqual left1 left2
+      && expressionStructurallyEqual right1 right2
   _ -> False
   where
     binOpEqual (AST.JSBinOpPlus _) (AST.JSBinOpPlus _) = True
@@ -1429,7 +1451,7 @@ expressionStructurallyEqual expr1 expr2 = case (expr1, expr2) of
 -- | Structural equality for statements (ignoring annotations)
 statementStructurallyEqual :: AST.JSStatement -> AST.JSStatement -> Bool
 statementStructurallyEqual stmt1 stmt2 = case (stmt1, stmt2) of
-  (AST.JSExpressionStatement expr1 _, AST.JSExpressionStatement expr2 _) -> 
+  (AST.JSExpressionStatement expr1 _, AST.JSExpressionStatement expr2 _) ->
     expressionStructurallyEqual expr1 expr2
   (AST.JSVariable _ vars1 _, AST.JSVariable _ vars2 _) ->
     length (commaListToList vars1) == length (commaListToList vars2)
@@ -1438,7 +1460,7 @@ statementStructurallyEqual stmt1 stmt2 = case (stmt1, stmt2) of
 -- | Structural equality for ASTs (ignoring annotations)
 astStructurallyEqual :: AST.JSAST -> AST.JSAST -> Bool
 astStructurallyEqual ast1 ast2 = case (ast1, ast2) of
-  (AST.JSAstProgram stmts1 _, AST.JSAstProgram stmts2 _) -> 
+  (AST.JSAstProgram stmts1 _, AST.JSAstProgram stmts2 _) ->
     length stmts1 == length stmts2
   _ -> False
 
@@ -1450,20 +1472,20 @@ commaListToList (AST.JSLCons xs _ x) = commaListToList xs ++ [x]
 
 -- | Count comments in AST
 countComments :: AST.JSAST -> Int
-countComments _ = 0  -- Simplified for now
+countComments _ = 0 -- Simplified for now
 
 -- | Count block comments in AST
 countBlockComments :: AST.JSAST -> Int
-countBlockComments _ = 0  -- Simplified for now
+countBlockComments _ = 0 -- Simplified for now
 
 -- | Check if comment positions are preserved
 commentPositionsPreserved :: AST.JSAST -> AST.JSAST -> Bool
-commentPositionsPreserved _ _ = True  -- Simplified for now
+commentPositionsPreserved _ _ = True -- Simplified for now
 
 -- | Check if source positions are maintained
 -- Since we use JSNoAnnot, we check structural consistency instead
 sourcePositionsMaintained :: AST.JSAST -> AST.JSAST -> Bool
-sourcePositionsMaintained original parsed = 
+sourcePositionsMaintained original parsed =
   structurallyEquivalent original parsed
 
 -- | Check if relative positions are preserved
@@ -1471,8 +1493,8 @@ sourcePositionsMaintained original parsed =
 relativePositionsPreserved :: AST.JSAST -> AST.JSAST -> Bool
 relativePositionsPreserved original parsed = case (original, parsed) of
   (AST.JSAstProgram stmts1 _, AST.JSAstProgram stmts2 _) ->
-    length stmts1 == length stmts2 &&
-    all (uncurry statementStructurallyEqual) (zip stmts1 stmts2)
+    length stmts1 == length stmts2
+      && all (uncurry statementStructurallyEqual) (zip stmts1 stmts2)
   _ -> False
 
 -- | Check if line numbers are preserved through parsing
@@ -1484,16 +1506,16 @@ lineNumbersPreserved original parsed =
   sameAnnotationPattern original parsed
   where
     sameAnnotationPattern (AST.JSAstProgram stmts1 ann1) (AST.JSAstProgram stmts2 ann2) =
-      annotationTypesMatch ann1 ann2 && 
-      length stmts1 == length stmts2 &&
-      all (uncurry statementAnnotationsMatch) (zip stmts1 stmts2)
+      annotationTypesMatch ann1 ann2
+        && length stmts1 == length stmts2
+        && all (uncurry statementAnnotationsMatch) (zip stmts1 stmts2)
     sameAnnotationPattern _ _ = False
-    
+
     annotationTypesMatch AST.JSNoAnnot AST.JSNoAnnot = True
     annotationTypesMatch (AST.JSAnnot {}) (AST.JSAnnot {}) = True
     annotationTypesMatch _ _ = False
 
--- | Check if column numbers are preserved through parsing  
+-- | Check if column numbers are preserved through parsing
 -- Validates that position information is consistently handled
 columnNumbersPreserved :: AST.JSAST -> AST.JSAST -> Bool
 columnNumbersPreserved original parsed =
@@ -1501,10 +1523,10 @@ columnNumbersPreserved original parsed =
   structurallyConsistent original parsed
   where
     structurallyConsistent (AST.JSAstProgram stmts1 _) (AST.JSAstProgram stmts2 _) =
-      length stmts1 == length stmts2 &&
-      all (uncurry statementTypesMatch) (zip stmts1 stmts2)
+      length stmts1 == length stmts2
+        && all (uncurry statementTypesMatch) (zip stmts1 stmts2)
     structurallyConsistent _ _ = False
-    
+
     statementTypesMatch stmt1 stmt2 = statementTypeOf stmt1 == statementTypeOf stmt2
     statementTypeOf (AST.JSStatementBlock {}) = "block"
     statementTypeOf (AST.JSExpressionStatement {}) = "expression"
@@ -1519,32 +1541,32 @@ positionOrderingMaintained original parsed =
   statementOrderPreserved original parsed
   where
     statementOrderPreserved (AST.JSAstProgram stmts1 _) (AST.JSAstProgram stmts2 _) =
-      length stmts1 == length stmts2 &&
-      statementsCorrespond stmts1 stmts2
+      length stmts1 == length stmts2
+        && statementsCorrespond stmts1 stmts2
     statementOrderPreserved _ _ = False
-    
+
     statementsCorrespond [] [] = True
-    statementsCorrespond (s1:ss1) (s2:ss2) = 
+    statementsCorrespond (s1 : ss1) (s2 : ss2) =
       statementStructurallyEqual s1 s2 && statementsCorrespond ss1 ss2
     statementsCorrespond _ _ = False
 
 -- | Parse tokens into AST
 parseTokens :: [AST.JSExpression] -> Either String AST.JSAST
-parseTokens exprs = 
+parseTokens exprs =
   let stmts = map (\expr -> AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)) exprs
-  in Right (AST.JSAstProgram stmts AST.JSNoAnnot)
+   in Right (AST.JSAstProgram stmts AST.JSNoAnnot)
 
 -- | Check if token positions are mapped correctly to AST
 -- Validates that the number of expressions matches expected AST structure
 tokenPositionsMappedCorrectly :: [AST.JSExpression] -> AST.JSAST -> Bool
 tokenPositionsMappedCorrectly exprs (AST.JSAstProgram stmts _) =
   -- Each expression should correspond to an expression statement
-  length exprs == length (filter isExpressionStatement stmts) &&
-  all isValidExpressionInStatement (zip exprs stmts)
+  length exprs == length (filter isExpressionStatement stmts)
+    && all isValidExpressionInStatement (zip exprs stmts)
   where
     isExpressionStatement (AST.JSExpressionStatement {}) = True
     isExpressionStatement _ = False
-    
+
     isValidExpressionInStatement (expr, AST.JSExpressionStatement astExpr _) =
       expressionStructurallyEqual expr astExpr
     isValidExpressionInStatement _ = True -- Non-expression statements are valid
@@ -1563,7 +1585,7 @@ tokenPositionRelationship expr1 expr2 =
     _ -> "equivalent"
   where
     expressionComplexity (AST.JSLiteral {}) = 1
-    expressionComplexity (AST.JSIdentifier {}) = 1  
+    expressionComplexity (AST.JSIdentifier {}) = 1
     expressionComplexity (AST.JSCallExpression {}) = 3
     expressionComplexity (AST.JSExpressionBinary {}) = 2
     expressionComplexity _ = 2
@@ -1582,10 +1604,10 @@ sourceLocationsNonDecreasing (AST.JSAstProgram stmts _) =
   statementsWellFormed stmts
   where
     statementsWellFormed [] = True
-    statementsWellFormed [_] = True  
-    statementsWellFormed (stmt1:stmt2:rest) =
-      statementOrderValid stmt1 stmt2 && statementsWellFormed (stmt2:rest)
-    
+    statementsWellFormed [_] = True
+    statementsWellFormed (stmt1 : stmt2 : rest) =
+      statementOrderValid stmt1 stmt2 && statementsWellFormed (stmt2 : rest)
+
     -- Function declarations can come before or after other statements
     -- Expression statements should be well-formed
     statementOrderValid (AST.JSFunction {}) _ = True
@@ -1616,11 +1638,11 @@ positionsOverlap pos1 pos2 =
 
 -- | Extract actual positions from AST
 extractActualPositions :: AST.JSAST -> [TokenPosn]
-extractActualPositions _ = []  -- Simplified for now
+extractActualPositions _ = [] -- Simplified for now
 
 -- | Calculate positions for AST
 calculatePositions :: AST.JSAST -> [TokenPosn]
-calculatePositions _ = []  -- Simplified for now
+calculatePositions _ = [] -- Simplified for now
 
 -- | Calculate position offset
 calculatePositionOffset :: TokenPosn -> TokenPosn -> Int
@@ -1632,15 +1654,15 @@ applyPositionOffset (TokenPn addr line col) offset = TokenPn (addr + offset) lin
 
 -- | Rename variable in function
 renameVariable :: AST.JSStatement -> String -> String -> AST.JSStatement
-renameVariable stmt _ _ = stmt  -- Simplified for now
+renameVariable stmt _ _ = stmt -- Simplified for now
 
 -- | Check alpha equivalence
 alphaEquivalent :: AST.JSStatement -> AST.JSStatement -> Bool
-alphaEquivalent _ _ = True  -- Simplified for now
+alphaEquivalent _ _ = True -- Simplified for now
 
 -- | Extract free variables
 extractFreeVariables :: AST.JSStatement -> [String]
-extractFreeVariables _ = []  -- Simplified for now
+extractFreeVariables _ = [] -- Simplified for now
 
 -- | Check semantic equivalence between functions
 semanticallyEquivalentFunctions :: AST.JSStatement -> AST.JSStatement -> Bool
@@ -1653,11 +1675,11 @@ astShape _ = "unknown"
 
 -- | Canonicalize AST
 canonicalizeAST :: AST.JSAST -> AST.JSAST
-canonicalizeAST = id  -- Simplified for now
+canonicalizeAST = id -- Simplified for now
 
 -- | Extract binding structure
 extractBindingStructure :: AST.JSStatement -> String
-extractBindingStructure _ = "bindings"  -- Simplified for now
+extractBindingStructure _ = "bindings" -- Simplified for now
 
 -- | Check binding structures equivalence
 bindingStructuresEquivalent :: String -> String -> Bool
@@ -1665,27 +1687,27 @@ bindingStructuresEquivalent s1 s2 = s1 == s2
 
 -- | Check for variable capture
 hasVariableCapture :: AST.JSStatement -> Bool
-hasVariableCapture _ = False  -- Simplified for now
+hasVariableCapture _ = False -- Simplified for now
 
 -- | Apply renaming map
 applyRenamingMap :: AST.JSAST -> [(String, String)] -> AST.JSAST
-applyRenamingMap ast _ = ast  -- Simplified for now
+applyRenamingMap ast _ = ast -- Simplified for now
 
 -- Helper functions to render different AST types to strings
 renderExpressionToString :: AST.JSExpression -> String
-renderExpressionToString expr = 
+renderExpressionToString expr =
   let stmt = AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
       prog = AST.JSAstProgram [stmt] AST.JSNoAnnot
-  in renderToString prog
+   in renderToString prog
 
 renderStatementToString :: AST.JSStatement -> String
-renderStatementToString stmt = 
+renderStatementToString stmt =
   let prog = AST.JSAstProgram [stmt] AST.JSNoAnnot
-  in renderToString prog
+   in renderToString prog
 
 -- Parse functions for expressions and statements (safe parsing)
 parseExpression :: String -> Either String AST.JSExpression
-parseExpression input = 
+parseExpression input =
   case Language.JavaScript.Parser.parse input "test" of
     Right (AST.JSAstProgram [AST.JSExpressionStatement expr _] _) -> Right expr
     Right _ -> Left "Not a single expression statement"
@@ -1700,36 +1722,36 @@ parseStatement input =
 
 -- AST transformation helper functions
 addCommentsToAST :: AST.JSAST -> AST.JSAST
-addCommentsToAST = id  -- Simplified for now
+addCommentsToAST = id -- Simplified for now
 
 addBlockCommentsToAST :: AST.JSAST -> AST.JSAST
-addBlockCommentsToAST = id  -- Simplified for now
+addBlockCommentsToAST = id -- Simplified for now
 
 addPositionedCommentsToAST :: AST.JSAST -> AST.JSAST
-addPositionedCommentsToAST = id  -- Simplified for now
+addPositionedCommentsToAST = id -- Simplified for now
 
 addPositionInfoToAST :: AST.JSAST -> AST.JSAST
-addPositionInfoToAST = id  -- Simplified for now
+addPositionInfoToAST = id -- Simplified for now
 
 addRelativePositionsToAST :: AST.JSAST -> AST.JSAST
-addRelativePositionsToAST = id  -- Simplified for now
+addRelativePositionsToAST = id -- Simplified for now
 
 addLineNumbersToAST :: AST.JSAST -> AST.JSAST
-addLineNumbersToAST = id  -- Simplified for now
+addLineNumbersToAST = id -- Simplified for now
 
 addColumnNumbersToAST :: AST.JSAST -> AST.JSAST
-addColumnNumbersToAST = id  -- Simplified for now
+addColumnNumbersToAST = id -- Simplified for now
 
 addOrderedPositionsToAST :: AST.JSAST -> AST.JSAST
-addOrderedPositionsToAST = id  -- Simplified for now
+addOrderedPositionsToAST = id -- Simplified for now
 
 addCalculatedPositionsToAST :: AST.JSAST -> AST.JSAST
-addCalculatedPositionsToAST = id  -- Simplified for now
+addCalculatedPositionsToAST = id -- Simplified for now
 
 createAlphaEquivalent :: AST.JSStatement -> AST.JSStatement
-createAlphaEquivalent = id  -- Simplified for now
+createAlphaEquivalent = id -- Simplified for now
 
-createStructurallyEquivalent :: AST.JSAST -> AST.JSAST  
+createStructurallyEquivalent :: AST.JSAST -> AST.JSAST
 createStructurallyEquivalent prog@(AST.JSAstProgram stmts ann) =
   -- Create a structurally equivalent AST by rebuilding with same structure
   AST.JSAstProgram (map cloneStatement stmts) ann
@@ -1740,7 +1762,7 @@ createStructurallyEquivalent prog@(AST.JSAstProgram stmts ann) =
       AST.JSFunction ann1 name lp params rp body semi ->
         AST.JSFunction ann1 name lp params rp body semi
       other -> other
-    
+
     cloneExpression expr = case expr of
       AST.JSDecimal ann num -> AST.JSDecimal ann num
       AST.JSStringLiteral ann str -> AST.JSStringLiteral ann str
@@ -1752,14 +1774,14 @@ createStructurallyEquivalent other = other
 simpleExprStmt :: AST.JSExpression -> AST.JSStatement
 simpleExprStmt expr = AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
 
-literalNumber :: String -> AST.JSExpression  
+literalNumber :: String -> AST.JSExpression
 literalNumber num = AST.JSDecimal AST.JSNoAnnot num
 
 literalString :: String -> AST.JSExpression
 literalString str = AST.JSStringLiteral AST.JSNoAnnot ("\"" ++ str ++ "\"")
 
 createEquivalent :: AST.JSAST -> AST.JSAST
-createEquivalent = id  -- Simplified for now
+createEquivalent = id -- Simplified for now
 
 -- | Check if two statements have matching annotation patterns
 statementAnnotationsMatch :: AST.JSStatement -> AST.JSStatement -> Bool
@@ -1770,14 +1792,14 @@ statementAnnotationsMatch stmt1 stmt2 = case (stmt1, stmt2) of
     annotationTypesMatch ann1 ann2
   (AST.JSStatementBlock ann1 _ _ _, AST.JSStatementBlock ann2 _ _ _) ->
     annotationTypesMatch ann1 ann2
-  _ -> True  -- Different statement types, but annotations might still match pattern
+  _ -> True -- Different statement types, but annotations might still match pattern
   where
-    expressionAnnotationsMatch (AST.JSDecimal ann1 _) (AST.JSDecimal ann2 _) = 
+    expressionAnnotationsMatch (AST.JSDecimal ann1 _) (AST.JSDecimal ann2 _) =
       annotationTypesMatch ann1 ann2
-    expressionAnnotationsMatch (AST.JSIdentifier ann1 _) (AST.JSIdentifier ann2 _) = 
+    expressionAnnotationsMatch (AST.JSIdentifier ann1 _) (AST.JSIdentifier ann2 _) =
       annotationTypesMatch ann1 ann2
     expressionAnnotationsMatch _ _ = True
-    
+
     annotationTypesMatch AST.JSNoAnnot AST.JSNoAnnot = True
     annotationTypesMatch (AST.JSAnnot {}) (AST.JSAnnot {}) = True
     annotationTypesMatch _ _ = False
@@ -1785,16 +1807,16 @@ statementAnnotationsMatch stmt1 stmt2 = case (stmt1, stmt2) of
 -- Helper functions for AST manipulation
 replaceFirstExprInStatements :: [AST.JSStatement] -> AST.JSExpression -> [AST.JSStatement]
 replaceFirstExprInStatements [] _ = []
-replaceFirstExprInStatements (stmt:stmts) newExpr = 
+replaceFirstExprInStatements (stmt : stmts) newExpr =
   case replaceFirstExprInStatement stmt newExpr of
     stmt' -> stmt' : stmts
 
 replaceFirstExprInStatement :: AST.JSStatement -> AST.JSExpression -> AST.JSStatement
 replaceFirstExprInStatement stmt newExpr = case stmt of
   AST.JSExpressionStatement expr semi -> AST.JSExpressionStatement newExpr semi
-  _ -> stmt  -- For other statements, return unchanged
+  _ -> stmt -- For other statements, return unchanged
 
 deleteAtIndex :: Int -> [a] -> [a]
 deleteAtIndex _ [] = []
-deleteAtIndex 0 (_:xs) = xs
-deleteAtIndex n (x:xs) = x : deleteAtIndex (n-1) xs
+deleteAtIndex 0 (_ : xs) = xs
+deleteAtIndex n (x : xs) = x : deleteAtIndex (n -1) xs

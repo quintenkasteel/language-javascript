@@ -1,6 +1,6 @@
+{-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ExtendedDefaultRules #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- | Coverage-guided fuzzing implementation for JavaScript parser.
@@ -45,56 +45,56 @@
 --
 -- @since 0.7.1.0
 module Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
-    ( -- * Coverage Data Types
-      CoverageData(..)
-    , CoveragePath(..)
-    , CoverageMetrics(..)
-    , BranchCoverage(..)
-    
-    -- * Coverage Measurement
-    , measureCoverage
-    , measureBranchCoverage
-    , measurePathCoverage
-    , combineCoverageData
-    
-    -- * Guided Generation
-    , guidedGeneration
-    , evolveInputPopulation
-    , prioritizeInputs
-    , generateCoverageTargeted
-    
-    -- * Genetic Algorithm Components
-    , GeneticConfig(..)
-    , Individual(..)
-    , Population
-    , evolvePopulation
-    , crossoverInputs
-    , mutateForCoverage
-    
-    -- * Coverage Analysis
-    , analyzeCoverageGaps
-    , identifyUncoveredPaths
-    , calculateCoverageScore
-    , generateCoverageReport
-    ) where
+  ( -- * Coverage Data Types
+    CoverageData (..),
+    CoveragePath (..),
+    CoverageMetrics (..),
+    BranchCoverage (..),
 
-import Control.Exception (catch, SomeException)
+    -- * Coverage Measurement
+    measureCoverage,
+    measureBranchCoverage,
+    measurePathCoverage,
+    combineCoverageData,
+
+    -- * Guided Generation
+    guidedGeneration,
+    evolveInputPopulation,
+    prioritizeInputs,
+    generateCoverageTargeted,
+
+    -- * Genetic Algorithm Components
+    GeneticConfig (..),
+    Individual (..),
+    Population,
+    evolvePopulation,
+    crossoverInputs,
+    mutateForCoverage,
+
+    -- * Coverage Analysis
+    analyzeCoverageGaps,
+    identifyUncoveredPaths,
+    calculateCoverageScore,
+    generateCoverageReport,
+  )
+where
+
+import Control.Exception (SomeException, catch)
 import Control.Monad (forM, forM_, replicateM)
-import Data.List (sortBy, nub, (\\))
-import Data.Ord (comparing, Down(..))
-import System.Process (readProcessWithExitCode)
-import System.Random (randomRIO, randomIO)
+import Data.List (nub, sortBy, (\\))
 import qualified Data.Map.Strict as Map
+import Data.Ord (Down (..), comparing)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-
 import Language.JavaScript.Parser (readJs, renderToString)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
-  ( generateRandomJS
-  , mutateFuzzInput
-  , applyRandomMutations
+  ( applyRandomMutations,
+    generateRandomJS,
+    mutateFuzzInput,
   )
+import System.Process (readProcessWithExitCode)
+import System.Random (randomIO, randomRIO)
 
 -- ---------------------------------------------------------------------
 -- Coverage Data Types
@@ -102,38 +102,42 @@ import Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
 
 -- | Comprehensive code coverage data
 data CoverageData = CoverageData
-  { coveredLines :: ![Int]
-  , branchCoverage :: ![BranchCoverage] 
-  , pathCoverage :: ![CoveragePath]
-  , coverageMetrics :: !CoverageMetrics
-  } deriving (Eq, Show)
+  { coveredLines :: ![Int],
+    branchCoverage :: ![BranchCoverage],
+    pathCoverage :: ![CoveragePath],
+    coverageMetrics :: !CoverageMetrics
+  }
+  deriving (Eq, Show)
 
 -- | Individual code path representation
 data CoveragePath = CoveragePath
-  { pathId :: !String
-  , pathBlocks :: ![String]
-  , pathFrequency :: !Int
-  , pathDepth :: !Int
-  } deriving (Eq, Show)
+  { pathId :: !String,
+    pathBlocks :: ![String],
+    pathFrequency :: !Int,
+    pathDepth :: !Int
+  }
+  deriving (Eq, Show)
 
 -- | Coverage metrics and statistics
 data CoverageMetrics = CoverageMetrics
-  { linesCovered :: !Int
-  , totalLines :: !Int
-  , branchesCovered :: !Int
-  , totalBranches :: !Int
-  , pathsCovered :: !Int
-  , totalPaths :: !Int
-  , coveragePercentage :: !Double
-  } deriving (Eq, Show)
+  { linesCovered :: !Int,
+    totalLines :: !Int,
+    branchesCovered :: !Int,
+    totalBranches :: !Int,
+    pathsCovered :: !Int,
+    totalPaths :: !Int,
+    coveragePercentage :: !Double
+  }
+  deriving (Eq, Show)
 
 -- | Branch coverage information
 data BranchCoverage = BranchCoverage
-  { branchId :: !String
-  , branchTaken :: !Bool
-  , branchCount :: !Int
-  , branchLocation :: !String
-  } deriving (Eq, Show)
+  { branchId :: !String,
+    branchTaken :: !Bool,
+    branchCount :: !Int,
+    branchLocation :: !String
+  }
+  deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------
 -- Genetic Algorithm Types
@@ -141,35 +145,38 @@ data BranchCoverage = BranchCoverage
 
 -- | Genetic algorithm configuration
 data GeneticConfig = GeneticConfig
-  { populationSize :: !Int
-  , generations :: !Int
-  , crossoverRate :: !Double
-  , mutationRate :: !Double
-  , elitismRate :: !Double
-  , fitnessThreshold :: !Double
-  } deriving (Eq, Show)
+  { populationSize :: !Int,
+    generations :: !Int,
+    crossoverRate :: !Double,
+    mutationRate :: !Double,
+    elitismRate :: !Double,
+    fitnessThreshold :: !Double
+  }
+  deriving (Eq, Show)
 
 -- | Individual in genetic algorithm population
 data Individual = Individual
-  { individualInput :: !Text.Text
-  , individualCoverage :: !CoverageData
-  , individualFitness :: !Double
-  , individualGeneration :: !Int
-  } deriving (Eq, Show)
+  { individualInput :: !Text.Text,
+    individualCoverage :: !CoverageData,
+    individualFitness :: !Double,
+    individualGeneration :: !Int
+  }
+  deriving (Eq, Show)
 
 -- | Population of individuals
 type Population = [Individual]
 
 -- | Default genetic algorithm configuration
 defaultGeneticConfig :: GeneticConfig
-defaultGeneticConfig = GeneticConfig
-  { populationSize = 50
-  , generations = 100
-  , crossoverRate = 0.8
-  , mutationRate = 0.2
-  , elitismRate = 0.1
-  , fitnessThreshold = 0.95
-  }
+defaultGeneticConfig =
+  GeneticConfig
+    { populationSize = 50,
+      generations = 100,
+      crossoverRate = 0.8,
+      mutationRate = 0.2,
+      elitismRate = 0.1,
+      fitnessThreshold = 0.95
+    }
 
 -- ---------------------------------------------------------------------
 -- Coverage Measurement
@@ -191,7 +198,7 @@ measureLineCoverage input = do
   -- For now, simulate based on input complexity
   let complexity = length (words input)
   let estimatedLines = min 100 (complexity `div` 2)
-  return [1..estimatedLines]
+  return [1 .. estimatedLines]
 
 -- | Measure branch coverage in parser execution
 measureBranchCoverage :: String -> IO [BranchCoverage]
@@ -200,18 +207,19 @@ measureBranchCoverage input = do
   result <- catch (return $ readJs input) (\(_ :: SomeException) -> return $ AST.JSAstProgram [] (AST.JSNoAnnot))
   case result of
     AST.JSAstProgram stmts _ -> do
-      branches <- forM (zip [1..] stmts) $ \(i, stmt) -> do
+      branches <- forM (zip [1 ..] stmts) $ \(i, stmt) -> do
         taken <- return $ case stmt of
           AST.JSIf {} -> True
-          AST.JSIfElse {} -> True  
+          AST.JSIfElse {} -> True
           AST.JSSwitch {} -> True
           _ -> False
-        return $ BranchCoverage
-          { branchId = "branch_" ++ show i
-          , branchTaken = taken
-          , branchCount = if taken then 1 else 0
-          , branchLocation = "stmt_" ++ show i
-          }
+        return $
+          BranchCoverage
+            { branchId = "branch_" ++ show i,
+              branchTaken = taken,
+              branchCount = if taken then 1 else 0,
+              branchLocation = "stmt_" ++ show i
+            }
       return branches
     _ -> return []
 
@@ -222,59 +230,64 @@ measurePathCoverage input = do
   result <- catch (return $ readJs input) (\(_ :: SomeException) -> return $ AST.JSAstProgram [] (AST.JSNoAnnot))
   case result of
     AST.JSAstProgram stmts _ -> do
-      paths <- forM (zip [1..] stmts) $ \(i, _stmt) -> do
-        return $ CoveragePath
-          { pathId = "path_" ++ show i
-          , pathBlocks = ["block_" ++ show j | j <- [1..i]]
-          , pathFrequency = 1
-          , pathDepth = i
-          }
+      paths <- forM (zip [1 ..] stmts) $ \(i, _stmt) -> do
+        return $
+          CoveragePath
+            { pathId = "path_" ++ show i,
+              pathBlocks = ["block_" ++ show j | j <- [1 .. i]],
+              pathFrequency = 1,
+              pathDepth = i
+            }
       return paths
     _ -> return []
 
 -- | Combine multiple coverage measurements
 combineCoverageData :: [CoverageData] -> CoverageData
 combineCoverageData [] = emptyCoverageData
-combineCoverageData coverages = CoverageData
-  { coveredLines = nub $ concatMap coveredLines coverages
-  , branchCoverage = nub $ concatMap branchCoverage coverages
-  , pathCoverage = nub $ concatMap pathCoverage coverages
-  , coverageMetrics = combinedMetrics
-  }
+combineCoverageData coverages =
+  CoverageData
+    { coveredLines = nub $ concatMap coveredLines coverages,
+      branchCoverage = nub $ concatMap branchCoverage coverages,
+      pathCoverage = nub $ concatMap pathCoverage coverages,
+      coverageMetrics = combinedMetrics
+    }
   where
-    combinedMetrics = CoverageMetrics
-      { linesCovered = length $ nub $ concatMap coveredLines coverages
-      , totalLines = maximum $ map (totalLines . coverageMetrics) coverages
-      , branchesCovered = length $ nub $ concatMap branchCoverage coverages
-      , totalBranches = maximum $ map (totalBranches . coverageMetrics) coverages
-      , pathsCovered = length $ nub $ concatMap pathCoverage coverages
-      , totalPaths = maximum $ map (totalPaths . coverageMetrics) coverages
-      , coveragePercentage = 0.0  -- Calculated separately
-      }
+    combinedMetrics =
+      CoverageMetrics
+        { linesCovered = length $ nub $ concatMap coveredLines coverages,
+          totalLines = maximum $ map (totalLines . coverageMetrics) coverages,
+          branchesCovered = length $ nub $ concatMap branchCoverage coverages,
+          totalBranches = maximum $ map (totalBranches . coverageMetrics) coverages,
+          pathsCovered = length $ nub $ concatMap pathCoverage coverages,
+          totalPaths = maximum $ map (totalPaths . coverageMetrics) coverages,
+          coveragePercentage = 0.0 -- Calculated separately
+        }
 
 -- | Calculate coverage metrics from measurements
 calculateMetrics :: [Int] -> [BranchCoverage] -> [CoveragePath] -> CoverageMetrics
-calculateMetrics lines branches paths = CoverageMetrics
-  { linesCovered = length lines
-  , totalLines = estimateTotalLines
-  , branchesCovered = length $ filter branchTaken branches
-  , totalBranches = length branches
-  , pathsCovered = length paths
-  , totalPaths = estimateTotalPaths
-  , coveragePercentage = calculatePercentage lines branches paths
-  }
+calculateMetrics lines branches paths =
+  CoverageMetrics
+    { linesCovered = length lines,
+      totalLines = estimateTotalLines,
+      branchesCovered = length $ filter branchTaken branches,
+      totalBranches = length branches,
+      pathsCovered = length paths,
+      totalPaths = estimateTotalPaths,
+      coveragePercentage = calculatePercentage lines branches paths
+    }
   where
-    estimateTotalLines = 1000  -- Estimate based on parser size
-    estimateTotalPaths = 500   -- Estimate based on parser complexity
+    estimateTotalLines = 1000 -- Estimate based on parser size
+    estimateTotalPaths = 500 -- Estimate based on parser complexity
 
 -- | Calculate overall coverage percentage
 calculatePercentage :: [Int] -> [BranchCoverage] -> [CoveragePath] -> Double
 calculatePercentage lines branches paths =
   let linePercent = fromIntegral (length lines) / 1000.0
-      branchPercent = fromIntegral (length $ filter branchTaken branches) / 
-                     max 1 (fromIntegral $ length branches)
+      branchPercent =
+        fromIntegral (length $ filter branchTaken branches)
+          / max 1 (fromIntegral $ length branches)
       pathPercent = fromIntegral (length paths) / 500.0
-  in (linePercent + branchPercent + pathPercent) / 3.0 * 100.0
+   in (linePercent + branchPercent + pathPercent) / 3.0 * 100.0
 
 -- | Empty coverage data
 emptyCoverageData :: CoverageData
@@ -362,9 +375,9 @@ evolvePopulation :: GeneticConfig -> Population -> IO Population
 evolvePopulation config population = do
   let eliteCount = round (elitismRate config * fromIntegral (populationSize config))
   let elite = take eliteCount $ sortBy (comparing (Down . individualFitness)) population
-  
+
   offspring <- generateOffspring config population (populationSize config - eliteCount)
-  
+
   let newPopulation = elite ++ offspring
   return $ take (populationSize config) newPopulation
 
@@ -374,15 +387,14 @@ generateOffspring _config _population 0 = return []
 generateOffspring config population count = do
   parent1 <- selectParent population
   parent2 <- selectParent population
-  
+
   offspring <- crossoverInputs (individualInput parent1) (individualInput parent2)
   mutated <- mutateForCoverage offspring
-  
+
   coverage <- measureCoverage (Text.unpack mutated)
-  let fitness = individualFitness parent1  -- Simplified fitness calculation
-  
+  let fitness = individualFitness parent1 -- Simplified fitness calculation
   let individual = Individual mutated coverage fitness 0
-  
+
   rest <- generateOffspring config population (count - 1)
   return (individual : rest)
 
@@ -417,20 +429,20 @@ mutateForCoverage input = do
 
 -- | Analyze coverage gaps and missing areas
 analyzeCoverageGaps :: CoverageData -> [String]
-analyzeCoverageGaps coverage = 
+analyzeCoverageGaps coverage =
   let lineGaps = identifyLineGaps coverage
       branchGaps = identifyBranchGaps coverage
       pathGaps = identifyPathGaps coverage
-  in map ("line_" ++) (map show lineGaps) ++ 
-     map ("branch_" ++) branchGaps ++
-     map ("path_" ++) pathGaps
+   in map ("line_" ++) (map show lineGaps)
+        ++ map ("branch_" ++) branchGaps
+        ++ map ("path_" ++) pathGaps
 
 -- | Identify uncovered code paths
 identifyUncoveredPaths :: CoverageData -> [String]
 identifyUncoveredPaths coverage =
-  let allPaths = ["path_" ++ show i | i <- [1..100]]  -- Estimated total paths
+  let allPaths = ["path_" ++ show i | i <- [1 .. 100]] -- Estimated total paths
       coveredPaths = map pathId (pathCoverage coverage)
-  in allPaths \\ coveredPaths
+   in allPaths \\ coveredPaths
 
 -- | Calculate coverage score between two coverage measurements
 calculateCoverageScore :: CoverageData -> CoverageData -> Double
@@ -441,19 +453,21 @@ calculateCoverageScore base new =
       baseBranches = Set.fromList (map branchId (branchCoverage base))
       newBranches = Set.fromList (map branchId (branchCoverage new))
       newBranchCoverage = Set.size (newBranches `Set.difference` baseBranches)
-  in fromIntegral newCoverage + fromIntegral newBranchCoverage
+   in fromIntegral newCoverage + fromIntegral newBranchCoverage
 
 -- | Generate comprehensive coverage report
 generateCoverageReport :: CoverageData -> String
-generateCoverageReport coverage = unlines $
-  [ "=== Coverage Report ==="
-  , "Lines covered: " ++ show (linesCovered metrics) ++ "/" ++ show (totalLines metrics)
-  , "Branches covered: " ++ show (branchesCovered metrics) ++ "/" ++ show (totalBranches metrics)  
-  , "Paths covered: " ++ show (pathsCovered metrics) ++ "/" ++ show (totalPaths metrics)
-  , "Overall coverage: " ++ show (coveragePercentage metrics) ++ "%"
-  , ""
-  , "Uncovered areas:"
-  ] ++ map ("  " ++) (analyzeCoverageGaps coverage)
+generateCoverageReport coverage =
+  unlines $
+    [ "=== Coverage Report ===",
+      "Lines covered: " ++ show (linesCovered metrics) ++ "/" ++ show (totalLines metrics),
+      "Branches covered: " ++ show (branchesCovered metrics) ++ "/" ++ show (totalBranches metrics),
+      "Paths covered: " ++ show (pathsCovered metrics) ++ "/" ++ show (totalPaths metrics),
+      "Overall coverage: " ++ show (coveragePercentage metrics) ++ "%",
+      "",
+      "Uncovered areas:"
+    ]
+      ++ map ("  " ++) (analyzeCoverageGaps coverage)
   where
     metrics = coverageMetrics coverage
 
@@ -463,23 +477,23 @@ generateCoverageReport coverage = unlines $
 
 -- | Identify gaps in line coverage
 identifyLineGaps :: CoverageData -> [Int]
-identifyLineGaps coverage = 
+identifyLineGaps coverage =
   let covered = Set.fromList (coveredLines coverage)
-      allLines = [1..totalLines (coverageMetrics coverage)]
-  in filter (`Set.notMember` covered) allLines
+      allLines = [1 .. totalLines (coverageMetrics coverage)]
+   in filter (`Set.notMember` covered) allLines
 
 -- | Identify gaps in branch coverage
 identifyBranchGaps :: CoverageData -> [String]
 identifyBranchGaps coverage =
   let uncovered = filter (not . branchTaken) (branchCoverage coverage)
-  in map branchId uncovered
+   in map branchId uncovered
 
 -- | Identify gaps in path coverage
 identifyPathGaps :: CoverageData -> [String]
 identifyPathGaps coverage =
-  let allPaths = ["path_" ++ show i | i <- [1..totalPaths (coverageMetrics coverage)]]
+  let allPaths = ["path_" ++ show i | i <- [1 .. totalPaths (coverageMetrics coverage)]]
       coveredPaths = map pathId (pathCoverage coverage)
-  in allPaths \\ coveredPaths
+   in allPaths \\ coveredPaths
 
 -- | Generate input targeting specific lines
 generateInputForLines :: [Int] -> IO Text.Text
@@ -523,4 +537,4 @@ generateInputForGaps gaps = do
 -- | Maximum by comparison
 maximumBy :: (a -> a -> Ordering) -> [a] -> a
 maximumBy _ [] = error "maximumBy: empty list"
-maximumBy cmp (x:xs) = foldl (\acc y -> if cmp acc y == LT then y else acc) x xs
+maximumBy cmp (x : xs) = foldl (\acc y -> if cmp acc y == LT then y else acc) x xs

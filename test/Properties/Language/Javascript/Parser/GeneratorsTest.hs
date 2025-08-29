@@ -6,51 +6,59 @@
 --
 -- Simple test to verify that the generators compile and work correctly.
 module Properties.Language.Javascript.Parser.GeneratorsTest
-    ( testGenerators
-    ) where
+  ( testGenerators,
+  )
+where
 
-import Test.Hspec
-import Test.QuickCheck
-
+import qualified Data.ByteString.Char8 as BS8
 import Language.JavaScript.Parser.AST
 import Properties.Language.Javascript.Parser.Generators
-import qualified Data.ByteString.Char8 as BS8
+import Test.Hspec
+import Test.QuickCheck
 
 -- | Test suite for QuickCheck generators
 testGenerators :: Spec
 testGenerators = describe "QuickCheck Generators" $ do
-
   describe "Expression generators" $ do
-    it "generates valid JSExpression instances" $ property $
-      \expr -> isValidExpression (expr :: JSExpression)
-    
-    it "generates JSBinOp instances" $ property $
-      \op -> isValidBinOp (op :: JSBinOp)
-    
-    it "generates JSUnaryOp instances" $ property $
-      \op -> isValidUnaryOp (op :: JSUnaryOp)
+    it "generates valid JSExpression instances" $
+      property $
+        \expr -> isValidExpression (expr :: JSExpression)
+
+    it "generates JSBinOp instances" $
+      property $
+        \op -> isValidBinOp (op :: JSBinOp)
+
+    it "generates JSUnaryOp instances" $
+      property $
+        \op -> isValidUnaryOp (op :: JSUnaryOp)
 
   describe "Statement generators" $ do
-    it "generates valid JSStatement instances" $ property $
-      \stmt -> isValidStatement (stmt :: JSStatement)
-    
-    it "generates JSBlock instances" $ property $
-      \block -> isValidBlock (block :: JSBlock)
+    it "generates valid JSStatement instances" $
+      property $
+        \stmt -> isValidStatement (stmt :: JSStatement)
+
+    it "generates JSBlock instances" $
+      property $
+        \block -> isValidBlock (block :: JSBlock)
 
   describe "Program generators" $ do
-    it "generates valid JSAST instances" $ property $
-      \ast -> isValidJSAST (ast :: JSAST)
-    
-    it "generates valid identifier strings" $ property $ do
-      ident <- genValidIdentifier
-      return $ not (null ident) && all (`elem` (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "_$")) ident
+    it "generates valid JSAST instances" $
+      property $
+        \ast -> isValidJSAST (ast :: JSAST)
+
+    it "generates valid identifier strings" $
+      property $ do
+        ident <- genValidIdentifier
+        return $ not (null ident) && all (`elem` (['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] ++ "_$")) ident
 
   describe "Complex structure generators" $ do
-    it "generates JSObjectProperty instances" $ property $
-      \prop -> isValidObjectProperty (prop :: JSObjectProperty)
-    
-    it "generates JSCommaList instances" $ property $
-      \list -> isValidCommaList (list :: JSCommaList JSExpression)
+    it "generates JSObjectProperty instances" $
+      property $
+        \prop -> isValidObjectProperty (prop :: JSObjectProperty)
+
+    it "generates JSCommaList instances" $
+      property $
+        \list -> isValidCommaList (list :: JSCommaList JSExpression)
 
 -- Helper functions for validation
 isValidExpression :: JSExpression -> Bool
@@ -66,7 +74,7 @@ isValidExpression expr = case expr of
   JSObjectLiteral _ _ _ -> True
   JSArrowExpression _ _ _ -> True
   JSFunctionExpression _ _ _ _ _ _ -> True
-  _ -> True  -- Accept all valid AST nodes
+  _ -> True -- Accept all valid AST nodes
 
 isValidBinOp :: JSBinOp -> Bool
 isValidBinOp op = case op of
@@ -86,7 +94,7 @@ isValidBinOp op = case op of
   JSBinOpOr _ -> True
   JSBinOpPlus _ -> True
   JSBinOpTimes _ -> True
-  _ -> True  -- Accept all valid binary operators
+  _ -> True -- Accept all valid binary operators
 
 isValidUnaryOp :: JSUnaryOp -> Bool
 isValidUnaryOp op = case op of
@@ -99,7 +107,7 @@ isValidUnaryOp op = case op of
   JSUnaryOpTilde _ -> True
   JSUnaryOpTypeof _ -> True
   JSUnaryOpVoid _ -> True
-  _ -> True  -- Accept all valid unary operators
+  _ -> True -- Accept all valid unary operators
 
 isValidStatement :: JSStatement -> Bool
 isValidStatement stmt = case stmt of
@@ -122,7 +130,7 @@ isValidStatement stmt = case stmt of
   JSVariable _ _ _ -> True
   JSWhile _ _ _ _ _ -> True
   JSWith _ _ _ _ _ _ -> True
-  _ -> True  -- Accept all valid statements
+  _ -> True -- Accept all valid statements
 
 isValidBlock :: JSBlock -> Bool
 isValidBlock (JSBlock _ _ _) = True

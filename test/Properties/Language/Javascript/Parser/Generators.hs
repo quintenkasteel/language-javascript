@@ -36,7 +36,7 @@
 --
 -- >>> sample (arbitrary :: Gen JSExpression)
 -- JSIdentifier (JSAnnot ...) "x"
--- JSDecimal (JSAnnot ...) "42" 
+-- JSDecimal (JSAnnot ...) "42"
 -- JSExpressionBinary (JSIdentifier ...) (JSBinOpPlus ...) (JSDecimal ...)
 --
 -- Generating invalid programs for error testing:
@@ -48,51 +48,51 @@
 --
 -- @since 0.7.1.0
 module Properties.Language.Javascript.Parser.Generators
-    ( -- * AST Node Generators
-      genJSExpression
-    , genJSStatement
-    , genJSBinOp
-    , genJSUnaryOp
-    , genJSAssignOp
-    , genJSAnnot
-    , genJSSemi
-    , genJSIdent
-    , genJSAST
-    
-      -- * Size-Controlled Generators
-    , genSizedExpression
-    , genSizedStatement
-    , genSizedProgram
-    
-      -- * Invalid JavaScript Generators
-    , genInvalidJavaScript
-    , genInvalidExpression
-    , genInvalidStatement
-    , genMalformedSyntax
-    
-      -- * Edge Case Generators
-    , genUnicodeEdgeCases
-    , genDeeplyNestedStructures
-    , genParserStressTests
-    , genBoundaryConditions
-    
-      -- * Utility Generators
-    , genValidIdentifier
-    , genValidNumber
-    , genValidString
-    , genCommaList
-    , genJSObjectPropertyList
-    ) where
+  ( -- * AST Node Generators
+    genJSExpression,
+    genJSStatement,
+    genJSBinOp,
+    genJSUnaryOp,
+    genJSAssignOp,
+    genJSAnnot,
+    genJSSemi,
+    genJSIdent,
+    genJSAST,
 
-import Test.QuickCheck
+    -- * Size-Controlled Generators
+    genSizedExpression,
+    genSizedStatement,
+    genSizedProgram,
+
+    -- * Invalid JavaScript Generators
+    genInvalidJavaScript,
+    genInvalidExpression,
+    genInvalidStatement,
+    genMalformedSyntax,
+
+    -- * Edge Case Generators
+    genUnicodeEdgeCases,
+    genDeeplyNestedStructures,
+    genParserStressTests,
+    genBoundaryConditions,
+
+    -- * Utility Generators
+    genValidIdentifier,
+    genValidNumber,
+    genValidString,
+    genCommaList,
+    genJSObjectPropertyList,
+  )
+where
+
 import Control.Monad (replicateM)
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.List as List
 import qualified Data.Text as Text
-import qualified Data.ByteString.Char8 as BS8
-
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..), tokenPosnEmpty)
 import qualified Language.JavaScript.Parser.Token as Token
+import Test.QuickCheck
 
 -- ---------------------------------------------------------------------
 -- Core AST Node Generators
@@ -130,32 +130,32 @@ genJSBinOp :: Gen JSBinOp
 genJSBinOp = do
   annot <- genJSAnnot
   elements
-    [ JSBinOpAnd annot
-    , JSBinOpBitAnd annot
-    , JSBinOpBitOr annot
-    , JSBinOpBitXor annot
-    , JSBinOpDivide annot
-    , JSBinOpEq annot
-    , JSBinOpExponentiation annot
-    , JSBinOpGe annot
-    , JSBinOpGt annot
-    , JSBinOpIn annot
-    , JSBinOpInstanceOf annot
-    , JSBinOpLe annot
-    , JSBinOpLsh annot
-    , JSBinOpLt annot
-    , JSBinOpMinus annot
-    , JSBinOpMod annot
-    , JSBinOpNeq annot
-    , JSBinOpOf annot
-    , JSBinOpOr annot
-    , JSBinOpNullishCoalescing annot
-    , JSBinOpPlus annot
-    , JSBinOpRsh annot
-    , JSBinOpStrictEq annot
-    , JSBinOpStrictNeq annot
-    , JSBinOpTimes annot
-    , JSBinOpUrsh annot
+    [ JSBinOpAnd annot,
+      JSBinOpBitAnd annot,
+      JSBinOpBitOr annot,
+      JSBinOpBitXor annot,
+      JSBinOpDivide annot,
+      JSBinOpEq annot,
+      JSBinOpExponentiation annot,
+      JSBinOpGe annot,
+      JSBinOpGt annot,
+      JSBinOpIn annot,
+      JSBinOpInstanceOf annot,
+      JSBinOpLe annot,
+      JSBinOpLsh annot,
+      JSBinOpLt annot,
+      JSBinOpMinus annot,
+      JSBinOpMod annot,
+      JSBinOpNeq annot,
+      JSBinOpOf annot,
+      JSBinOpOr annot,
+      JSBinOpNullishCoalescing annot,
+      JSBinOpPlus annot,
+      JSBinOpRsh annot,
+      JSBinOpStrictEq annot,
+      JSBinOpStrictNeq annot,
+      JSBinOpTimes annot,
+      JSBinOpUrsh annot
     ]
 
 -- | Generate arbitrary unary operators.
@@ -166,15 +166,15 @@ genJSUnaryOp :: Gen JSUnaryOp
 genJSUnaryOp = do
   annot <- genJSAnnot
   elements
-    [ JSUnaryOpDecr annot
-    , JSUnaryOpDelete annot
-    , JSUnaryOpIncr annot
-    , JSUnaryOpMinus annot
-    , JSUnaryOpNot annot
-    , JSUnaryOpPlus annot
-    , JSUnaryOpTilde annot
-    , JSUnaryOpTypeof annot
-    , JSUnaryOpVoid annot
+    [ JSUnaryOpDecr annot,
+      JSUnaryOpDelete annot,
+      JSUnaryOpIncr annot,
+      JSUnaryOpMinus annot,
+      JSUnaryOpNot annot,
+      JSUnaryOpPlus annot,
+      JSUnaryOpTilde annot,
+      JSUnaryOpTypeof annot,
+      JSUnaryOpVoid annot
     ]
 
 -- | Generate arbitrary assignment operators.
@@ -186,21 +186,21 @@ genJSAssignOp :: Gen JSAssignOp
 genJSAssignOp = do
   annot <- genJSAnnot
   elements
-    [ JSAssign annot
-    , JSTimesAssign annot
-    , JSDivideAssign annot
-    , JSModAssign annot
-    , JSPlusAssign annot
-    , JSMinusAssign annot
-    , JSLshAssign annot
-    , JSRshAssign annot
-    , JSUrshAssign annot
-    , JSBwAndAssign annot
-    , JSBwXorAssign annot
-    , JSBwOrAssign annot
-    , JSLogicalAndAssign annot
-    , JSLogicalOrAssign annot
-    , JSNullishAssign annot
+    [ JSAssign annot,
+      JSTimesAssign annot,
+      JSDivideAssign annot,
+      JSModAssign annot,
+      JSPlusAssign annot,
+      JSMinusAssign annot,
+      JSLshAssign annot,
+      JSRshAssign annot,
+      JSUrshAssign annot,
+      JSBwAndAssign annot,
+      JSBwXorAssign annot,
+      JSBwOrAssign annot,
+      JSLogicalAndAssign annot,
+      JSLogicalOrAssign annot,
+      JSNullishAssign annot
     ]
 
 -- | Generate arbitrary JavaScript annotations.
@@ -209,11 +209,12 @@ genJSAssignOp = do
 -- and comment data. Balanced between no annotation, space
 -- annotation, and full position annotations.
 genJSAnnot :: Gen JSAnnot
-genJSAnnot = frequency
-  [ (3, return JSNoAnnot)
-  , (1, return JSAnnotSpace)
-  , (1, JSAnnot <$> genTokenPosn <*> genCommentList)
-  ]
+genJSAnnot =
+  frequency
+    [ (3, return JSNoAnnot),
+      (1, return JSAnnotSpace),
+      (1, JSAnnot <$> genTokenPosn <*> genCommentList)
+    ]
   where
     genTokenPosn = do
       addr <- choose (0, 10000)
@@ -221,11 +222,12 @@ genJSAnnot = frequency
       col <- choose (0, 200)
       return (TokenPn addr line col)
     genCommentList = listOf genCommentAnnotation
-    genCommentAnnotation = oneof
-      [ Token.CommentA <$> genTokenPosn <*> genValidString
-      , Token.WhiteSpace <$> genTokenPosn <*> genWhitespace
-      , pure Token.NoComment
-      ]
+    genCommentAnnotation =
+      oneof
+        [ Token.CommentA <$> genTokenPosn <*> genValidString,
+          Token.WhiteSpace <$> genTokenPosn <*> genWhitespace,
+          pure Token.NoComment
+        ]
     genWhitespace = elements [" ", "\t", "\n", "\r\n"]
 
 -- | Generate arbitrary semicolon tokens.
@@ -233,20 +235,22 @@ genJSAnnot = frequency
 -- Creates semicolon tokens including explicit semicolons with
 -- annotations and automatic semicolon insertion markers.
 genJSSemi :: Gen JSSemi
-genJSSemi = oneof
-  [ JSSemi <$> genJSAnnot
-  , return JSSemiAuto
-  ]
+genJSSemi =
+  oneof
+    [ JSSemi <$> genJSAnnot,
+      return JSSemiAuto
+    ]
 
 -- | Generate arbitrary JavaScript identifiers.
 --
 -- Creates valid identifier objects including simple names and
 -- reserved word identifiers with proper annotation information.
 genJSIdent :: Gen JSIdent
-genJSIdent = oneof
-  [ JSIdentName <$> genJSAnnot <*> genValidIdentifier
-  , pure JSIdentNone
-  ]
+genJSIdent =
+  oneof
+    [ JSIdentName <$> genJSAnnot <*> genValidIdentifier,
+      pure JSIdentNone
+    ]
 
 -- | Generate arbitrary JavaScript AST roots.
 --
@@ -254,13 +258,14 @@ genJSIdent = oneof
 -- statements, expressions, and literals with proper nesting
 -- and realistic structure.
 genJSAST :: Gen JSAST
-genJSAST = oneof
-  [ JSAstProgram <$> genStatementList <*> genJSAnnot
-  , JSAstModule <$> genModuleItemList <*> genJSAnnot
-  , JSAstStatement <$> genJSStatement <*> genJSAnnot
-  , JSAstExpression <$> genJSExpression <*> genJSAnnot
-  , JSAstLiteral <$> genLiteralExpression <*> genJSAnnot
-  ]
+genJSAST =
+  oneof
+    [ JSAstProgram <$> genStatementList <*> genJSAnnot,
+      JSAstModule <$> genModuleItemList <*> genJSAnnot,
+      JSAstStatement <$> genJSStatement <*> genJSAnnot,
+      JSAstExpression <$> genJSExpression <*> genJSAnnot,
+      JSAstLiteral <$> genLiteralExpression <*> genJSAnnot
+    ]
   where
     genStatementList = listOf genJSStatement
     genModuleItemList = listOf genJSModuleItem
@@ -276,15 +281,16 @@ genJSAST = oneof
 -- for recursive calls to ensure termination.
 genSizedExpression :: Int -> Gen JSExpression
 genSizedExpression 0 = genAtomicExpression
-genSizedExpression n = frequency
-  [ (3, genAtomicExpression)
-  , (2, genBinaryExpression n)
-  , (2, genUnaryExpression n)
-  , (1, genCallExpression n)
-  , (1, genMemberExpression n)
-  , (1, genArrayLiteral n)
-  , (1, genObjectLiteral n)
-  ]
+genSizedExpression n =
+  frequency
+    [ (3, genAtomicExpression),
+      (2, genBinaryExpression n),
+      (2, genUnaryExpression n),
+      (1, genCallExpression n),
+      (1, genMemberExpression n),
+      (1, genArrayLiteral n),
+      (1, genObjectLiteral n)
+    ]
 
 -- | Generate sized JavaScript statement with complexity control.
 --
@@ -293,20 +299,21 @@ genSizedExpression n = frequency
 -- conditional statement depth for balanced generation.
 genSizedStatement :: Int -> Gen JSStatement
 genSizedStatement 0 = genAtomicStatement
-genSizedStatement n = frequency
-  [ (4, genAtomicStatement)
-  , (2, genBlockStatement n)
-  , (2, genIfStatement n)
-  , (1, genForStatement n)
-  , (1, genActualWhileStatement n)
-  , (1, genDoWhileStatement n)
-  , (1, genFunctionStatement n)
-  , (1, genVariableStatement)
-  , (1, genSwitchStatement n)
-  , (1, genTryStatement n)
-  , (1, genThrowStatement)
-  , (1, genWithStatement n)
-  ]
+genSizedStatement n =
+  frequency
+    [ (4, genAtomicStatement),
+      (2, genBlockStatement n),
+      (2, genIfStatement n),
+      (1, genForStatement n),
+      (1, genActualWhileStatement n),
+      (1, genDoWhileStatement n),
+      (1, genFunctionStatement n),
+      (1, genVariableStatement),
+      (1, genSwitchStatement n),
+      (1, genTryStatement n),
+      (1, genThrowStatement),
+      (1, genWithStatement n)
+    ]
 
 -- | Generate sized JavaScript program with controlled complexity.
 --
@@ -337,13 +344,14 @@ genSizedProgram size = do
 -- "var 123abc = value;"         -- Invalid identifier start
 -- "if (condition { stmt; }"     -- Missing closing parenthesis
 genInvalidJavaScript :: Gen String
-genInvalidJavaScript = oneof
-  [ genMissingSyntaxTokens
-  , genInvalidIdentifiers
-  , genUnmatchedDelimiters
-  , genIncompleteStatements
-  , genInvalidOperatorSequences
-  ]
+genInvalidJavaScript =
+  oneof
+    [ genMissingSyntaxTokens,
+      genInvalidIdentifiers,
+      genUnmatchedDelimiters,
+      genIncompleteStatements,
+      genInvalidOperatorSequences
+    ]
 
 -- | Generate syntactically invalid expressions.
 --
@@ -351,12 +359,13 @@ genInvalidJavaScript = oneof
 -- error recovery. Focuses on operator precedence violations,
 -- missing operands, and invalid token sequences.
 genInvalidExpression :: Gen String
-genInvalidExpression = oneof
-  [ genInvalidBinaryOp
-  , genInvalidUnaryOp
-  , genMissingOperands
-  , genInvalidLiterals
-  ]
+genInvalidExpression =
+  oneof
+    [ genInvalidBinaryOp,
+      genInvalidUnaryOp,
+      genMissingOperands,
+      genInvalidLiterals
+    ]
 
 -- | Generate syntactically invalid statements.
 --
@@ -364,12 +373,13 @@ genInvalidExpression = oneof
 -- control flow, missing semicolons, and invalid declarations
 -- for comprehensive error handling testing.
 genInvalidStatement :: Gen String
-genInvalidStatement = oneof
-  [ genIncompleteIf
-  , genInvalidFor
-  , genMalformedFunction
-  , genInvalidDeclaration
-  ]
+genInvalidStatement =
+  oneof
+    [ genIncompleteIf,
+      genInvalidFor,
+      genMalformedFunction,
+      genInvalidDeclaration
+    ]
 
 -- | Generate malformed syntax patterns.
 --
@@ -377,14 +387,15 @@ genInvalidStatement = oneof
 -- covering all major syntactic categories for exhaustive
 -- parser error testing coverage.
 genMalformedSyntax :: Gen String
-genMalformedSyntax = oneof
-  [ genInvalidTokenSequences
-  , genStructuralErrors
-  , genContextErrors
-  ]
+genMalformedSyntax =
+  oneof
+    [ genInvalidTokenSequences,
+      genStructuralErrors,
+      genContextErrors
+    ]
 
 -- ---------------------------------------------------------------------
--- Edge Case Generators  
+-- Edge Case Generators
 -- ---------------------------------------------------------------------
 
 -- | Generate Unicode edge cases for identifier testing.
@@ -393,12 +404,13 @@ genMalformedSyntax = oneof
 -- and boundary conditions to test lexer Unicode handling and
 -- identifier validation edge cases.
 genUnicodeEdgeCases :: Gen String
-genUnicodeEdgeCases = oneof
-  [ genUnicodeIdentifiers
-  , genSurrogatePairs
-  , genCombiningCharacters
-  , genNonBMPCharacters
-  ]
+genUnicodeEdgeCases =
+  oneof
+    [ genUnicodeIdentifiers,
+      genSurrogatePairs,
+      genCombiningCharacters,
+      genNonBMPCharacters
+    ]
 
 -- | Generate deeply nested JavaScript structures.
 --
@@ -406,12 +418,13 @@ genUnicodeEdgeCases = oneof
 -- stack limits and performance. Includes function nesting,
 -- object nesting, and expression nesting stress tests.
 genDeeplyNestedStructures :: Gen String
-genDeeplyNestedStructures = oneof
-  [ genDeeplyNestedFunctions
-  , genDeeplyNestedObjects
-  , genDeeplyNestedArrays
-  , genDeeplyNestedExpressions
-  ]
+genDeeplyNestedStructures =
+  oneof
+    [ genDeeplyNestedFunctions,
+      genDeeplyNestedObjects,
+      genDeeplyNestedArrays,
+      genDeeplyNestedExpressions
+    ]
 
 -- | Generate parser stress test cases.
 --
@@ -419,12 +432,13 @@ genDeeplyNestedStructures = oneof
 -- complex expressions, and edge case combinations designed
 -- to test parser performance and robustness.
 genParserStressTests :: Gen String
-genParserStressTests = oneof
-  [ genLargePrograms
-  , genComplexExpressions
-  , genRepetitiveStructures
-  , genEdgeCaseCombinations
-  ]
+genParserStressTests =
+  oneof
+    [ genLargePrograms,
+      genComplexExpressions,
+      genRepetitiveStructures,
+      genEdgeCaseCombinations
+    ]
 
 -- | Generate boundary condition test cases.
 --
@@ -432,12 +446,13 @@ genParserStressTests = oneof
 -- including maximum identifier lengths, numeric limits,
 -- and string length boundaries.
 genBoundaryConditions :: Gen String
-genBoundaryConditions = oneof
-  [ genMaxLengthIdentifiers
-  , genNumericBoundaries
-  , genStringBoundaries
-  , genNestingLimits
-  ]
+genBoundaryConditions =
+  oneof
+    [ genMaxLengthIdentifiers,
+      genNumericBoundaries,
+      genStringBoundaries,
+      genNestingLimits
+    ]
 
 -- ---------------------------------------------------------------------
 -- Utility Generators
@@ -457,27 +472,64 @@ genValidIdentifier = do
     then genValidIdentifier
     else return identifier
   where
-    genIdentifierStart = oneof
-      [ choose ('a', 'z')
-      , choose ('A', 'Z')
-      , return '_'
-      , return '$'
-      ]
-    genIdentifierPart = oneof
-      [ choose ('a', 'z')
-      , choose ('A', 'Z')
-      , choose ('0', '9')
-      , return '_'
-      , return '$'
-      ]
-    reservedWords = 
-      [ "break", "case", "catch", "continue", "debugger", "default"
-      , "delete", "do", "else", "finally", "for", "function", "if"
-      , "in", "instanceof", "new", "return", "switch", "this", "throw"
-      , "try", "typeof", "var", "void", "while", "with", "class"
-      , "const", "enum", "export", "extends", "import", "super"
-      , "implements", "interface", "let", "package", "private"
-      , "protected", "public", "static", "yield"
+    genIdentifierStart =
+      oneof
+        [ choose ('a', 'z'),
+          choose ('A', 'Z'),
+          return '_',
+          return '$'
+        ]
+    genIdentifierPart =
+      oneof
+        [ choose ('a', 'z'),
+          choose ('A', 'Z'),
+          choose ('0', '9'),
+          return '_',
+          return '$'
+        ]
+    reservedWords =
+      [ "break",
+        "case",
+        "catch",
+        "continue",
+        "debugger",
+        "default",
+        "delete",
+        "do",
+        "else",
+        "finally",
+        "for",
+        "function",
+        "if",
+        "in",
+        "instanceof",
+        "new",
+        "return",
+        "switch",
+        "this",
+        "throw",
+        "try",
+        "typeof",
+        "var",
+        "void",
+        "while",
+        "with",
+        "class",
+        "const",
+        "enum",
+        "export",
+        "extends",
+        "import",
+        "super",
+        "implements",
+        "interface",
+        "let",
+        "package",
+        "private",
+        "protected",
+        "public",
+        "static",
+        "yield"
       ]
 
 -- | Generate valid JavaScript number literal.
@@ -486,18 +538,19 @@ genValidIdentifier = do
 -- notation, hexadecimal, binary, and octal formats following
 -- JavaScript numeric literal syntax rules.
 genValidNumber :: Gen String
-genValidNumber = oneof
-  [ genDecimalInteger
-  , genDecimalFloat
-  , genScientificNotation
-  , genHexadecimal
-  , genBinary
-  , genOctal
-  ]
+genValidNumber =
+  oneof
+    [ genDecimalInteger,
+      genDecimalFloat,
+      genScientificNotation,
+      genHexadecimal,
+      genBinary,
+      genOctal
+    ]
   where
     genDecimalInteger = show <$> (arbitrary :: Gen Integer)
     genDecimalFloat = do
-      integral <- abs <$> (arbitrary :: Gen Integer) 
+      integral <- abs <$> (arbitrary :: Gen Integer)
       fractional <- abs <$> (arbitrary :: Gen Integer)
       return (show integral ++ "." ++ show fractional)
     genScientificNotation = do
@@ -507,19 +560,22 @@ genValidNumber = oneof
     genHexadecimal = do
       num <- abs <$> (arbitrary :: Gen Integer)
       return ("0x" ++ showHex num "")
-      where showHex 0 acc = if null acc then "0" else acc
-            showHex n acc = showHex (n `div` 16) (hexDigit (n `mod` 16) : acc)
-            hexDigit d = "0123456789abcdef" !! fromInteger d
+      where
+        showHex 0 acc = if null acc then "0" else acc
+        showHex n acc = showHex (n `div` 16) (hexDigit (n `mod` 16) : acc)
+        hexDigit d = "0123456789abcdef" !! fromInteger d
     genBinary = do
       num <- abs <$> (arbitrary :: Gen Int)
       return ("0b" ++ showBin num "")
-      where showBin 0 acc = if null acc then "0" else acc
-            showBin n acc = showBin (n `div` 2) (show (n `mod` 2) ++ acc)
+      where
+        showBin 0 acc = if null acc then "0" else acc
+        showBin n acc = showBin (n `div` 2) (show (n `mod` 2) ++ acc)
     genOctal = do
       num <- abs <$> (arbitrary :: Gen Int)
       return ("0o" ++ showOct num "")
-      where showOct 0 acc = if null acc then "0" else acc
-            showOct n acc = showOct (n `div` 8) (show (n `mod` 8) ++ acc)
+      where
+        showOct 0 acc = if null acc then "0" else acc
+        showOct n acc = showOct (n `div` 8) (show (n `mod` 8) ++ acc)
 
 -- | Generate valid JavaScript string literal.
 --
@@ -527,11 +583,12 @@ genValidNumber = oneof
 -- and special character support including Unicode escapes
 -- and template literal syntax.
 genValidString :: Gen String
-genValidString = oneof
-  [ genSingleQuotedString
-  , genDoubleQuotedString
-  , genTemplateLiteral
-  ]
+genValidString =
+  oneof
+    [ genSingleQuotedString,
+      genDoubleQuotedString,
+      genTemplateLiteral
+    ]
   where
     genSingleQuotedString = do
       content <- genStringContent '\''
@@ -543,29 +600,32 @@ genValidString = oneof
       content <- genTemplateContent
       return ("`" ++ content ++ "`")
     genStringContent quote = listOf (genStringChar quote)
-    genStringChar quote = oneof
-      [ choose ('a', 'z')
-      , choose ('A', 'Z')
-      , choose ('0', '9')
-      , return ' '
-      ]
-    genEscapedChar quote = oneof
-      [ return "\\\\"
-      , return "\\\'"
-      , return "\\\""
-      , return "\\n"
-      , return "\\t"
-      , return "\\r"
-      , if quote == '\'' then return "\\'" else return "\""
-      ]
+    genStringChar quote =
+      oneof
+        [ choose ('a', 'z'),
+          choose ('A', 'Z'),
+          choose ('0', '9'),
+          return ' '
+        ]
+    genEscapedChar quote =
+      oneof
+        [ return "\\\\",
+          return "\\\'",
+          return "\\\"",
+          return "\\n",
+          return "\\t",
+          return "\\r",
+          if quote == '\'' then return "\\'" else return "\""
+        ]
     genTemplateContent = listOf genTemplateChar
-    genTemplateChar = oneof
-      [ choose ('a', 'z')
-      , choose ('A', 'Z')
-      , choose ('0', '9')
-      , return ' '
-      , return '\n'
-      ]
+    genTemplateChar =
+      oneof
+        [ choose ('a', 'z'),
+          choose ('A', 'Z'),
+          choose ('0', '9'),
+          return ' ',
+          return '\n'
+        ]
 
 -- | Generate comma-separated list with proper structure.
 --
@@ -573,15 +633,16 @@ genValidString = oneof
 -- and trailing comma handling for function parameters,
 -- array elements, and object properties.
 genCommaList :: Gen a -> Gen (JSCommaList a)
-genCommaList genElement = oneof
-  [ return JSLNil
-  , JSLOne <$> genElement
-  , do
-      first <- genElement
-      comma <- genJSAnnot
-      rest <- genElement
-      return (JSLCons (JSLOne first) comma rest)
-  ]
+genCommaList genElement =
+  oneof
+    [ return JSLNil,
+      JSLOne <$> genElement,
+      do
+        first <- genElement
+        comma <- genJSAnnot
+        rest <- genElement
+        return (JSLCons (JSLOne first) comma rest)
+    ]
 
 -- | Generate JavaScript object property list.
 --
@@ -589,13 +650,14 @@ genCommaList genElement = oneof
 -- including data properties, getters, setters, and methods
 -- with proper comma separation and syntax.
 genJSObjectPropertyList :: Gen JSObjectPropertyList
-genJSObjectPropertyList = oneof
-  [ JSCTLNone <$> genCommaList genJSObjectProperty
-  , do
-      list <- genCommaList genJSObjectProperty
-      comma <- genJSAnnot
-      return (JSCTLComma list comma)
-  ]
+genJSObjectPropertyList =
+  oneof
+    [ JSCTLNone <$> genCommaList genJSObjectProperty,
+      do
+        list <- genCommaList genJSObjectProperty
+        comma <- genJSAnnot
+        return (JSCTLComma list comma)
+    ]
 
 -- ---------------------------------------------------------------------
 -- Helper Generators for Complex Structures
@@ -603,34 +665,37 @@ genJSObjectPropertyList = oneof
 
 -- | Generate atomic (non-recursive) expressions.
 genAtomicExpression :: Gen JSExpression
-genAtomicExpression = oneof
-  [ genLiteralExpression
-  , genIdentifierExpression
-  , genThisExpression
-  ]
+genAtomicExpression =
+  oneof
+    [ genLiteralExpression,
+      genIdentifierExpression,
+      genThisExpression
+    ]
 
 -- | Generate atomic (non-recursive) statements.
 genAtomicStatement :: Gen JSStatement
-genAtomicStatement = oneof
-  [ genExpressionStatement
-  , genReturnStatement
-  , genBreakStatement
-  , genContinueStatement
-  , genEmptyStatement
-  ]
+genAtomicStatement =
+  oneof
+    [ genExpressionStatement,
+      genReturnStatement,
+      genBreakStatement,
+      genContinueStatement,
+      genEmptyStatement
+    ]
 
 -- | Generate literal expressions.
 genLiteralExpression :: Gen JSExpression
-genLiteralExpression = oneof
-  [ JSDecimal <$> genJSAnnot <*> genValidNumber
-  , JSLiteral <$> genJSAnnot <*> genBooleanLiteral
-  , JSStringLiteral <$> genJSAnnot <*> genValidString
-  , JSHexInteger <$> genJSAnnot <*> genHexNumber
-  , JSBinaryInteger <$> genJSAnnot <*> genBinaryNumber
-  , JSOctal <$> genJSAnnot <*> genOctalNumber
-  , JSBigIntLiteral <$> genJSAnnot <*> genBigIntNumber
-  , JSRegEx <$> genJSAnnot <*> genRegexLiteral
-  ]
+genLiteralExpression =
+  oneof
+    [ JSDecimal <$> genJSAnnot <*> genValidNumber,
+      JSLiteral <$> genJSAnnot <*> genBooleanLiteral,
+      JSStringLiteral <$> genJSAnnot <*> genValidString,
+      JSHexInteger <$> genJSAnnot <*> genHexNumber,
+      JSBinaryInteger <$> genJSAnnot <*> genBinaryNumber,
+      JSOctal <$> genJSAnnot <*> genOctalNumber,
+      JSBigIntLiteral <$> genJSAnnot <*> genBigIntNumber,
+      JSRegEx <$> genJSAnnot <*> genRegexLiteral
+    ]
   where
     genBooleanLiteral = elements ["true", "false", "null", "undefined"]
     genHexNumber = ("0x" ++) <$> genHexDigits
@@ -681,10 +746,11 @@ genCallExpression n = do
 
 -- | Generate member expressions with size control.
 genMemberExpression :: Int -> Gen JSExpression
-genMemberExpression n = oneof
-  [ genMemberDot n
-  , genMemberSquare n
-  ]
+genMemberExpression n =
+  oneof
+    [ genMemberDot n,
+      genMemberSquare n
+    ]
   where
     genMemberDot size = do
       obj <- genSizedExpression (size `div` 2)
@@ -760,10 +826,11 @@ genBlockStatement n = do
 
 -- | Generate if statements with size control.
 genIfStatement :: Int -> Gen JSStatement
-genIfStatement n = oneof
-  [ genSimpleIf n
-  , genIfElse n
-  ]
+genIfStatement n =
+  oneof
+    [ genSimpleIf n,
+      genIfElse n
+    ]
   where
     genSimpleIf size = do
       ifAnnot <- genJSAnnot
@@ -821,18 +888,20 @@ genFunctionStatement n = do
 
 -- | Generate module items.
 genJSModuleItem :: Gen JSModuleItem
-genJSModuleItem = oneof
-  [ JSModuleImportDeclaration <$> genJSAnnot <*> genJSImportDeclaration
-  , JSModuleExportDeclaration <$> genJSAnnot <*> genJSExportDeclaration
-  , JSModuleStatementListItem <$> genJSStatement
-  ]
+genJSModuleItem =
+  oneof
+    [ JSModuleImportDeclaration <$> genJSAnnot <*> genJSImportDeclaration,
+      JSModuleExportDeclaration <$> genJSAnnot <*> genJSExportDeclaration,
+      JSModuleStatementListItem <$> genJSStatement
+    ]
 
 -- | Generate import declarations.
 genJSImportDeclaration :: Gen JSImportDeclaration
-genJSImportDeclaration = oneof
-  [ genImportWithClause
-  , genBareImport
-  ]
+genJSImportDeclaration =
+  oneof
+    [ genImportWithClause,
+      genBareImport
+    ]
   where
     genImportWithClause = do
       clause <- genJSImportClause
@@ -849,12 +918,13 @@ genJSImportDeclaration = oneof
 
 -- | Generate export declarations.
 genJSExportDeclaration :: Gen JSExportDeclaration
-genJSExportDeclaration = oneof
-  [ genExportAllFrom
-  , genExportFrom
-  , genExportLocals
-  , genExportStatement
-  ]
+genJSExportDeclaration =
+  oneof
+    [ genExportAllFrom,
+      genExportFrom,
+      genExportLocals,
+      genExportStatement
+    ]
   where
     genExportAllFrom = do
       star <- genJSBinOp
@@ -885,14 +955,15 @@ genJSExportClause = do
 
 -- | Generate export specifiers.
 genJSExportSpecifier :: Gen JSExportSpecifier
-genJSExportSpecifier = oneof
-  [ JSExportSpecifier <$> genJSIdent
-  , do
-      name1 <- genJSIdent
-      asAnnot <- genJSAnnot
-      name2 <- genJSIdent
-      return (JSExportSpecifierAs name1 asAnnot name2)
-  ]
+genJSExportSpecifier =
+  oneof
+    [ JSExportSpecifier <$> genJSIdent,
+      do
+        name1 <- genJSIdent
+        asAnnot <- genJSAnnot
+        name2 <- genJSIdent
+        return (JSExportSpecifierAs name1 asAnnot name2)
+    ]
 
 -- | Generate variable statements.
 genVariableStatement :: Gen JSStatement
@@ -902,10 +973,11 @@ genVariableStatement = do
   semi <- genJSSemi
   return (JSVariable annot decls semi)
   where
-    genVariableDeclaration = oneof
-      [ genJSIdentifier
-      , genJSVarInit
-      ]
+    genVariableDeclaration =
+      oneof
+        [ genJSIdentifier,
+          genJSVarInit
+        ]
     genJSIdentifier = JSIdentifier <$> genJSAnnot <*> genValidIdentifier
     genJSVarInit = do
       ident <- genJSIdentifier
@@ -915,13 +987,14 @@ genVariableStatement = do
 
 -- | Generate variable initializers.
 genJSVarInitializer :: Gen JSVarInitializer
-genJSVarInitializer = oneof
-  [ return JSVarInitNone
-  , do
-      annot <- genJSAnnot
-      expr <- genJSExpression
-      return (JSVarInit annot expr)
-  ]
+genJSVarInitializer =
+  oneof
+    [ return JSVarInitNone,
+      do
+        annot <- genJSAnnot
+        expr <- genJSExpression
+        return (JSVarInit annot expr)
+    ]
 
 -- | Generate while statements with size control.
 genActualWhileStatement :: Int -> Gen JSStatement
@@ -948,10 +1021,11 @@ genSwitchStatement n = do
 
 -- | Generate switch case parts.
 genJSSwitchParts :: Int -> Gen JSSwitchParts
-genJSSwitchParts n = oneof
-  [ genCaseClause n
-  , genDefaultClause n
-  ]
+genJSSwitchParts n =
+  oneof
+    [ genCaseClause n,
+      genDefaultClause n
+    ]
   where
     genCaseClause size = do
       caseAnnot <- genJSAnnot
@@ -976,10 +1050,11 @@ genTryStatement n = do
 
 -- | Generate try-catch clauses.
 genJSTryCatch :: Int -> Gen JSTryCatch
-genJSTryCatch n = oneof
-  [ genSimpleCatch n
-  , genConditionalCatch n
-  ]
+genJSTryCatch n =
+  oneof
+    [ genSimpleCatch n,
+      genConditionalCatch n
+    ]
   where
     genSimpleCatch size = do
       catchAnnot <- genJSAnnot
@@ -1000,13 +1075,14 @@ genJSTryCatch n = oneof
 
 -- | Generate try-finally clauses.
 genJSTryFinally :: Int -> Gen JSTryFinally
-genJSTryFinally n = oneof
-  [ return JSNoFinally
-  , do
-      finallyAnnot <- genJSAnnot
-      block <- genJSBlock n
-      return (JSFinally finallyAnnot block)
-  ]
+genJSTryFinally n =
+  oneof
+    [ return JSNoFinally,
+      do
+        finallyAnnot <- genJSAnnot
+        block <- genJSBlock n
+        return (JSFinally finallyAnnot block)
+    ]
 
 -- | Generate throw statements.
 genThrowStatement :: Gen JSStatement
@@ -1033,105 +1109,118 @@ genWithStatement n = do
 
 -- | Generate missing syntax tokens.
 genMissingSyntaxTokens :: Gen String
-genMissingSyntaxTokens = oneof
-  [ return "function ( { return x; }"  -- Missing function name
-  , return "if (x { return; }"         -- Missing closing paren
-  , return "for (var i = 0 i < 10; i++)"  -- Missing semicolon
-  , return "{ var x = 42"              -- Missing closing brace
-  ]
+genMissingSyntaxTokens =
+  oneof
+    [ return "function ( { return x; }", -- Missing function name
+      return "if (x { return; }", -- Missing closing paren
+      return "for (var i = 0 i < 10; i++)", -- Missing semicolon
+      return "{ var x = 42" -- Missing closing brace
+    ]
 
 -- | Generate invalid identifiers.
 genInvalidIdentifiers :: Gen String
-genInvalidIdentifiers = oneof
-  [ return "var 123abc = 42;"          -- Identifier starts with digit
-  , return "let class = 'test';"       -- Reserved word as identifier
-  , return "const @invalid = true;"    -- Invalid character in identifier
-  , return "function 2bad() {}"        -- Function name starts with digit
-  ]
+genInvalidIdentifiers =
+  oneof
+    [ return "var 123abc = 42;", -- Identifier starts with digit
+      return "let class = 'test';", -- Reserved word as identifier
+      return "const @invalid = true;", -- Invalid character in identifier
+      return "function 2bad() {}" -- Function name starts with digit
+    ]
 
 -- | Generate unmatched delimiters.
 genUnmatchedDelimiters :: Gen String
-genUnmatchedDelimiters = oneof
-  [ return "if (condition { stmt; }"   -- Missing closing paren
-  , return "function test( { return; }" -- Missing closing paren
-  , return "var arr = [1, 2, 3;"       -- Missing closing bracket
-  , return "obj = { key: value;"       -- Missing closing brace
-  ]
+genUnmatchedDelimiters =
+  oneof
+    [ return "if (condition { stmt; }", -- Missing closing paren
+      return "function test( { return; }", -- Missing closing paren
+      return "var arr = [1, 2, 3;", -- Missing closing bracket
+      return "obj = { key: value;" -- Missing closing brace
+    ]
 
 -- | Generate incomplete statements.
 genIncompleteStatements :: Gen String
-genIncompleteStatements = oneof
-  [ return "if (true)"                 -- Missing statement body
-  , return "for (var i = 0; i < 10;"  -- Incomplete for loop
-  , return "function test()"           -- Missing function body
-  , return "var x ="                   -- Missing initializer
-  ]
+genIncompleteStatements =
+  oneof
+    [ return "if (true)", -- Missing statement body
+      return "for (var i = 0; i < 10;", -- Incomplete for loop
+      return "function test()", -- Missing function body
+      return "var x =" -- Missing initializer
+    ]
 
 -- | Generate invalid operator sequences.
 genInvalidOperatorSequences :: Gen String
-genInvalidOperatorSequences = oneof
-  [ return "x ++ ++"                   -- Double increment
-  , return "a = = b"                   -- Spaced assignment
-  , return "x + + y"                   -- Spaced addition
-  , return "!!"                        -- Double negation without operand
-  ]
+genInvalidOperatorSequences =
+  oneof
+    [ return "x ++ ++", -- Double increment
+      return "a = = b", -- Spaced assignment
+      return "x + + y", -- Spaced addition
+      return "!!" -- Double negation without operand
+    ]
 
 -- Additional invalid syntax generators...
 genInvalidBinaryOp :: Gen String
-genInvalidBinaryOp = oneof
-  [ return "x + + y"
-  , return "a * / b"
-  , return "c && || d"
-  ]
+genInvalidBinaryOp =
+  oneof
+    [ return "x + + y",
+      return "a * / b",
+      return "c && || d"
+    ]
 
 genInvalidUnaryOp :: Gen String
-genInvalidUnaryOp = oneof
-  [ return "++x++"
-  , return "!!!"
-  , return "typeof typeof"
-  ]
+genInvalidUnaryOp =
+  oneof
+    [ return "++x++",
+      return "!!!",
+      return "typeof typeof"
+    ]
 
 genMissingOperands :: Gen String
-genMissingOperands = oneof
-  [ return "+ 5"
-  , return "* 10"
-  , return "&& true"
-  ]
+genMissingOperands =
+  oneof
+    [ return "+ 5",
+      return "* 10",
+      return "&& true"
+    ]
 
 genInvalidLiterals :: Gen String
-genInvalidLiterals = oneof
-  [ return "0x"         -- Hex without digits
-  , return "0b"         -- Binary without digits
-  , return "1.2.3"      -- Multiple decimal points
-  ]
+genInvalidLiterals =
+  oneof
+    [ return "0x", -- Hex without digits
+      return "0b", -- Binary without digits
+      return "1.2.3" -- Multiple decimal points
+    ]
 
 genIncompleteIf :: Gen String
-genIncompleteIf = oneof
-  [ return "if (true)"
-  , return "if true { }"
-  , return "if (condition else"
-  ]
+genIncompleteIf =
+  oneof
+    [ return "if (true)",
+      return "if true { }",
+      return "if (condition else"
+    ]
 
 genInvalidFor :: Gen String
-genInvalidFor = oneof
-  [ return "for (;;; i++) {}"
-  , return "for (var i =; i < 10; i++)"
-  , return "for (var i = 0 i < 10; i++)"
-  ]
+genInvalidFor =
+  oneof
+    [ return "for (;;; i++) {}",
+      return "for (var i =; i < 10; i++)",
+      return "for (var i = 0 i < 10; i++)"
+    ]
 
 genMalformedFunction :: Gen String
-genMalformedFunction = oneof
-  [ return "function ( { return; }"
-  , return "function test(a b) {}"
-  , return "function test() return 42;"
-  ]
+genMalformedFunction =
+  oneof
+    [ return "function ( { return; }",
+      return "function test(a b) {}",
+      return "function test() return 42;"
+    ]
 
 genInvalidDeclaration :: Gen String
-genInvalidDeclaration = oneof
-  [ return "var ;"
-  , return "let = 42;"
-  , return "const x;"
-  ]
+genInvalidDeclaration =
+  oneof
+    [ return "var ;",
+      return "let = 42;",
+      return "const x;"
+    ]
 
 genInvalidTokenSequences :: Gen String
 genInvalidTokenSequences = return "{{ }} (( )) [[ ]]"
@@ -1189,12 +1278,13 @@ genMaxLengthIdentifiers = do
   return ("var " ++ longId ++ " = 42;")
 
 genNumericBoundaries :: Gen String
-genNumericBoundaries = oneof
-  [ return "var max = 9007199254740991;"  -- Number.MAX_SAFE_INTEGER
-  , return "var min = -9007199254740991;" -- Number.MIN_SAFE_INTEGER
-  , return "var inf = Infinity;"
-  , return "var ninf = -Infinity;"
-  ]
+genNumericBoundaries =
+  oneof
+    [ return "var max = 9007199254740991;", -- Number.MAX_SAFE_INTEGER
+      return "var min = -9007199254740991;", -- Number.MIN_SAFE_INTEGER
+      return "var inf = Infinity;",
+      return "var ninf = -Infinity;"
+    ]
 
 genStringBoundaries :: Gen String
 genStringBoundaries = do
@@ -1209,18 +1299,20 @@ genArrayElementList :: Int -> Gen [JSArrayElement]
 genArrayElementList n = listOf (genJSArrayElement n)
 
 genJSArrayElement :: Int -> Gen JSArrayElement
-genJSArrayElement n = oneof
-  [ JSArrayElement <$> genSizedExpression n
-  , JSArrayComma <$> genJSAnnot
-  ]
+genJSArrayElement n =
+  oneof
+    [ JSArrayElement <$> genSizedExpression n,
+      JSArrayComma <$> genJSAnnot
+    ]
 
 genJSObjectProperty :: Gen JSObjectProperty
-genJSObjectProperty = oneof
-  [ genDataProperty
-  , genMethodProperty
-  , genIdentRef
-  , genObjectSpread
-  ]
+genJSObjectProperty =
+  oneof
+    [ genDataProperty,
+      genMethodProperty,
+      genIdentRef,
+      genObjectSpread
+    ]
   where
     genDataProperty = do
       name <- genJSPropertyName
@@ -1240,11 +1332,12 @@ genJSObjectProperty = oneof
       return (JSObjectSpread spread expr)
 
 genJSPropertyName :: Gen JSPropertyName
-genJSPropertyName = oneof
-  [ JSPropertyIdent <$> genJSAnnot <*> genValidIdentifier
-  , JSPropertyString <$> genJSAnnot <*> genValidString
-  , JSPropertyNumber <$> genJSAnnot <*> genValidNumber
-  ]
+genJSPropertyName =
+  oneof
+    [ JSPropertyIdent <$> genJSAnnot <*> genValidIdentifier,
+      JSPropertyString <$> genJSAnnot <*> genValidString,
+      JSPropertyNumber <$> genJSAnnot <*> genValidNumber
+    ]
 
 genJSBlock :: Int -> Gen JSBlock
 genJSBlock n = do
@@ -1254,15 +1347,16 @@ genJSBlock n = do
   return (JSBlock lbrace stmts rbrace)
 
 genJSImportClause :: Gen JSImportClause
-genJSImportClause = oneof
-  [ JSImportClauseDefault <$> genJSIdent
-  , JSImportClauseNameSpace <$> genJSImportNameSpace
-  , JSImportClauseNamed <$> genJSImportsNamed
-  ]
+genJSImportClause =
+  oneof
+    [ JSImportClauseDefault <$> genJSIdent,
+      JSImportClauseNameSpace <$> genJSImportNameSpace,
+      JSImportClauseNamed <$> genJSImportsNamed
+    ]
 
 genJSImportNameSpace :: Gen JSImportNameSpace
 genJSImportNameSpace = do
-  star <- genJSBinOp  -- Using existing generator for simplicity
+  star <- genJSBinOp -- Using existing generator for simplicity
   asAnnot <- genJSAnnot
   ident <- genJSIdent
   return (JSImportNameSpace star asAnnot ident)
@@ -1353,10 +1447,11 @@ instance Arbitrary JSTryFinally where
   arbitrary = genJSTryFinally 2
 
 instance Arbitrary JSAccessor where
-  arbitrary = oneof
-    [ JSAccessorGet <$> genJSAnnot
-    , JSAccessorSet <$> genJSAnnot
-    ]
+  arbitrary =
+    oneof
+      [ JSAccessorGet <$> genJSAnnot,
+        JSAccessorSet <$> genJSAnnot
+      ]
 
 instance Arbitrary JSPropertyName where
   arbitrary = genJSPropertyName
@@ -1369,11 +1464,12 @@ instance Arbitrary JSMethodDefinition where
 
 -- | Generate method definitions.
 genJSMethodDefinition :: Gen JSMethodDefinition
-genJSMethodDefinition = oneof
-  [ JSMethodDefinition <$> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
-  , JSGeneratorMethodDefinition <$> genJSAnnot <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
-  , JSPropertyAccessor <$> arbitrary <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
-  ]
+genJSMethodDefinition =
+  oneof
+    [ JSMethodDefinition <$> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2,
+      JSGeneratorMethodDefinition <$> genJSAnnot <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2,
+      JSPropertyAccessor <$> arbitrary <*> genJSPropertyName <*> genJSAnnot <*> genCommaList genIdentifierExpression <*> genJSAnnot <*> genJSBlock 2
+    ]
 
 instance Arbitrary JSModuleItem where
   arbitrary = genJSModuleItem
@@ -1404,16 +1500,16 @@ shrinkJSStatement :: JSStatement -> [JSStatement]
 shrinkJSStatement stmt = case stmt of
   JSStatementBlock _ stmts _ _ -> stmts ++ concatMap shrinkJSStatement stmts
   JSIf _ _ cond _ thenStmt -> [thenStmt] ++ shrinkJSStatement thenStmt
-  JSIfElse _ _ cond _ thenStmt _ elseStmt -> 
+  JSIfElse _ _ cond _ thenStmt _ elseStmt ->
     [thenStmt, elseStmt] ++ shrinkJSStatement thenStmt ++ shrinkJSStatement elseStmt
-  JSExpressionStatement expr _ -> []  -- Cannot shrink expression to statement
-  JSReturn _ (Just expr) _ -> []  -- Cannot shrink expression to statement 
+  JSExpressionStatement expr _ -> [] -- Cannot shrink expression to statement
+  JSReturn _ (Just expr) _ -> [] -- Cannot shrink expression to statement
   _ -> []
 
 -- | Shrink JavaScript AST for QuickCheck.
 shrinkJSAST :: JSAST -> [JSAST]
 shrinkJSAST ast = case ast of
-  JSAstProgram stmts annot -> 
+  JSAstProgram stmts annot ->
     [JSAstProgram ss annot | ss <- shrink stmts]
   JSAstStatement stmt annot ->
     [JSAstStatement s annot | s <- shrink stmt]
@@ -1438,31 +1534,34 @@ jsCommaListToList (JSLCons list _ x) = jsCommaListToList list ++ [x]
 
 -- | Generate JSCommaTrailingList for any element type.
 genJSCommaTrailingList :: Gen a -> Gen (JSCommaTrailingList a)
-genJSCommaTrailingList genElement = oneof
-  [ JSCTLNone <$> genCommaList genElement
-  , do
-      list <- genCommaList genElement
-      comma <- genJSAnnot
-      return (JSCTLComma list comma)
-  ]
+genJSCommaTrailingList genElement =
+  oneof
+    [ JSCTLNone <$> genCommaList genElement,
+      do
+        list <- genCommaList genElement
+        comma <- genJSAnnot
+        return (JSCTLComma list comma)
+    ]
 
 -- | Generate JSClassHeritage.
 genJSClassHeritage :: Gen JSClassHeritage
-genJSClassHeritage = oneof
-  [ return JSExtendsNone
-  , JSExtends <$> genJSAnnot <*> genJSExpression
-  ]
+genJSClassHeritage =
+  oneof
+    [ return JSExtendsNone,
+      JSExtends <$> genJSAnnot <*> genJSExpression
+    ]
 
 -- | Generate JSClassElement.
 genJSClassElement :: Gen JSClassElement
-genJSClassElement = oneof
-  [ genJSInstanceMethod
-  , genJSStaticMethod
-  , genJSClassSemi
-  , genJSPrivateField
-  , genJSPrivateMethod
-  , genJSPrivateAccessor
-  ]
+genJSClassElement =
+  oneof
+    [ genJSInstanceMethod,
+      genJSStaticMethod,
+      genJSClassSemi,
+      genJSPrivateField,
+      genJSPrivateMethod,
+      genJSPrivateAccessor
+    ]
   where
     genJSInstanceMethod = do
       method <- genJSMethodDefinition
@@ -1509,17 +1608,19 @@ genJSTemplatePart = do
 
 -- | Generate JSArrowParameterList.
 genJSArrowParameterList :: Gen JSArrowParameterList
-genJSArrowParameterList = oneof
-  [ JSUnparenthesizedArrowParameter <$> genJSIdent
-  , JSParenthesizedArrowParameterList <$> genJSAnnot <*> genCommaList genJSExpression <*> genJSAnnot
-  ]
+genJSArrowParameterList =
+  oneof
+    [ JSUnparenthesizedArrowParameter <$> genJSIdent,
+      JSParenthesizedArrowParameterList <$> genJSAnnot <*> genCommaList genJSExpression <*> genJSAnnot
+    ]
 
 -- | Generate JSConciseBody.
 genJSConciseBody :: Gen JSConciseBody
-genJSConciseBody = oneof
-  [ JSConciseFunctionBody <$> genJSBlock 2
-  , JSConciseExpressionBody <$> genJSExpression
-  ]
+genJSConciseBody =
+  oneof
+    [ JSConciseFunctionBody <$> genJSBlock 2,
+      JSConciseExpressionBody <$> genJSExpression
+    ]
 
 -- ---------------------------------------------------------------------
 -- Additional Arbitrary Instances for Complete Coverage
