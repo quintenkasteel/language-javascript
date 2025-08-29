@@ -562,7 +562,7 @@ Yield :: { AST.JSAnnot }
 Yield : 'yield' { mkJSAnnot $1 }
 
 ImportMeta :: { AST.JSExpression }
-ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == ("meta") 
+ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == ("meta")
                                      then return (AST.JSImportMeta (mkJSAnnot $1) (mkJSAnnot $2))
                                      else parseError $3 }
 
@@ -729,7 +729,7 @@ CallExpression : MemberExpression Arguments
                     { AST.JSOptionalMemberSquare $1 (mkJSAnnot $2) $4 (mkJSAnnot $5) {- 'CallExpression6' -} }
                | MemberExpression OptionalChaining Arguments
                     { mkJSOptionalCallExpression $1 $2 $3 {- 'CallExpression7' -} }
-               | CallExpression OptionalChaining Arguments  
+               | CallExpression OptionalChaining Arguments
                     { mkJSOptionalCallExpression $1 $2 $3 {- 'CallExpression8' -} }
                | CallExpression TemplateLiteral
                     { mkJSTemplateLiteral (Just $1) $2 {- 'CallExpression9' -} }
@@ -1637,7 +1637,7 @@ StatementMain : StatementNoEmpty Eof	{ AST.JSAstStatement $1 $2   	{- 'Statement
 {
 
 -- Need this type while build the AST, but is not actually part of the AST.
-data JSArguments = JSArguments AST.JSAnnot (AST.JSCommaList AST.JSExpression) AST.JSAnnot    -- ^lb, args, rb
+data JSArguments = JSArguments AST.JSAnnot (AST.JSCommaList AST.JSExpression) AST.JSAnnot    -- lb, args, rb
 data JSUntaggedTemplate = JSUntaggedTemplate !AST.JSAnnot !String ![AST.JSTemplatePart] -- lquot, head, parts
 
 blockToStatement :: AST.JSBlock -> AST.JSSemi -> AST.JSStatement
