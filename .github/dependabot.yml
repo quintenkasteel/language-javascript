@@ -1,0 +1,42 @@
+# GitHub Dependabot configuration for language-javascript
+# Automatically creates PRs for dependency updates
+
+version: 2
+updates:
+  # Monitor Haskell dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "quintenkasteel"
+    assignees:
+      - "quintenkasteel"
+    commit-message:
+      prefix: "ci"
+      prefix-development: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    
+  # Monitor for security updates more frequently
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-type: "direct"
+        update-type: "security"
+    commit-message:
+      prefix: "security"
+      prefix-development: "security"
+      include: "scope"
+    labels:
+      - "security"
+      - "dependencies"
