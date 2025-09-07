@@ -7,7 +7,7 @@ Fixes #(issue_number) <!-- If applicable -->
 ## Type of Change
 
 - [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
-- [ ] ✨ New feature (non-breaking change which adds functionality)  
+- [ ] ✨ New feature (non-breaking change which adds functionality)
 - [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
 - [ ] 📚 Documentation update
 - [ ] 🔧 Refactoring (no functional changes, no api changes)
@@ -20,19 +20,20 @@ Fixes #(issue_number) <!-- If applicable -->
 If this PR adds support for new JavaScript features, please specify:
 
 - [ ] ES5 features
-- [ ] ES6/ES2015 features  
+- [ ] ES6/ES2015 features
 - [ ] ES2016+ features
 - [ ] Node.js specific features
 - [ ] Browser specific features
 - [ ] TypeScript syntax (if applicable)
 
-**Feature details:** 
+**Feature details:**
+
 <!-- Describe the JavaScript language features supported -->
 
 ## Parser Changes
 
 - [ ] Lexer changes (`.x` files)
-- [ ] Grammar changes (`.y` files) 
+- [ ] Grammar changes (`.y` files)
 - [ ] AST changes
 - [ ] Pretty printer changes
 - [ ] Error handling changes
@@ -48,7 +49,7 @@ If this PR adds support for new JavaScript features, please specify:
 
 **Test coverage:** <!-- Mention coverage percentage if known -->
 
-## CLAUDE.md Compliance
+## Code Compliance
 
 - [ ] Functions are ≤15 lines
 - [ ] Function parameters are ≤4
@@ -73,7 +74,7 @@ If this PR adds support for new JavaScript features, please specify:
 
 ## Checklist
 
-- [ ] My code follows the CLAUDE.md style guidelines
+- [ ] My code follows the Code style guidelines
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made corresponding changes to the documentation
