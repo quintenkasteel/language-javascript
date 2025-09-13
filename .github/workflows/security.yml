@@ -1,0 +1,271 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, new-ast, release/* ]
+  pull_request:
+    branches: [ main, new-ast ]
+  schedule:
+    # Run security checks daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Haskell
+      uses: haskell-actions/setup@v2
+      with:
+        ghc-version: '9.8.4'
+        cabal-version: 'latest'
+
+    - name: Generate freeze file
+      run: |
+        cabal configure
+        cabal freeze
+
+    - name: Check for known vulnerable packages
+      run: |
+        echo "Checking for known vulnerable Haskell packages..."
+        
+        # Basic check for potentially problematic packages
+        if grep -i "network.*<" cabal.project.freeze 2>/dev/null; then
+          echo "⚠️  Old network library version detected"
+        fi
+        
+        if grep -i "aeson.*<" cabal.project.freeze 2>/dev/null; then
+          echo "⚠️  Check aeson version for security updates"
+        fi
+        
+        echo "✅ Basic dependency security check completed"
+
+    - name: Audit dependencies
+      run: |
+        echo "Auditing dependency security..."
+        cabal outdated || echo "Some dependencies may have newer versions available"
+
+  code-security-scan:
+    name: Code Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Scan for unsafe functions
+      run: |
+        echo "Scanning for potentially unsafe Haskell functions..."
+        
+        UNSAFE_FOUND=0
+        
+        echo "=== Checking for unsafe IO operations ==="
+        if find src test -name "*.hs" -exec grep -Hn "unsafePerformIO" {} \; | head -10; then
+          echo "⚠️  Found unsafePerformIO usage"
+          UNSAFE_FOUND=1
+        else
+          echo "✅ No unsafePerformIO found"
+        fi
+        
+        if find src test -name "*.hs" -exec grep -Hn "unsafeCoerce" {} \; | head -10; then
+          echo "⚠️  Found unsafeCoerce usage"
+          UNSAFE_FOUND=1
+        else
+          echo "✅ No unsafeCoerce found"
+        fi
+        
+        echo "=== Checking for partial functions ==="
+        if find src test -name "*.hs" -exec grep -Hn "\bhead\b" {} \; | head -5; then
+          echo "⚠️  Found head usage (partial function)"
+        fi
+        
+        if find src test -name "*.hs" -exec grep -Hn "\btail\b" {} \; | head -5; then
+          echo "⚠️  Found tail usage (partial function)"
+        fi
+        
+        if find src test -name "*.hs" -exec grep -Hn "\b!!\b" {} \; | head -5; then
+          echo "⚠️  Found !! operator usage (partial function)"
+        fi
+        
+        echo "=== Checking for error and undefined ==="
+        ERROR_COUNT=$(find src -name "*.hs" -exec grep -c "\berror\b" {} \; 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo "0")
+        if [ $ERROR_COUNT -gt 0 ]; then
+          echo "⚠️  Found $ERROR_COUNT instances of 'error' in src/"
+          find src -name "*.hs" -exec grep -Hn "\berror\b" {} \; | head -5
+        else
+          echo "✅ No 'error' calls found in src/"
+        fi
+        
+        UNDEFINED_COUNT=$(find src -name "*.hs" -exec grep -c "\bundefined\b" {} \; 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo "0")
+        if [ $UNDEFINED_COUNT -gt 0 ]; then
+          echo "❌ Found $UNDEFINED_COUNT instances of 'undefined' in src/"
+          find src -name "*.hs" -exec grep -Hn "\bundefined\b" {} \; | head -5
+          UNSAFE_FOUND=1
+        else
+          echo "✅ No 'undefined' found in src/"
+        fi
+        
+        if [ $UNSAFE_FOUND -eq 1 ]; then
+          echo "❌ Unsafe code patterns detected"
+          exit 1
+        fi
+        
+        echo "✅ Code security scan completed"
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Scan for hardcoded secrets
+      run: |
+        echo "Scanning for potential hardcoded secrets..."
+        
+        SECRETS_FOUND=0
+        
+        echo "=== Checking for common secret patterns ==="
+        
+        # Check for API keys
+        if find . -name "*.hs" -o -name "*.cabal" -o -name "*.yaml" -o -name "*.yml" | xargs grep -i -E "(api[_-]?key|secret[_-]?key)" | grep -v "^Binary file" | head -5; then
+          echo "⚠️  Potential API key references found"
+          SECRETS_FOUND=1
+        fi
+        
+        # Check for passwords
+        if find . -name "*.hs" -o -name "*.cabal" -o -name "*.yaml" -o -name "*.yml" | xargs grep -i -E "(password|passwd)" | grep -v "^Binary file" | head -5; then
+          echo "⚠️  Password references found (review manually)"
+        fi
+        
+        # Check for tokens
+        if find . -name "*.hs" -o -name "*.cabal" -o -name "*.yaml" -o -name "*.yml" | xargs grep -i -E "token.*=" | grep -v "^Binary file" | head -5; then
+          echo "⚠️  Token assignments found (review manually)"
+        fi
+        
+        # Check for base64 encoded strings (potential secrets)
+        if find . -name "*.hs" | xargs grep -E "['\"][A-Za-z0-9+/]{20,}={0,2}['\"]" | head -3; then
+          echo "⚠️  Potential base64 encoded data found"
+        fi
+        
+        if [ $SECRETS_FOUND -eq 1 ]; then
+          echo "❌ Potential secrets detected - manual review required"
+          exit 1
+        fi
+        
+        echo "✅ No obvious hardcoded secrets found"
+
+  input-validation-check:
+    name: Input Validation Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check JavaScript input validation
+      run: |
+        echo "Checking for proper JavaScript input validation..."
+        
+        VALIDATION_ISSUES=0
+        
+        echo "=== Checking for input size limits ==="
+        if find src -name "*.hs" -exec grep -Hn "maxInputSize\|maxFileSize\|sizeLimit" {} \; | head -5; then
+          echo "✅ Found input size validation"
+        else
+          echo "⚠️  No obvious input size limits found"
+          VALIDATION_ISSUES=1
+        fi
+        
+        echo "=== Checking for input sanitization ==="
+        if find src -name "*.hs" -exec grep -Hn "validate.*Input\|sanitize\|escape" {} \; | head -5; then
+          echo "✅ Found input validation/sanitization"
+        else
+          echo "⚠️  No obvious input validation found"
+          VALIDATION_ISSUES=1
+        fi
+        
+        echo "=== Checking for error handling in parsing ==="
+        if find src -name "*.hs" -exec grep -Hn "ParseError\|SyntaxError\|LexError" {} \; | head -5; then
+          echo "✅ Found proper error handling"
+        else
+          echo "⚠️  Limited error handling found"
+          VALIDATION_ISSUES=1
+        fi
+        
+        if [ $VALIDATION_ISSUES -eq 1 ]; then
+          echo "⚠️  Input validation could be improved"
+          # Don't fail the build for this, just warn
+        fi
+        
+        echo "✅ Input validation check completed"
+
+  supply-chain-security:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Verify build dependencies
+      run: |
+        echo "Checking build and dependency integrity..."
+        
+        # Check cabal file integrity
+        if [ -f "language-javascript.cabal" ]; then
+          echo "✅ Main cabal file exists"
+          
+          # Basic validation of cabal file
+          if grep -q "^name:" language-javascript.cabal && grep -q "^version:" language-javascript.cabal; then
+            echo "✅ Cabal file has required fields"
+          else
+            echo "❌ Cabal file missing required fields"
+            exit 1
+          fi
+        else
+          echo "❌ Main cabal file missing"
+          exit 1
+        fi
+        
+        # Check for suspicious build scripts
+        if find . -name "*.sh" -o -name "Makefile" | head -10; then
+          echo "⚠️  Build scripts found - ensure they are secure"
+          find . -name "*.sh" -o -name "Makefile" | head -5
+        fi
+        
+        echo "✅ Supply chain security check completed"
+
+  compliance-check:
+    name: Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check license compliance
+      run: |
+        echo "Checking license and compliance..."
+        
+        # Check for license file
+        if [ -f "LICENSE" ] || [ -f "LICENSE.txt" ] || [ -f "LICENCE" ]; then
+          echo "✅ License file found"
+        else
+          echo "⚠️  No license file found"
+        fi
+        
+        # Check cabal file has license field
+        if grep -q "^license:" language-javascript.cabal; then
+          LICENSE=$(grep "^license:" language-javascript.cabal)
+          echo "✅ License declared in cabal: $LICENSE"
+        else
+          echo "⚠️  No license declared in cabal file"
+        fi
+        
+        echo "✅ Compliance check completed"
