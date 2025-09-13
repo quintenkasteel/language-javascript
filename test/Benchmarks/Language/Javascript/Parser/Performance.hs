@@ -203,12 +203,12 @@ testLargeFileHandling = describe "Large file handling" $ do
   it "parses 1MB files under 1000ms target" $ do
     metrics <- measureFileOfSize (1024 * 1024) -- 1MB
     metricsParseTime metrics `shouldSatisfy` (< 1200) -- Relaxed: 1007ms actual
-    metricsSuccess metrics `shouldBe` True
+    metrics `shouldSatisfy` metricsSuccess
 
   it "parses 5MB files under 9000ms target" $ do
     metrics <- measureFileOfSize (5 * 1024 * 1024) -- 5MB
     metricsParseTime metrics `shouldSatisfy` (< 15000) -- Relaxed: 11914ms actual
-    metricsSuccess metrics `shouldBe` True
+    metrics `shouldSatisfy` metricsSuccess
 
   it "maintains >0.5MB/s throughput for large files" $ do
     metrics <- measureFileOfSize (2 * 1024 * 1024) -- 2MB
@@ -223,7 +223,7 @@ testMemoryConstraints = describe "Memory usage validation" $ do
 
     -- Memory usage should be reasonable (< 50x input size)
     let memoryRatios = map (\m -> fromIntegral (metricsMemoryUsage m) / fromIntegral (metricsInputSize m)) metrics
-    all (< 50) memoryRatios `shouldBe` True
+    memoryRatios `shouldSatisfy` all (< 50)
 
   it "shows linear memory scaling with input size" $ do
     let sizes = [200 * 1024, 400 * 1024] -- 200KB, 400KB
@@ -276,7 +276,7 @@ testThroughputTargets = describe "Throughput target validation" $ do
     let avgThroughput = sum throughputs / fromIntegral (length throughputs)
     let variance = map (\t -> abs (t - avgThroughput) / avgThroughput) throughputs
     -- All should be within 80% of average (relaxed for system variance)
-    all (< 0.8) variance `shouldBe` True
+    variance `shouldSatisfy` all (< 0.8)
 
 -- | Test memory usage targets
 testMemoryTargets :: Spec

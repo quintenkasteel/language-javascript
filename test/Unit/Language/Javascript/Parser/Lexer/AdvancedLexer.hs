@@ -333,8 +333,8 @@ testLexerErrorRecovery =
         -- Test that properly terminated strings work correctly
         testLex "'terminated'" `shouldContain` "StringToken"
         testLex "\"also terminated\"" `shouldContain` "StringToken"
-        -- Basic string functionality should work
-        True `shouldBe` True
+        -- Verify basic string tokenization works
+        testLex "'hello'" `shouldBe` "[StringToken 'hello']"
 
       Hspec.it "recovers from invalid escape sequences" $ do
         testLex "'valid' + 'next'"
@@ -347,8 +347,8 @@ testLexerErrorRecovery =
         -- Test that valid regex patterns work correctly
         testLex "/valid/" `shouldContain` "RegEx"
         testLex "/pattern/g" `shouldContain` "RegEx"
-        -- Basic regex functionality should work
-        True `shouldBe` True
+        -- Verify basic regex tokenization works
+        testLex "/test/" `shouldBe` "[RegExToken /test/]"
 
       Hspec.it "handles regex flag recovery" $ do
         testLex "x = /valid/g + /pattern/i"

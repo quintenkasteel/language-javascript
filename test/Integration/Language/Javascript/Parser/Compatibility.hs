@@ -145,29 +145,37 @@ testPopularLibraryCompatibility = describe "Popular library compatibility" $ do
     -- Simple React-style component test
     let reactCode = "class MyComponent extends React.Component { render() { return React.createElement('div', null, 'Hello'); } }"
     case parse (Text.unpack reactCode) "react-test" of
-      Right _ -> True `shouldBe` True
-      Left _ -> expectationFailure "Failed to parse React-style component"
+      Right ast -> case ast of
+        JSAstProgram [JSClass {}] _ -> pure ()
+        _ -> expectationFailure $ "Expected class declaration, got: " ++ show ast
+      Left err -> expectationFailure $ "Failed to parse React-style component: " ++ show err
 
   it "parses Vue.js library correctly" $ do
     -- Simple Vue-style component test
     let vueCode = "var app = new Vue({ el: '#app', data: { message: 'Hello Vue!' }, methods: { greet: function() { console.log('Hello'); } } });"
     case parse (Text.unpack vueCode) "vue-test" of
-      Right _ -> True `shouldBe` True
-      Left _ -> expectationFailure "Failed to parse Vue-style component"
+      Right ast -> case ast of
+        JSAstProgram [JSVariable {}] _ -> pure ()
+        _ -> expectationFailure $ "Expected variable declaration, got: " ++ show ast
+      Left err -> expectationFailure $ "Failed to parse Vue-style component: " ++ show err
 
   it "parses Angular library correctly" $ do
     -- Simple Angular-style component test
     let angularCode = "angular.module('myApp', []).controller('MyController', function($scope) { $scope.message = 'Hello Angular'; });"
     case parse (Text.unpack angularCode) "angular-test" of
-      Right _ -> True `shouldBe` True
-      Left _ -> expectationFailure "Failed to parse Angular-style component"
+      Right ast -> case ast of
+        JSAstProgram [JSExpressionStatement {}] _ -> pure ()
+        _ -> expectationFailure $ "Expected expression statement, got: " ++ show ast
+      Left err -> expectationFailure $ "Failed to parse Angular-style component: " ++ show err
 
   it "parses Lodash library correctly" $ do
     -- Simple Lodash-style utility test
     let lodashCode = "var result = _.map([1, 2, 3], function(n) { return n * 2; }); var filtered = _.filter(result, function(n) { return n > 2; });"
     case parse (Text.unpack lodashCode) "lodash-test" of
-      Right _ -> True `shouldBe` True
-      Left _ -> expectationFailure "Failed to parse Lodash-style utilities"
+      Right ast -> case ast of
+        JSAstProgram [JSVariable {}, JSVariable {}] _ -> pure ()
+        _ -> expectationFailure $ "Expected two variable declarations, got: " ++ show ast
+      Left err -> expectationFailure $ "Failed to parse Lodash-style utilities: " ++ show err
 
 -- | Test compatibility with major JavaScript frameworks
 testFrameworkCompatibility :: Spec
@@ -228,8 +236,10 @@ testBabelParserCompatibility = describe "Babel parser compatibility" $ do
     -- Test basic Babel-compatible ES6+ features
     let babelCode = "const arrow = (x) => x * 2; class TestClass { constructor() { this.value = 42; } }"
     case parse (Text.unpack babelCode) "babel-test" of
-      Right _ -> True `shouldBe` True
-      Left _ -> expectationFailure "Failed to parse Babel-compatible features"
+      Right ast -> case ast of
+        JSAstProgram [JSConstant {}, JSClass {}] _ -> pure ()
+        _ -> expectationFailure $ "Expected const declaration and class, got: " ++ show ast
+      Left err -> expectationFailure $ "Failed to parse Babel-compatible features: " ++ show err
 
   it "maintains semantic equivalence with Babel output" $ do
     babelTestCases <- getBabelTestCases
@@ -246,8 +256,10 @@ testTypeScriptParserCompatibility = describe "TypeScript parser compatibility" $
     -- Test TypeScript-compiled JavaScript patterns
     let tsCode = "var MyClass = (function () { function MyClass(name) { this.name = name; } MyClass.prototype.greet = function () { return 'Hello ' + this.name; }; return MyClass; }());"
     case parse (Text.unpack tsCode) "typescript-test" of
-      Right _ -> True `shouldBe` True
-      Left _ -> expectationFailure "Failed to parse TypeScript-compiled JavaScript"
+      Right ast -> case ast of
+        JSAstProgram [JSVariable {}] _ -> pure ()
+        _ -> expectationFailure $ "Expected variable declaration, got: " ++ show ast
+      Left err -> expectationFailure $ "Failed to parse TypeScript-compiled JavaScript: " ++ show err
 
   it "handles TypeScript emit patterns correctly" $ do
     tsEmitPatterns <- getTypeScriptEmitPatterns

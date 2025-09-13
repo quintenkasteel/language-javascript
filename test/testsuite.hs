@@ -61,12 +61,22 @@ import Unit.Language.Javascript.Parser.Validation.Core
 import Unit.Language.Javascript.Parser.Validation.ES6Features
 import Unit.Language.Javascript.Parser.Validation.Modules
 import Unit.Language.Javascript.Parser.Validation.StrictMode
+import Unit.Language.Javascript.Process.TreeShake.Core
+import Unit.Language.Javascript.Process.TreeShake.Advanced
+import Unit.Language.Javascript.Process.TreeShake.Stress
+import Unit.Language.Javascript.Process.TreeShake.FrameworkPatterns
+import Unit.Language.Javascript.Process.TreeShake.AdvancedJSEdgeCases
+import Unit.Language.Javascript.Process.TreeShake.LibraryPatterns
+import Unit.Language.Javascript.Process.TreeShake.IntegrationScenarios
+import Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
+-- import Unit.Language.Javascript.Process.TreeShake.Usage
+-- import Unit.Language.Javascript.Process.TreeShake.Elimination
+import Integration.Language.Javascript.Process.TreeShake
 
 main :: IO ()
 main = do
   summary <- hspecWithResult defaultConfig testAll
-  when
-    (summaryFailures summary == 0)
+  when (summaryFailures summary == 0)
     exitSuccess
   exitFailure
 
@@ -111,6 +121,18 @@ testAll = do
   Unit.Language.Javascript.Parser.Error.Quality.testErrorQuality
   Unit.Language.Javascript.Parser.Error.Negative.testNegativeCases
 
+  -- Unit Tests - TreeShake
+  Unit.Language.Javascript.Process.TreeShake.Core.testTreeShakeCore
+  Unit.Language.Javascript.Process.TreeShake.Advanced.testTreeShakeAdvanced
+  Unit.Language.Javascript.Process.TreeShake.Stress.testTreeShakeStress
+  Unit.Language.Javascript.Process.TreeShake.FrameworkPatterns.frameworkPatternsTests
+  Unit.Language.Javascript.Process.TreeShake.AdvancedJSEdgeCases.advancedJSEdgeCasesTests
+  Unit.Language.Javascript.Process.TreeShake.LibraryPatterns.libraryPatternsTests
+  Unit.Language.Javascript.Process.TreeShake.IntegrationScenarios.integrationScenariosTests
+  Unit.Language.Javascript.Process.TreeShake.EnterpriseScale.enterpriseScaleTests
+  -- Unit.Language.Javascript.Process.TreeShake.Usage.testUsageAnalysis
+  -- Unit.Language.Javascript.Process.TreeShake.Elimination.testEliminationCore
+
   -- Integration Tests
   Integration.Language.Javascript.Parser.RoundTrip.testRoundTrip
   Integration.Language.Javascript.Parser.RoundTrip.testES6RoundTrip
@@ -120,6 +142,7 @@ testAll = do
   Integration.Language.Javascript.Parser.Minification.testMinifyProg
   Integration.Language.Javascript.Parser.Minification.testMinifyModule
   Integration.Language.Javascript.Parser.Compatibility.testRealWorldCompatibility
+  Integration.Language.Javascript.Process.TreeShake.testTreeShakeIntegration
 
   -- Golden Tests
   Golden.Language.Javascript.Parser.GoldenTests.goldenTests

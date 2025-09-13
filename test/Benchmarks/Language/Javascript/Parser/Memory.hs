@@ -126,7 +126,7 @@ memoryConstraintTests = describe "Memory constraint validation" $ do
   it "validates linear memory growth O(n)" $ do
     let sizes = [100 * 1024, 500 * 1024, 1024 * 1024] -- 100KB, 500KB, 1MB
     metrics <- mapM measureMemoryForSize sizes
-    validateLinearGrowth metrics `shouldBe` True
+    metrics `shouldSatisfy` validateLinearGrowth
 
   it "maintains memory overhead under 20x input size" $ do
     config <- return defaultMemoryConfig
@@ -173,7 +173,7 @@ streamingMemoryTests = describe "Streaming memory validation" $ do
   it "maintains constant memory for streaming scenarios" $ do
     let config = defaultMemoryConfig {configStreamChunkSize = 32 * 1024}
     streamMetrics <- measureStreamingMemory config
-    validateConstantMemoryStreaming streamMetrics `shouldBe` True
+    streamMetrics `shouldSatisfy` validateConstantMemoryStreaming
 
   it "processes large files with bounded memory" $ do
     let largeFileSize = 5 * 1024 * 1024 -- 5MB
@@ -183,7 +183,7 @@ streamingMemoryTests = describe "Streaming memory validation" $ do
   it "handles incremental parsing memory efficiently" $ do
     chunks <- createIncrementalTestData (configStreamChunkSize defaultMemoryConfig)
     metrics <- measureIncrementalParsing chunks
-    validateIncrementalMemoryUsage metrics `shouldBe` True
+    metrics `shouldSatisfy` validateIncrementalMemoryUsage
 
 -- | Memory pressure testing and validation
 memoryPressureTests :: Spec
@@ -196,7 +196,7 @@ memoryPressureTests = describe "Memory pressure handling" $ do
   it "degrades gracefully under memory constraints" $ do
     let constrainedConfig = defaultMemoryConfig {configMaxMemoryMB = 30}
     degradationMetrics <- measureGracefulDegradation constrainedConfig
-    validateGracefulDegradation degradationMetrics `shouldBe` True
+    degradationMetrics `shouldSatisfy` validateGracefulDegradation
 
   it "recovers memory after pressure release" $ do
     initialMemory <- getCurrentMemoryUsage
@@ -212,12 +212,12 @@ linearMemoryGrowthTests = describe "Linear memory growth validation" $ do
   it "validates O(n) memory scaling with input size" $ do
     let sizes = [64 * 1024, 128 * 1024, 256 * 1024, 512 * 1024] -- Powers of 2
     metrics <- mapM measureMemoryForSize sizes
-    validateLinearScaling metrics `shouldBe` True
+    metrics `shouldSatisfy` validateLinearScaling
 
   it "prevents quadratic memory growth O(n²)" $ do
     let sizes = [100 * 1024, 400 * 1024, 900 * 1024] -- Square relationships
     metrics <- mapM measureMemoryForSize sizes
-    validateNotQuadratic metrics `shouldBe` True
+    metrics `shouldSatisfy` validateNotQuadratic
 
 -- ================================================================
 -- Memory Testing Implementation Functions
