@@ -89,8 +89,8 @@ showStripped = AST.showStripped
 showStrippedMaybe :: Show a => Either a AST.JSAST -> String
 showStrippedMaybe maybeAst =
   case maybeAst of
-    Left msg -> "Left (" ++ show msg ++ ")"
-    Right p -> "Right (" ++ AST.showStripped p ++ ")"
+    Left msg -> "Left (" <> (show msg <> ")")
+    Right p -> "Right (" <> (AST.showStripped p <> ")")
 
 -- | Backward-compatible String version of showStripped
 showStrippedString :: AST.JSAST -> String

@@ -151,18 +151,13 @@ lint-ci: ## Run hlint with CI-friendly output (fails on warnings)
 fix-lint: ## Automatically fix hlint suggestions and format code
 	@echo "$(BLUE)Auto-fixing hlint suggestions...$(RESET)"
 	@if command -v $(HLINT) > /dev/null 2>&1; then \
-		$(HLINT) $(SRC_DIR) $(TEST_DIR) \
-		  --ignore="Parse error" \
-		  --ignore="Use camelCase" \
-		  --ignore="Reduce duplication" \
-		  --no-summary -j | \
-		grep -oP '(?<=$(SRC_DIR)/).*?(?=:)|(?<=$(TEST_DIR)/).*?(?=:)' | \
-		sort -u | \
-		xargs -I _ $(HLINT) $(SRC_DIR)/_ $(TEST_DIR)/_ \
-		  --ignore="Parse error" \
-		  --ignore="Use camelCase" \
-		  --ignore="Reduce duplication" \
-		  --refactor --refactor-options="--inplace" -j 2>/dev/null || true; \
+		for file in $$(find $(SRC_DIR) $(TEST_DIR) -name "*.hs" -o -name "*.lhs"); do \
+			$(HLINT) "$$file" \
+			  --ignore="Parse error" \
+			  --ignore="Use camelCase" \
+			  --ignore="Reduce duplication" \
+			  --refactor --refactor-options="--inplace" -j &>/dev/null || true; \
+		done; \
 		echo "$(YELLOW)Running format after hlint fixes...$(RESET)"; \
 		$(MAKE) format; \
 		echo "$(GREEN)Auto-fix completed!$(RESET)"; \

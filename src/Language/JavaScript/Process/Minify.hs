@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Language.JavaScript.Process.Minify
@@ -7,10 +6,7 @@ module Language.JavaScript.Process.Minify
   )
 where
 
-#if ! MIN_VERSION_base(4,13,0)
 import Control.Applicative ((<$>))
-#endif
-
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
@@ -19,7 +15,7 @@ import Language.JavaScript.Parser.Token
 
 minifyJS :: JSAST -> JSAST
 minifyJS (JSAstProgram xs _) = JSAstProgram (fixStatementList noSemi xs) emptyAnnot
-minifyJS (JSAstModule xs _) = JSAstModule (map (fix emptyAnnot) xs) emptyAnnot
+minifyJS (JSAstModule xs _) = JSAstModule (fmap (fix emptyAnnot) xs) emptyAnnot
 minifyJS (JSAstStatement (JSStatementBlock _ [s] _ _) _) = JSAstStatement (fixStmtE noSemi s) emptyAnnot
 minifyJS (JSAstStatement s _) = JSAstStatement (fixStmtE noSemi s) emptyAnnot
 minifyJS (JSAstExpression e _) = JSAstExpression (fixEmpty e) emptyAnnot
@@ -75,7 +71,7 @@ fixStmt a s (JSMethodCall e _ args _ _) = JSMethodCall (fix a e) emptyAnnot (fix
 fixStmt a s (JSReturn _ me _) = JSReturn a (fixSpace me) s
 fixStmt a s (JSSwitch _ _ e _ _ sps _ _) = JSSwitch a emptyAnnot (fixEmpty e) emptyAnnot emptyAnnot (fixSwitchParts sps) emptyAnnot s
 fixStmt a s (JSThrow _ e _) = JSThrow a (fixSpace e) s
-fixStmt a _ (JSTry _ b tc tf) = JSTry a (fixEmpty b) (map fixEmpty tc) (fixEmpty tf)
+fixStmt a _ (JSTry _ b tc tf) = JSTry a (fixEmpty b) (fmap fixEmpty tc) (fixEmpty tf)
 fixStmt a s (JSVariable _ ss _) = JSVariable a (fixVarList ss) s
 fixStmt a s (JSWhile _ _ e _ st) = JSWhile a emptyAnnot (fixEmpty e) emptyAnnot (fixStmt a s st)
 fixStmt a s (JSWith _ _ e _ st _) = JSWith a emptyAnnot (fixEmpty e) emptyAnnot (fixStmtE noSemi st) s
@@ -119,7 +115,7 @@ fixStatementList trailingSemi =
     fixList _ _ [] = []
     fixList a s [JSStatementBlock _ blk _ _] = fixList a s blk
     fixList a s [x] = [fixStmt a s x]
-    fixList _ s (JSStatementBlock _ blk _ _ : xs) = fixList emptyAnnot semi (filter (not . isRedundant) blk) ++ fixList emptyAnnot s xs
+    fixList _ s (JSStatementBlock _ blk _ _ : xs) = fixList emptyAnnot semi (filter (not . isRedundant) blk) <> fixList emptyAnnot s xs
     fixList a s (JSConstant _ vs1 _ : JSConstant _ vs2 _ : xs) = fixList a s (JSConstant spaceAnnot (concatCommaList vs1 vs2) s : xs)
     fixList a s (JSVariable _ vs1 _ : JSVariable _ vs2 _ : xs) = fixList a s (JSVariable spaceAnnot (concatCommaList vs1 vs2) s : xs)
     fixList a s (x1@JSFunction {} : x2@JSFunction {} : xs) = fixStmt a noSemi x1 : fixList newlineAnnot s (x2 : xs)
@@ -155,7 +151,7 @@ instance MinifyJS JSExpression where
   fix _ (JSStringLiteral _ s) = JSStringLiteral emptyAnnot s
   fix _ (JSRegEx _ s) = JSRegEx emptyAnnot s
   -- Non-Terminals
-  fix _ (JSArrayLiteral _ xs _) = JSArrayLiteral emptyAnnot (map fixEmpty xs) emptyAnnot
+  fix _ (JSArrayLiteral _ xs _) = JSArrayLiteral emptyAnnot (fmap fixEmpty xs) emptyAnnot
   fix a (JSArrowExpression ps _ body) = JSArrowExpression (fix a ps) emptyAnnot (fix a body)
   fix a (JSAssignExpression lhs op rhs) = JSAssignExpression (fix a lhs) (fixEmpty op) (fixEmpty rhs)
   fix a (JSAwaitExpression _ ex) = JSAwaitExpression a (fixSpace ex)
@@ -177,7 +173,7 @@ instance MinifyJS JSExpression where
   fix a (JSMemberSquare xs _ e _) = JSMemberSquare (fix a xs) emptyAnnot (fixEmpty e) emptyAnnot
   fix a (JSNewExpression _ e) = JSNewExpression a (fixSpace e)
   fix _ (JSObjectLiteral _ xs _) = JSObjectLiteral emptyAnnot (fixEmpty xs) emptyAnnot
-  fix a (JSTemplateLiteral t _ s ps) = JSTemplateLiteral (fmap (fix a) t) emptyAnnot s (map fixEmpty ps)
+  fix a (JSTemplateLiteral t _ s ps) = JSTemplateLiteral (fmap (fix a) t) emptyAnnot s (fmap fixEmpty ps)
   fix a (JSUnaryExpression op x) = let (ta, fop) = fixUnaryOp a op in JSUnaryExpression fop (fix ta x)
   fix a (JSVarInitExpression x1 x2) = JSVarInitExpression (fix a x1) (fixEmpty x2)
   fix a (JSYieldExpression _ x) = JSYieldExpression a (fixSpace x)
@@ -224,7 +220,7 @@ stringLitConcat xs ys | null ys = JSStringLiteral emptyAnnot xs
 stringLitConcat xall yall =
   case yall of
     [] -> JSStringLiteral emptyAnnot xall
-    (_ : yss) -> JSStringLiteral emptyAnnot (init xall ++ init yss ++ "'")
+    (_ : yss) -> JSStringLiteral emptyAnnot (init xall <> (init yss <> "'"))
 
 -- Normalize a String. If its single quoted, just return it and its double quoted
 -- convert it to single quoted.
@@ -239,7 +235,7 @@ normalizeToSQ str =
     convertSQ [] = []
     convertSQ [c] = "'"
     convertSQ (c : rest) = case c of
-      '\'' -> "\\'" ++ convertSQ rest
+      '\'' -> "\\'" <> convertSQ rest
       '\\' -> case rest of
         ('"' : rest') -> '"' : convertSQ rest'
         _ -> c : convertSQ rest
@@ -393,7 +389,7 @@ instance MinifyJS JSBlock where
   fix _ (JSBlock _ ss _) = JSBlock emptyAnnot (fixStatementList noSemi ss) emptyAnnot
 
 instance MinifyJS JSObjectProperty where
-  fix a (JSPropertyNameandValue n _ vs) = JSPropertyNameandValue (fix a n) emptyAnnot (map fixEmpty vs)
+  fix a (JSPropertyNameandValue n _ vs) = JSPropertyNameandValue (fix a n) emptyAnnot (fmap fixEmpty vs)
   fix a (JSPropertyIdentRef _ s) = JSPropertyIdentRef a s
   fix a (JSObjectMethod m) = JSObjectMethod (fix a m)
   fix a (JSObjectSpread _ expr) = JSObjectSpread a (fix emptyAnnot expr)

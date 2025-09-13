@@ -50,7 +50,7 @@ decimalToken :: TokenPosn -> String -> Token
 decimalToken loc str
   -- Validate decimal literal for edge cases
   | isValidDecimal str = DecimalToken loc (str) []
-  | otherwise = error ("Invalid decimal literal: " ++ str ++ " at " ++ show loc)
+  | otherwise = error ("Invalid decimal literal: " <> (str <> (" at " <> show loc)))
   where
     -- Check for invalid decimal patterns - very conservative
     isValidDecimal s
@@ -63,7 +63,7 @@ hexIntegerToken :: TokenPosn -> String -> Token
 hexIntegerToken loc str
   -- Very conservative hex validation - only reject clearly incomplete patterns
   | isValidHex str = HexIntegerToken loc (str) []
-  | otherwise = error ("Invalid hex literal: " ++ str ++ " at " ++ show loc)
+  | otherwise = error ("Invalid hex literal: " <> (str <> (" at " <> show loc)))
   where
     -- Check for invalid hex patterns
     isValidHex s
@@ -78,7 +78,7 @@ binaryIntegerToken :: TokenPosn -> String -> Token
 binaryIntegerToken loc str
   -- Very conservative binary validation
   | isValidBinary str = BinaryIntegerToken loc (str) []
-  | otherwise = error ("Invalid binary literal: " ++ str ++ " at " ++ show loc)
+  | otherwise = error ("Invalid binary literal: " <> (str <> (" at " <> show loc)))
   where
     -- Check for invalid binary patterns
     isValidBinary s
@@ -93,7 +93,7 @@ octalToken :: TokenPosn -> String -> Token
 octalToken loc str
   -- Very conservative octal validation
   | isValidOctal str = OctalToken loc (str) []
-  | otherwise = error ("Invalid octal literal: " ++ str ++ " at " ++ show loc)
+  | otherwise = error ("Invalid octal literal: " <> (str <> (" at " <> show loc)))
   where
     -- Check for invalid octal patterns
     isValidOctal s

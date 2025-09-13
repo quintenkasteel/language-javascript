@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoOverloadedStrings #-}
@@ -12,15 +11,12 @@ module Language.JavaScript.Pretty.Printer
 where
 
 import Blaze.ByteString.Builder (Builder, toLazyByteString)
-#if ! MIN_VERSION_base(4,13,0)
-import Data.Monoid (mempty)
-import Data.Semigroup ((<>))
-#endif
-
 import qualified Blaze.ByteString.Builder.Char.Utf8 as BS
 import qualified Codec.Binary.UTF8.String as US
 import qualified Data.ByteString.Lazy as LB
 import Data.List
+import Data.Monoid (mempty)
+import Data.Semigroup ((<>))
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Text.Lazy (Text)
@@ -48,7 +44,7 @@ renderJS node = bb
 
 renderToString :: JSAST -> String
 -- need to be careful to not lose the unicode encoding on output
-renderToString js = US.decode $ LB.unpack $ toLazyByteString $ renderJS js
+renderToString js = (US.decode . LB.unpack) . toLazyByteString $ renderJS js
 
 renderToText :: JSAST -> Text
 -- need to be careful to not lose the unicode encoding on output
@@ -143,8 +139,8 @@ instance RenderJS TokenPosn where
       (bbline, ccur') = if lcur < ltgt then (str (replicate (ltgt - lcur) '\n'), 1) else (mempty, ccur)
       bbcol = if ccur' < ctgt then str (replicate (ctgt - ccur') ' ') else mempty
       bb' = bbline <> bbcol
-      lnew = if lcur < ltgt then ltgt else lcur
-      cnew = if ccur' < ctgt then ctgt else ccur'
+      lnew = max lcur ltgt
+      cnew = max ccur' ctgt
 
 instance RenderJS [CommentAnnotation] where
   (|>) = foldl' (|>)

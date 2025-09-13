@@ -191,7 +191,7 @@ positionOffset (TokenPn addr1 _ _) (TokenPn addr2 _ _) = addr2 - addr1
 --
 -- @since 0.7.1.0
 makePosition :: Int -> Int -> TokenPosn
-makePosition line col = TokenPn 0 line col
+makePosition = TokenPn 0
 
 -- | Normalize a position to ensure non-negative values.
 --
@@ -259,7 +259,7 @@ isEmptyPosition pos = pos == tokenPosnEmpty
 -- @since 0.7.1.0
 formatPosition :: TokenPosn -> String
 formatPosition (TokenPn addr line col) =
-  "address " ++ show addr ++ ", line " ++ show line ++ ", column " ++ show col
+  "address " <> (show addr <> (", line " <> (show line <> (", column " <> show col))))
 
 -- | Format position for error messages.
 --
@@ -272,7 +272,7 @@ formatPosition (TokenPn addr line col) =
 -- @since 0.7.1.0
 formatPositionForError :: TokenPosn -> String
 formatPositionForError (TokenPn _ line col) =
-  "line " ++ show line ++ ", column " ++ show col
+  "line " <> (show line <> (", column " <> show col))
 
 -- | Compare positions by address.
 --
