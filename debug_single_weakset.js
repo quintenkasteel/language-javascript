@@ -1,0 +1,1 @@
+var unused = new WeakSet();

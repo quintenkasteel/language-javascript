@@ -24,6 +24,12 @@ import qualified Data.Text.Lazy.Encoding as LT
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
+  ( CommentAnnotation(..)
+  , JSDocComment(..)
+  , JSDocTag(..)
+  , JSDocType(..)
+  , JSDocEnumValue(..)
+  )
 
 -- ---------------------------------------------------------------------
 
@@ -53,6 +59,61 @@ renderToText = LT.decodeUtf8 . toLazyByteString . renderJS
 class RenderJS a where
   -- Render node.
   (|>) :: PosAccum -> a -> PosAccum
+
+-- | Render JSDoc comment to pretty printed text
+renderJSDoc :: JSDocComment -> String
+renderJSDoc jsDoc =
+  let description = maybe "" (\desc -> "  " ++ Text.unpack desc ++ "\n") (jsDocDescription jsDoc)
+      tags = map renderJSDocTag (jsDocTags jsDoc)
+      tagLines = if null tags then "" else unlines (map ("  " ++) tags)
+  in "/**\n" ++ description ++ tagLines ++ " */"
+
+-- | Render individual JSDoc tag to string
+renderJSDocTag :: JSDocTag -> String
+renderJSDocTag tag =
+  let tagName = "@" ++ Text.unpack (jsDocTagName tag)
+      typeStr = maybe "" renderJSDocTypeString (jsDocTagType tag)
+      paramStr = maybe "" (" " ++) (fmap Text.unpack (jsDocTagParamName tag))
+      descStr = maybe "" (" - " ++) (fmap Text.unpack (jsDocTagDescription tag))
+  in tagName ++ typeStr ++ paramStr ++ descStr
+
+-- | Render JSDoc type to string
+renderJSDocTypeString :: JSDocType -> String
+renderJSDocTypeString jsDocType = case jsDocType of
+  JSDocBasicType name -> " {" ++ Text.unpack name ++ "}"
+  JSDocArrayType elementType -> " {" ++ renderJSDocTypeString' elementType ++ "[]}"
+  JSDocUnionType types -> " {" ++ intercalate "|" (map renderJSDocTypeString' types) ++ "}"
+  JSDocObjectType _ -> " {object}"
+  JSDocFunctionType paramTypes returnType ->
+    " {function(" ++ intercalate ", " (map renderJSDocTypeString' paramTypes) ++ "): " ++ renderJSDocTypeString' returnType ++ "}"
+  JSDocGenericType baseName args ->
+    " {" ++ Text.unpack baseName ++ "<" ++ intercalate ", " (map renderJSDocTypeString' args) ++ ">}"
+  JSDocOptionalType baseType -> " {" ++ renderJSDocTypeString' baseType ++ "=}"
+  JSDocNullableType baseType -> " {?" ++ renderJSDocTypeString' baseType ++ "}"
+  JSDocNonNullableType baseType -> " {!" ++ renderJSDocTypeString' baseType ++ "}"
+  JSDocEnumType enumName enumValues -> " {" ++
+    (if null enumValues
+       then Text.unpack enumName
+       else Text.unpack enumName ++ " {" ++ intercalate ", " (map (Text.unpack . jsDocEnumValueName) enumValues) ++ "}") ++ "}"
+
+-- | Helper to render JSDoc type without surrounding braces
+renderJSDocTypeString' :: JSDocType -> String
+renderJSDocTypeString' jsDocType = case jsDocType of
+  JSDocBasicType name -> Text.unpack name
+  JSDocArrayType elementType -> renderJSDocTypeString' elementType ++ "[]"
+  JSDocUnionType types -> intercalate "|" (map renderJSDocTypeString' types)
+  JSDocObjectType _ -> "object"
+  JSDocFunctionType paramTypes returnType ->
+    "function(" ++ intercalate ", " (map renderJSDocTypeString' paramTypes) ++ "): " ++ renderJSDocTypeString' returnType
+  JSDocGenericType baseName args ->
+    Text.unpack baseName ++ "<" ++ intercalate ", " (map renderJSDocTypeString' args) ++ ">"
+  JSDocOptionalType baseType -> renderJSDocTypeString' baseType ++ "="
+  JSDocNullableType baseType -> "?" ++ renderJSDocTypeString' baseType
+  JSDocNonNullableType baseType -> "!" ++ renderJSDocTypeString' baseType
+  JSDocEnumType enumName enumValues ->
+    if null enumValues
+      then Text.unpack enumName
+      else Text.unpack enumName ++ " {" ++ intercalate ", " (map (Text.unpack . jsDocEnumValueName) enumValues) ++ "}"
 
 instance RenderJS JSAST where
   (|>) pacc (JSAstProgram xs a) = pacc |> xs |> a
@@ -149,6 +210,7 @@ instance RenderJS CommentAnnotation where
   (|>) pacc NoComment = pacc
   (|>) pacc (CommentA p s) = pacc |> p |> s
   (|>) pacc (WhiteSpace p s) = pacc |> p |> s
+  (|>) pacc (JSDocA p jsDoc) = pacc |> p |> renderJSDoc jsDoc
 
 instance RenderJS [JSExpression] where
   (|>) = foldl' (|>)

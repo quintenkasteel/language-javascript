@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | JavaScript Abstract Syntax Tree definitions and utilities.
 --
@@ -79,12 +80,24 @@ module Language.JavaScript.Parser.AST
     JSExportSpecifier (..),
     binOpEq,
     showStripped,
+
+    -- * JSDoc Integration
+    extractJSDoc,
+    extractJSDocFromStatement,
+    extractJSDocFromExpression,
+    hasJSDoc,
+    getJSDocParams,
+    getJSDocReturnType,
+    validateJSDocParameters,
+    hasJSDocTag,
+    getJSDocTagsByName,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.Data
 import qualified Data.List as List
+import qualified Data.Text as Text
 import GHC.Generics (Generic)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Parser.Token
@@ -961,3 +974,104 @@ deAnnot (JSBinOpUrsh _) = JSBinOpUrsh JSNoAnnot
 -- @since 0.7.1.0
 binOpEq :: JSBinOp -> JSBinOp -> Bool
 binOpEq a b = deAnnot a == deAnnot b
+
+-- | JSDoc utility functions for AST integration
+
+-- | Extract JSDoc comment from JSAnnot annotation
+--
+-- Searches through the comment annotations in a JSAnnot to find
+-- JSDoc documentation. Returns the first JSDoc comment found.
+--
+-- ==== Examples
+--
+-- >>> extractJSDoc (JSAnnot pos [JSDocA pos jsDoc, CommentA pos "regular"])
+-- Just jsDoc
+--
+-- >>> extractJSDoc (JSAnnot pos [CommentA pos "regular"])
+-- Nothing
+--
+-- @since 0.8.0.0
+extractJSDoc :: JSAnnot -> Maybe JSDocComment
+extractJSDoc (JSAnnot _ comments) = findJSDoc comments
+  where
+    findJSDoc [] = Nothing
+    findJSDoc (JSDocA _ jsDoc : _) = Just jsDoc
+    findJSDoc (_ : rest) = findJSDoc rest
+extractJSDoc _ = Nothing
+
+-- | Extract JSDoc from any JavaScript statement that might have documentation
+--
+-- Looks for JSDoc comments in the leading annotation of various statement types.
+-- Useful for extracting function, class, or variable documentation.
+extractJSDocFromStatement :: JSStatement -> Maybe JSDocComment
+extractJSDocFromStatement stmt = case stmt of
+  JSFunction annot _ _ _ _ _ _ -> extractJSDoc annot
+  JSAsyncFunction annot _ _ _ _ _ _ _ -> extractJSDoc annot
+  JSGenerator annot _ _ _ _ _ _ _ -> extractJSDoc annot
+  JSClass annot _ _ _ _ _ _ -> extractJSDoc annot
+  JSVariable annot _ _ -> extractJSDoc annot
+  JSConstant annot _ _ -> extractJSDoc annot
+  JSLet annot _ _ -> extractJSDoc annot
+  _ -> Nothing
+
+-- | Extract JSDoc from JavaScript expressions that might have documentation
+--
+-- Looks for JSDoc comments in function expressions and class expressions.
+extractJSDocFromExpression :: JSExpression -> Maybe JSDocComment
+extractJSDocFromExpression expr = case expr of
+  JSFunctionExpression annot _ _ _ _ _ -> extractJSDoc annot
+  JSAsyncFunctionExpression annot _ _ _ _ _ _ -> extractJSDoc annot
+  JSGeneratorExpression annot _ _ _ _ _ _ -> extractJSDoc annot
+  JSClassExpression annot _ _ _ _ _ -> extractJSDoc annot
+  _ -> Nothing
+
+-- | Check if a JavaScript statement has JSDoc documentation
+hasJSDoc :: JSStatement -> Bool
+hasJSDoc = isJust . extractJSDocFromStatement
+  where
+    isJust Nothing = False
+    isJust (Just _) = True
+
+-- | Get function parameters from JSDoc @param tags
+--
+-- Extracts parameter names from JSDoc @param tags for validation
+-- against actual function parameters.
+getJSDocParams :: JSDocComment -> [Text.Text]
+getJSDocParams jsDoc =
+  [name | JSDocTag "param" _ (Just name) _ _ _ <- jsDocTags jsDoc]
+
+-- | Get return type from JSDoc @returns/@return tag
+--
+-- Extracts the return type from JSDoc documentation if present.
+getJSDocReturnType :: JSDocComment -> Maybe JSDocType
+getJSDocReturnType jsDoc =
+  case [jsDocType | JSDocTag tagName jsDocType _ _ _ _ <- jsDocTags jsDoc,
+                   tagName `elem` ["returns", "return"],
+                   isJust jsDocType] of
+    (Just returnType : _) -> Just returnType
+    _ -> Nothing
+  where
+    isJust Nothing = False
+    isJust (Just _) = True
+
+-- | Validate JSDoc parameter consistency with function signature
+--
+-- Compares JSDoc @param tags with actual function parameters to detect
+-- missing documentation or extra documented parameters.
+validateJSDocParameters :: JSDocComment -> [String] -> [String]
+validateJSDocParameters jsDoc functionParams =
+  let jsDocParams = map Text.unpack (getJSDocParams jsDoc)
+      missingDocs = filter (`notElem` jsDocParams) functionParams
+      extraDocs = filter (`notElem` functionParams) jsDocParams
+  in map ("Missing JSDoc for parameter: " ++) missingDocs ++
+     map ("Extra JSDoc parameter: " ++) extraDocs
+
+-- | Check if JSDoc comment has a specific tag
+hasJSDocTag :: Text.Text -> JSDocComment -> Bool
+hasJSDocTag tagName jsDoc =
+  any (\tag -> jsDocTagName tag == tagName) (jsDocTags jsDoc)
+
+-- | Get all JSDoc tags of a specific type
+getJSDocTagsByName :: Text.Text -> JSDocComment -> [JSDocTag]
+getJSDocTagsByName tagName jsDoc =
+  filter (\tag -> jsDocTagName tag == tagName) (jsDocTags jsDoc)

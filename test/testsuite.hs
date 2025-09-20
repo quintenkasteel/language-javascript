@@ -72,6 +72,8 @@ import Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
 -- import Unit.Language.Javascript.Process.TreeShake.Usage
 -- import Unit.Language.Javascript.Process.TreeShake.Elimination
 import Integration.Language.Javascript.Process.TreeShake
+import Test.Language.Javascript.JSDocTest
+import Unit.Language.Javascript.Runtime.ValidatorTest
 
 main :: IO ()
 main = do
@@ -132,6 +134,12 @@ testAll = do
   Unit.Language.Javascript.Process.TreeShake.EnterpriseScale.enterpriseScaleTests
   -- Unit.Language.Javascript.Process.TreeShake.Usage.testUsageAnalysis
   -- Unit.Language.Javascript.Process.TreeShake.Elimination.testEliminationCore
+
+  -- Unit Tests - JSDoc
+  Test.Language.Javascript.JSDocTest.tests
+
+  -- Unit Tests - Runtime Validation
+  Unit.Language.Javascript.Runtime.ValidatorTest.validatorTests
 
   -- Integration Tests
   Integration.Language.Javascript.Parser.RoundTrip.testRoundTrip

@@ -32,26 +32,43 @@ module Language.JavaScript.Parser.Validator
     ValidAST (..),
     ValidationResult,
     StrictMode (..),
+    RuntimeValue (..),
+    RuntimeValidationConfig (..),
     validate,
     validateWithStrictMode,
     validateStatement,
     validateExpression,
     validateModuleItem,
     validateAssignmentTarget,
+    validateJSDocIntegrity,
+    validateRuntimeCall,
+    validateRuntimeReturn,
+    validateRuntimeParameters,
+    validateRuntimeValue,
     errorToString,
     errorToStringWithContext,
     errorsToString,
     getErrorPosition,
     formatElmStyleError,
+    formatValidationError,
+    showJSDocType,
+    -- Runtime validation configurations
+    defaultValidationConfig,
+    developmentConfig,
+    productionConfig,
+    -- Enum validation functions
+    findDuplicateEnumValues,
+    validateEnumValueTypeConsistency,
+    validateEnumRuntimeValue,
   )
 where
 
 import Control.DeepSeq (NFData)
-import Data.Char (isDigit)
-import Data.List (group, isSuffixOf, nub, sort)
+import qualified Data.Char as Char
+import Data.List (group, intercalate, isSuffixOf, nub, sort)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Generics (Generic)
@@ -96,6 +113,17 @@ import Language.JavaScript.Parser.AST
     JSVarInitializer (..),
   )
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
+import Language.JavaScript.Parser.Token
+  ( JSDocComment(..)
+  , JSDocTag(..)
+  , JSDocTagSpecific(..)
+  , JSDocAccess(..)
+  , JSDocProperty(..)
+  , JSDocType(..)
+  , JSDocObjectField(..)
+  , JSDocEnumValue(..)
+  , CommentAnnotation(..)
+  )
 
 -- | Strongly typed validation errors with comprehensive JavaScript coverage.
 data ValidationError
@@ -173,6 +201,49 @@ data ValidationError
   | ReservedWordAsIdentifier !Text !TokenPosn
   | FutureReservedWord !Text !TokenPosn
   | MultipleDefaultCases !TokenPosn
+  | -- JSDoc Validation Errors
+    JSDocMissingParameter !Text !TokenPosn
+  | JSDocInvalidType !Text !TokenPosn
+  | JSDocUndefinedType !Text !TokenPosn
+  | JSDocInvalidTag !Text !TokenPosn
+  | JSDocMissingDescription !TokenPosn
+  | JSDocInvalidSyntax !Text !TokenPosn
+  | JSDocDuplicateTag !Text !TokenPosn
+  | JSDocInconsistentReturn !Text !Text !TokenPosn
+  | JSDocInvalidUnion !Text !TokenPosn
+  | JSDocMissingObjectField !Text !Text !TokenPosn
+  | JSDocInvalidArray !Text !TokenPosn
+  | JSDocTypeMismatch !Text !Text !TokenPosn
+  | JSDocSyntaxError !TokenPosn !Text
+  | JSDocTypeParseError !TokenPosn !Text
+  | JSDocInvalidTagCombination !Text !Text !TokenPosn
+  | JSDocMissingRequiredTag !Text !TokenPosn
+  | JSDocInvalidGenericType !Text !TokenPosn
+  | JSDocInvalidFunctionType !Text !TokenPosn
+  | JSDocInvalidAccess !Text !TokenPosn
+  | JSDocInvalidVersionFormat !Text !TokenPosn
+  | JSDocMissingAuthorInfo !TokenPosn
+  | JSDocInvalidEmailFormat !Text !TokenPosn
+  | JSDocInvalidReferenceFormat !Text !TokenPosn
+  | JSDocInvalidNullable !Text !TokenPosn
+  | JSDocInvalidOptional !Text !TokenPosn
+  | JSDocInvalidVariadic !Text !TokenPosn
+  | JSDocInvalidDefaultValue !Text !Text !TokenPosn
+  | -- Enum Validation Errors
+    JSDocEnumUndefined !Text !TokenPosn
+  | JSDocEnumValueDuplicate !Text !Text !TokenPosn
+  | JSDocEnumValueTypeMismatch !Text !Text !Text !TokenPosn
+  | JSDocEnumNotFound !Text !TokenPosn
+  | JSDocEnumCyclicReference !Text !TokenPosn
+  | JSDocEnumInvalidValue !Text !Text !TokenPosn
+  | -- Runtime Validation Errors
+    RuntimeTypeError !Text !Text !TokenPosn
+  | RuntimeParameterCountMismatch !Int !Int !TokenPosn
+  | RuntimeNullConstraintViolation !Text !TokenPosn
+  | RuntimeUnionTypeError ![Text] !Text !TokenPosn
+  | RuntimeObjectFieldMissing !Text !Text !TokenPosn
+  | RuntimeArrayTypeError !Text !TokenPosn
+  | RuntimeReturnTypeError !Text !Text !TokenPosn
   deriving (Eq, Generic, NFData, Show)
 
 -- | Strict mode error subtypes.
@@ -209,6 +280,28 @@ data ValidationContext = ValidationContext
     contextLabels :: ![Text],
     contextBindings :: ![Text], -- Track all bound names for duplicate detection
     contextSuperContext :: !Bool -- Track if super is valid
+  }
+  deriving (Eq, Generic, NFData, Show)
+
+-- | Runtime value types for JSDoc validation.
+data RuntimeValue
+  = JSUndefined
+  | JSNull
+  | JSBoolean !Bool
+  | JSNumber !Double
+  | JSString !Text
+  | JSObject ![(Text, RuntimeValue)]
+  | JSArray ![RuntimeValue]
+  | RuntimeJSFunction !Text
+  deriving (Eq, Generic, NFData, Show)
+
+-- | Runtime validation configuration.
+data RuntimeValidationConfig = RuntimeValidationConfig
+  { _validationEnabled :: !Bool,
+    _strictTypeChecking :: !Bool,
+    _allowImplicitConversions :: !Bool,
+    _reportWarnings :: !Bool,
+    _validateReturnTypes :: !Bool
   }
   deriving (Eq, Generic, NFData, Show)
 
@@ -309,6 +402,49 @@ getErrorPosition err = case err of
   DuplicateImport _ pos -> pos
   InvalidExportDefault pos -> pos
   MultipleDefaultCases pos -> pos
+  -- JSDoc Validation Errors
+  JSDocMissingParameter _ pos -> pos
+  JSDocInvalidType _ pos -> pos
+  JSDocUndefinedType _ pos -> pos
+  JSDocInvalidTag _ pos -> pos
+  JSDocMissingDescription pos -> pos
+  JSDocInvalidSyntax _ pos -> pos
+  JSDocDuplicateTag _ pos -> pos
+  JSDocInconsistentReturn _ _ pos -> pos
+  JSDocInvalidUnion _ pos -> pos
+  JSDocMissingObjectField _ _ pos -> pos
+  JSDocInvalidArray _ pos -> pos
+  JSDocTypeMismatch _ _ pos -> pos
+  JSDocSyntaxError pos _ -> pos
+  JSDocTypeParseError pos _ -> pos
+  JSDocInvalidTagCombination _ _ pos -> pos
+  JSDocMissingRequiredTag _ pos -> pos
+  JSDocInvalidGenericType _ pos -> pos
+  JSDocInvalidFunctionType _ pos -> pos
+  JSDocInvalidAccess _ pos -> pos
+  JSDocInvalidVersionFormat _ pos -> pos
+  JSDocMissingAuthorInfo pos -> pos
+  JSDocInvalidEmailFormat _ pos -> pos
+  JSDocInvalidReferenceFormat _ pos -> pos
+  JSDocInvalidNullable _ pos -> pos
+  JSDocInvalidOptional _ pos -> pos
+  JSDocInvalidVariadic _ pos -> pos
+  JSDocInvalidDefaultValue _ _ pos -> pos
+  -- Enum Validation Errors
+  JSDocEnumUndefined _ pos -> pos
+  JSDocEnumValueDuplicate _ _ pos -> pos
+  JSDocEnumValueTypeMismatch _ _ _ pos -> pos
+  JSDocEnumNotFound _ pos -> pos
+  JSDocEnumCyclicReference _ pos -> pos
+  JSDocEnumInvalidValue _ _ pos -> pos
+  -- Runtime Validation Errors
+  RuntimeTypeError _ _ pos -> pos
+  RuntimeParameterCountMismatch _ _ pos -> pos
+  RuntimeNullConstraintViolation _ pos -> pos
+  RuntimeUnionTypeError _ _ pos -> pos
+  RuntimeObjectFieldMissing _ _ pos -> pos
+  RuntimeArrayTypeError _ pos -> pos
+  RuntimeReturnTypeError _ _ pos -> pos
 
 -- | Extract line number from TokenPosn.
 getErrorLine :: TokenPosn -> Int
@@ -506,6 +642,89 @@ errorToStringSimple err = case err of
     "'" ++ Text.unpack word ++ "' is a future reserved word " ++ showPos pos
   MultipleDefaultCases pos ->
     "Switch statement cannot have multiple default clauses " ++ showPos pos
+  -- JSDoc Validation Errors
+  JSDocMissingParameter param pos ->
+    "JSDoc missing parameter documentation for '" ++ Text.unpack param ++ "' " ++ showPos pos
+  JSDocInvalidType typeName pos ->
+    "JSDoc invalid type '" ++ Text.unpack typeName ++ "' " ++ showPos pos
+  JSDocUndefinedType typeName pos ->
+    "JSDoc undefined type '" ++ Text.unpack typeName ++ "' " ++ showPos pos
+  JSDocInvalidTag tag pos ->
+    "JSDoc invalid tag '@" ++ Text.unpack tag ++ "' " ++ showPos pos
+  JSDocMissingDescription pos ->
+    "JSDoc missing description " ++ showPos pos
+  JSDocInvalidSyntax syntax pos ->
+    "JSDoc invalid syntax: " ++ Text.unpack syntax ++ " " ++ showPos pos
+  JSDocDuplicateTag tag pos ->
+    "JSDoc duplicate tag '@" ++ Text.unpack tag ++ "' " ++ showPos pos
+  JSDocInconsistentReturn expected actual pos ->
+    "JSDoc inconsistent return type: expected '" ++ Text.unpack expected ++ "', got '" ++ Text.unpack actual ++ "' " ++ showPos pos
+  JSDocInvalidUnion union pos ->
+    "JSDoc invalid union type '" ++ Text.unpack union ++ "' " ++ showPos pos
+  JSDocMissingObjectField objType field pos ->
+    "JSDoc missing object field '" ++ Text.unpack field ++ "' in type '" ++ Text.unpack objType ++ "' " ++ showPos pos
+  JSDocInvalidArray arrayType pos ->
+    "JSDoc invalid array type '" ++ Text.unpack arrayType ++ "' " ++ showPos pos
+  JSDocTypeMismatch expected actual pos ->
+    "JSDoc type mismatch: expected '" ++ Text.unpack expected ++ "', got '" ++ Text.unpack actual ++ "' " ++ showPos pos
+  JSDocSyntaxError pos msg ->
+    "JSDoc syntax error: " ++ Text.unpack msg ++ " " ++ showPos pos
+  JSDocTypeParseError pos msg ->
+    "JSDoc type parse error: " ++ Text.unpack msg ++ " " ++ showPos pos
+  JSDocInvalidTagCombination tag1 tag2 pos ->
+    "JSDoc invalid tag combination: '@" ++ Text.unpack tag1 ++ "' and '@" ++ Text.unpack tag2 ++ "' cannot be used together " ++ showPos pos
+  JSDocMissingRequiredTag tag pos ->
+    "JSDoc missing required tag '@" ++ Text.unpack tag ++ "' " ++ showPos pos
+  JSDocInvalidGenericType typeName pos ->
+    "JSDoc invalid generic type '" ++ Text.unpack typeName ++ "' " ++ showPos pos
+  JSDocInvalidFunctionType funcType pos ->
+    "JSDoc invalid function type '" ++ Text.unpack funcType ++ "' " ++ showPos pos
+  JSDocInvalidAccess access pos ->
+    "JSDoc invalid access level '" ++ Text.unpack access ++ "' " ++ showPos pos
+  JSDocInvalidVersionFormat version pos ->
+    "JSDoc invalid version format '" ++ Text.unpack version ++ "' " ++ showPos pos
+  JSDocMissingAuthorInfo pos ->
+    "JSDoc author tag missing name information " ++ showPos pos
+  JSDocInvalidEmailFormat email pos ->
+    "JSDoc invalid email format '" ++ Text.unpack email ++ "' " ++ showPos pos
+  JSDocInvalidReferenceFormat reference pos ->
+    "JSDoc invalid reference format '" ++ Text.unpack reference ++ "' " ++ showPos pos
+  JSDocInvalidNullable typeName pos ->
+    "JSDoc invalid nullable type '" ++ Text.unpack typeName ++ "' " ++ showPos pos
+  JSDocInvalidOptional typeName pos ->
+    "JSDoc invalid optional type '" ++ Text.unpack typeName ++ "' " ++ showPos pos
+  JSDocInvalidVariadic typeName pos ->
+    "JSDoc invalid variadic type '" ++ Text.unpack typeName ++ "' " ++ showPos pos
+  JSDocInvalidDefaultValue expected actual pos ->
+    "JSDoc invalid default value: expected '" ++ Text.unpack expected ++ "', got '" ++ Text.unpack actual ++ "' " ++ showPos pos
+  -- Enum Validation Errors
+  JSDocEnumUndefined enumName pos ->
+    "JSDoc undefined enum '" ++ Text.unpack enumName ++ "' " ++ showPos pos
+  JSDocEnumValueDuplicate enumName value pos ->
+    "JSDoc duplicate enum value '" ++ Text.unpack value ++ "' in enum '" ++ Text.unpack enumName ++ "' " ++ showPos pos
+  JSDocEnumValueTypeMismatch enumName type1 type2 pos ->
+    "JSDoc enum value type mismatch in '" ++ Text.unpack enumName ++ "': expected '" ++ Text.unpack type1 ++ "', got '" ++ Text.unpack type2 ++ "' " ++ showPos pos
+  JSDocEnumNotFound enumName pos ->
+    "JSDoc enum not found: '" ++ Text.unpack enumName ++ "' " ++ showPos pos
+  JSDocEnumCyclicReference enumName pos ->
+    "JSDoc cyclic enum reference in '" ++ Text.unpack enumName ++ "' " ++ showPos pos
+  JSDocEnumInvalidValue valueName literal pos ->
+    "JSDoc invalid enum value '" ++ Text.unpack valueName ++ "' with literal '" ++ Text.unpack literal ++ "' " ++ showPos pos
+  -- Runtime Validation Errors
+  RuntimeTypeError expected actual pos ->
+    "Runtime type error: expected '" ++ Text.unpack expected ++ "', got '" ++ Text.unpack actual ++ "' " ++ showPos pos
+  RuntimeParameterCountMismatch expected actual pos ->
+    "Runtime parameter count mismatch: expected " ++ show expected ++ ", got " ++ show actual ++ " " ++ showPos pos
+  RuntimeNullConstraintViolation param pos ->
+    "Runtime null constraint violation for parameter '" ++ Text.unpack param ++ "' " ++ showPos pos
+  RuntimeUnionTypeError validTypes actual pos ->
+    "Runtime union type error: expected one of [" ++ intercalate ", " (map Text.unpack validTypes) ++ "], got '" ++ Text.unpack actual ++ "' " ++ showPos pos
+  RuntimeObjectFieldMissing objType field pos ->
+    "Runtime object field missing: '" ++ Text.unpack field ++ "' in type '" ++ Text.unpack objType ++ "' " ++ showPos pos
+  RuntimeArrayTypeError elementType pos ->
+    "Runtime array type error: invalid element type '" ++ Text.unpack elementType ++ "' " ++ showPos pos
+  RuntimeReturnTypeError expected actual pos ->
+    "Runtime return type error: expected '" ++ Text.unpack expected ++ "', got '" ++ Text.unpack actual ++ "' " ++ showPos pos
 
 -- | Convert list of validation errors to formatted string.
 errorsToString :: [ValidationError] -> String
@@ -1141,7 +1360,7 @@ validateNumericLiteral literal
   | all isValidNumChar literal = []
   | otherwise = [InvalidNumericLiteral (Text.pack literal) (TokenPn 0 0 0)]
   where
-    isValidNumChar c = isDigit c || c `elem` (".-+eE" :: String)
+    isValidNumChar c = Char.isDigit c || c `elem` (".-+eE" :: String)
 
 -- | Validate hex literals.
 validateHexLiteral :: String -> [ValidationError]
@@ -1206,7 +1425,7 @@ validateStringEscapes = go
 
     validateNullEscape :: String -> [ValidationError]
     validateNullEscape rest = case rest of
-      (d : _) | isDigit d -> [InvalidEscapeSequence (Text.pack "\\0") (TokenPn 0 0 0)] ++ go rest
+      (d : _) | Char.isDigit d -> [InvalidEscapeSequence (Text.pack "\\0") (TokenPn 0 0 0)] ++ go rest
       _ -> go rest
 
     validateUnicodeEscape :: String -> [ValidationError]
@@ -1241,7 +1460,7 @@ validateStringEscapes = go
             else [InvalidEscapeSequence (Text.pack ("\\" ++ octalChars)) (TokenPn 0 0 0)] ++ go remaining
 
     isHexDigit :: Char -> Bool
-    isHexDigit c = isDigit c || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+    isHexDigit c = Char.isDigit c || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 
     isOctalDigit :: Char -> Bool
     isOctalDigit c = c >= '0' && c <= '7'
@@ -1306,10 +1525,10 @@ validateRegexPattern = validateRegexSyntax
 
         isValidQuantifier :: String -> Bool
         isValidQuantifier [] = False
-        isValidQuantifier s = case span isDigit s of
+        isValidQuantifier s = case span Char.isDigit s of
           (n1, "") -> not (null n1)
           (n1, ",") -> not (null n1)
-          (n1, ',' : n2) -> not (null n1) && (null n2 || all isDigit n2)
+          (n1, ',' : n2) -> not (null n1) && (null n2 || all Char.isDigit n2)
           _ -> False
 
 -- | Validate regex flags.
@@ -1341,7 +1560,7 @@ validateLiteral ctx literal =
     isNumericLiteral :: String -> Bool
     isNumericLiteral s = case s of
       [] -> False
-      (c : _) -> isDigit c || c == '.'
+      (c : _) -> Char.isDigit c || c == '.'
 
 -- Validation functions remain focused on semantic validation of parsed ASTs
 
@@ -1994,3 +2213,748 @@ extractTokenPosn item = case item of
   JSModuleImportDeclaration annot _ -> extractAnnotationPos annot
   JSModuleExportDeclaration annot _ -> extractAnnotationPos annot
   JSModuleStatementListItem stmt -> extractStatementPos stmt
+
+-- ============================================================================
+-- JSDoc Validation Functions (Consolidated from JSDocValidation.hs)
+-- ============================================================================
+
+-- | Validate JSDoc comment integrity.
+validateJSDocIntegrity :: JSDocComment -> [ValidationError]
+validateJSDocIntegrity jsDoc =
+  validateJSDocParameterTags jsDoc
+    ++ validateJSDocTypes jsDoc
+    ++ validateJSDocReturnConsistency jsDoc
+    ++ validateJSDocUnionTypes jsDoc
+    ++ validateJSDocObjectFields jsDoc
+    ++ validateJSDocArrayTypes jsDoc
+    ++ validateJSDocTagSpecifics jsDoc
+    ++ validateJSDocTagCombinations jsDoc
+    ++ validateJSDocRequiredFields jsDoc
+    ++ validateJSDocGenericTypes jsDoc
+    ++ validateJSDocFunctionTypes jsDoc
+    ++ validateJSDocCrossReferences jsDoc
+    ++ validateJSDocSemantics jsDoc
+    ++ validateJSDocExamples jsDoc
+
+-- | Validate JSDoc parameter tags.
+validateJSDocParameterTags :: JSDocComment -> [ValidationError]
+validateJSDocParameterTags jsDoc =
+  let paramTags = filter (\tag -> jsDocTagName tag == "param") (jsDocTags jsDoc)
+      pos = jsDocPosition jsDoc
+   in concatMap (validateParameterTag pos) paramTags
+
+validateParameterTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateParameterTag pos tag =
+  case (jsDocTagType tag, jsDocTagParamName tag) of
+    (Nothing, _) -> [JSDocInvalidType "missing type" pos]
+    (_, Nothing) -> [JSDocMissingParameter "unnamed parameter" pos]
+    (Just tagType, Just paramName) -> validateJSDocTypeStructure tagType pos
+
+-- | Validate JSDoc types structure.
+validateJSDocTypes :: JSDocComment -> [ValidationError]
+validateJSDocTypes jsDoc =
+  let allTags = jsDocTags jsDoc
+      pos = jsDocPosition jsDoc
+   in concatMap (validateTagType pos) allTags
+
+validateTagType :: TokenPosn -> JSDocTag -> [ValidationError]
+validateTagType pos tag =
+  case jsDocTagType tag of
+    Nothing -> []
+    Just tagType -> validateJSDocTypeStructure tagType pos
+
+validateJSDocTypeStructure :: JSDocType -> TokenPosn -> [ValidationError]
+validateJSDocTypeStructure jsDocType pos = case jsDocType of
+  JSDocBasicType typeName -> validateBasicType typeName pos
+  JSDocArrayType elementType -> validateJSDocTypeStructure elementType pos
+  JSDocUnionType types -> concatMap (\t -> validateJSDocTypeStructure t pos) types
+  JSDocObjectType fields -> concatMap (validateObjectField pos) fields
+  JSDocFunctionType paramTypes returnType ->
+    concatMap (\t -> validateJSDocTypeStructure t pos) paramTypes
+      ++ validateJSDocTypeStructure returnType pos
+  JSDocGenericType baseName args ->
+    validateBasicType baseName pos
+      ++ concatMap (\t -> validateJSDocTypeStructure t pos) args
+  JSDocOptionalType baseType -> validateJSDocTypeStructure baseType pos
+  JSDocNullableType baseType -> validateJSDocTypeStructure baseType pos
+  JSDocNonNullableType baseType -> validateJSDocTypeStructure baseType pos
+  JSDocEnumType enumName enumValues -> validateEnumType enumName enumValues pos
+
+validateBasicType :: Text -> TokenPosn -> [ValidationError]
+validateBasicType typeName pos
+  | typeName `elem` validJSDocTypes = []
+  | otherwise = [JSDocUndefinedType typeName pos]
+  where
+    validJSDocTypes = [ "string", "number", "boolean", "object", "function", "undefined", "null", "any", "void"
+                      , "Array", "Object", "String", "Number", "Boolean", "Function", "Date", "RegExp"
+                      , "Promise", "Map", "Set", "WeakMap", "WeakSet", "Symbol", "BigInt"
+                      , "Int8Array", "Uint8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array"
+                      , "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array"
+                      , "ArrayBuffer", "SharedArrayBuffer", "DataView", "Error", "TypeError", "RangeError"
+                      , "SyntaxError", "ReferenceError", "EvalError", "URIError", "JSON", "Math", "Intl"
+                      , "Node", "Element", "Document", "Window", "Event", "MouseEvent", "KeyboardEvent"
+                      , "HTMLElement", "HTMLDocument", "XMLHttpRequest", "Blob", "File", "FileReader"
+                      ]
+
+validateObjectField :: TokenPosn -> JSDocObjectField -> [ValidationError]
+validateObjectField pos field =
+  validateJSDocTypeStructure (jsDocFieldType field) pos
+
+-- | Validate enum type definition and references
+validateEnumType :: Text -> [JSDocEnumValue] -> TokenPosn -> [ValidationError]
+validateEnumType enumName enumValues pos =
+  let duplicateErrors = findDuplicateEnumValues enumValues pos
+      valueErrors = concatMap (validateEnumValue pos) enumValues
+      typeConsistencyErrors = validateEnumValueTypeConsistency enumName enumValues pos
+  in duplicateErrors ++ valueErrors ++ typeConsistencyErrors
+
+-- | Find duplicate enum values
+findDuplicateEnumValues :: [JSDocEnumValue] -> TokenPosn -> [ValidationError]
+findDuplicateEnumValues values pos =
+  let valueNames = map jsDocEnumValueName values
+      duplicates = findDuplicatesInList valueNames
+  in map (\name -> JSDocEnumValueDuplicate name (jsDocEnumValueName (head values)) pos) duplicates
+
+-- | Validate individual enum value
+validateEnumValue :: TokenPosn -> JSDocEnumValue -> [ValidationError]
+validateEnumValue pos enumValue =
+  case jsDocEnumValueLiteral enumValue of
+    Nothing -> []  -- No literal value specified
+    Just literal ->
+      if isValidEnumLiteral literal
+        then []
+        else [JSDocEnumInvalidValue (jsDocEnumValueName enumValue) literal pos]
+
+-- | Check if a literal value is valid for enums (string or number)
+isValidEnumLiteral :: Text -> Bool
+isValidEnumLiteral literal =
+  isStringLiteral literal || isNumericLiteral literal
+  where
+    isStringLiteral text =
+      (Text.isPrefixOf "\"" text && Text.isSuffixOf "\"" text) ||
+      (Text.isPrefixOf "'" text && Text.isSuffixOf "'" text)
+    isNumericLiteral text =
+      Text.all (\c -> Char.isDigit c || c == '.' || c == '-' || c == '+') text &&
+      not (Text.null text)
+
+-- | Validate that all enum values have consistent types
+validateEnumValueTypeConsistency :: Text -> [JSDocEnumValue] -> TokenPosn -> [ValidationError]
+validateEnumValueTypeConsistency enumName values pos =
+  let literalValues = mapMaybe jsDocEnumValueLiteral values
+      types = map getEnumLiteralType literalValues
+      uniqueTypes = nub types
+  in if length uniqueTypes > 1
+     then [JSDocEnumValueTypeMismatch enumName (head types) (types !! 1) pos]
+     else []
+  where
+    getEnumLiteralType :: Text -> Text
+    getEnumLiteralType literal
+      | (Text.isPrefixOf "\"" literal && Text.isSuffixOf "\"" literal) ||
+        (Text.isPrefixOf "'" literal && Text.isSuffixOf "'" literal) = "string"
+      | Text.all (\c -> Char.isDigit c || c == '.' || c == '-' || c == '+') literal = "number"
+      | otherwise = "unknown"
+
+-- | Find duplicates in a list
+findDuplicatesInList :: Eq a => [a] -> [a]
+findDuplicatesInList [] = []
+findDuplicatesInList (x:xs) = if x `elem` xs then x : findDuplicatesInList xs else findDuplicatesInList xs
+
+-- | Validate JSDoc return type consistency.
+validateJSDocReturnConsistency :: JSDocComment -> [ValidationError]
+validateJSDocReturnConsistency jsDoc =
+  let returnTags = filter (\tag -> jsDocTagName tag == "returns" || jsDocTagName tag == "return") (jsDocTags jsDoc)
+      pos = jsDocPosition jsDoc
+   in case returnTags of
+        [] -> []
+        [tag] -> validateReturnTag pos tag
+        _ -> [JSDocDuplicateTag "returns" pos]
+
+validateReturnTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateReturnTag pos tag =
+  case jsDocTagType tag of
+    Nothing -> [JSDocInvalidType "missing return type" pos]
+    Just tagType -> validateJSDocTypeStructure tagType pos
+
+-- | Validate JSDoc union types.
+validateJSDocUnionTypes :: JSDocComment -> [ValidationError]
+validateJSDocUnionTypes jsDoc =
+  let pos = jsDocPosition jsDoc
+   in concatMap (validateUnionInTag pos) (jsDocTags jsDoc)
+
+validateUnionInTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateUnionInTag pos tag =
+  case jsDocTagType tag of
+    Just (JSDocUnionType types) -> validateUnionTypes pos types
+    _ -> []
+
+validateUnionTypes :: TokenPosn -> [JSDocType] -> [ValidationError]
+validateUnionTypes pos types
+  | length types < 2 = [JSDocInvalidUnion "union must have at least 2 types" pos]
+  | otherwise = concatMap (\t -> validateJSDocTypeStructure t pos) types
+
+-- | Validate JSDoc object field specifications.
+validateJSDocObjectFields :: JSDocComment -> [ValidationError]
+validateJSDocObjectFields jsDoc =
+  let pos = jsDocPosition jsDoc
+   in concatMap (validateObjectInTag pos) (jsDocTags jsDoc)
+
+validateObjectInTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateObjectInTag pos tag =
+  case jsDocTagType tag of
+    Just (JSDocObjectType fields) -> validateObjectTypeFields pos fields
+    _ -> []
+
+validateObjectTypeFields :: TokenPosn -> [JSDocObjectField] -> [ValidationError]
+validateObjectTypeFields pos fields =
+  let fieldNames = map jsDocFieldName fields
+      duplicates = findDuplicates fieldNames
+   in map (\name -> JSDocMissingObjectField "object" name pos) duplicates
+     ++ concatMap (validateObjectField pos) fields
+
+-- | Validate JSDoc array types.
+validateJSDocArrayTypes :: JSDocComment -> [ValidationError]
+validateJSDocArrayTypes jsDoc =
+  let pos = jsDocPosition jsDoc
+   in concatMap (validateArrayInTag pos) (jsDocTags jsDoc)
+
+validateArrayInTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateArrayInTag pos tag =
+  case jsDocTagType tag of
+    Just (JSDocArrayType elementType) -> validateJSDocTypeStructure elementType pos
+    _ -> []
+
+-- | Validate JSDoc tag-specific information.
+validateJSDocTagSpecifics :: JSDocComment -> [ValidationError]
+validateJSDocTagSpecifics jsDoc =
+  let pos = jsDocPosition jsDoc
+      tags = jsDocTags jsDoc
+   in concatMap (validateTagSpecific pos) tags
+
+validateTagSpecific :: TokenPosn -> JSDocTag -> [ValidationError]
+validateTagSpecific pos tag =
+  case jsDocTagSpecific tag of
+    Nothing -> []
+    Just tagSpecific -> validateSpecificTag pos tagSpecific (jsDocTagName tag)
+
+validateSpecificTag :: TokenPosn -> JSDocTagSpecific -> Text -> [ValidationError]
+validateSpecificTag pos tagSpecific tagName = case tagSpecific of
+  JSDocParamTag optional variadic defaultValue ->
+    validateParamSpecific pos tagName optional variadic defaultValue
+  JSDocAuthorTag name email ->
+    validateAuthorSpecific pos name email
+  JSDocVersionTag version ->
+    validateVersionSpecific pos version
+  JSDocSinceTag version ->
+    validateVersionSpecific pos version
+  JSDocSeeTag reference displayText ->
+    validateSeeSpecific pos reference displayText
+  JSDocDeprecatedTag since replacement ->
+    validateDeprecatedSpecific pos since replacement
+  _ -> []
+
+validateParamSpecific :: TokenPosn -> Text -> Bool -> Bool -> Maybe Text -> [ValidationError]
+validateParamSpecific pos tagName optional variadic defaultValue =
+  let errors = []
+      optionalErrors = if optional && variadic
+                      then [JSDocInvalidTagCombination "optional" "variadic" pos]
+                      else []
+      defaultErrors = case defaultValue of
+        Just value | not optional -> [JSDocInvalidDefaultValue "optional parameter" "non-optional" pos]
+        _ -> []
+   in errors ++ optionalErrors ++ defaultErrors
+
+validateAuthorSpecific :: TokenPosn -> Text -> Maybe Text -> [ValidationError]
+validateAuthorSpecific pos name email =
+  let nameErrors = if Text.null name then [JSDocMissingAuthorInfo pos] else []
+      emailErrors = case email of
+        Just e | not (isValidEmail e) -> [JSDocInvalidEmailFormat e pos]
+        _ -> []
+   in nameErrors ++ emailErrors
+
+validateVersionSpecific :: TokenPosn -> Text -> [ValidationError]
+validateVersionSpecific pos version =
+  if isValidVersion version
+    then []
+    else [JSDocInvalidVersionFormat version pos]
+
+validateSeeSpecific :: TokenPosn -> Text -> Maybe Text -> [ValidationError]
+validateSeeSpecific pos reference _displayText =
+  if isValidReference reference
+    then []
+    else [JSDocInvalidReferenceFormat reference pos]
+
+validateDeprecatedSpecific :: TokenPosn -> Maybe Text -> Maybe Text -> [ValidationError]
+validateDeprecatedSpecific pos since _replacement =
+  case since of
+    Just version | not (isValidVersion version) -> [JSDocInvalidVersionFormat version pos]
+    _ -> []
+
+-- | Validate JSDoc tag combinations.
+validateJSDocTagCombinations :: JSDocComment -> [ValidationError]
+validateJSDocTagCombinations jsDoc =
+  let pos = jsDocPosition jsDoc
+      tags = jsDocTags jsDoc
+      tagNames = map jsDocTagName tags
+   in validateIncompatibleTags pos tagNames
+      ++ validateMutuallyExclusive pos tagNames
+      ++ validateRequiredCombinations pos tagNames
+
+validateIncompatibleTags :: TokenPosn -> [Text] -> [ValidationError]
+validateIncompatibleTags pos tagNames =
+  let incompatiblePairs = [ ("constructor", "namespace")
+                          , ("static", "inner")
+                          , ("abstract", "final")
+                          , ("public", "private")
+                          , ("public", "protected")
+                          , ("private", "protected")
+                          ]
+      hasTag tag = tag `elem` tagNames
+      checkPair (tag1, tag2) = if hasTag tag1 && hasTag tag2
+                              then [JSDocInvalidTagCombination tag1 tag2 pos]
+                              else []
+   in concatMap checkPair incompatiblePairs
+
+validateMutuallyExclusive :: TokenPosn -> [Text] -> [ValidationError]
+validateMutuallyExclusive pos tagNames =
+  let exclusiveGroups = [ ["public", "private", "protected", "package"]
+                        , ["class", "constructor", "namespace", "module"]
+                        ]
+      checkGroup group =
+        let presentTags = filter (`elem` tagNames) group
+        in case presentTags of
+          [] -> []
+          [_] -> []
+          (tag1:tag2:_) -> [JSDocInvalidTagCombination tag1 tag2 pos]
+   in concatMap checkGroup exclusiveGroups
+
+validateRequiredCombinations :: TokenPosn -> [Text] -> [ValidationError]
+validateRequiredCombinations pos tagNames =
+  let hasTag tag = tag `elem` tagNames
+      requirements = [ ("memberof", ["class", "namespace", "module"])
+                     , ("static", ["class"])
+                     , ("inner", ["class", "namespace"])
+                     ]
+      checkRequirement (tag, requiredTags) =
+        if hasTag tag && not (any hasTag requiredTags)
+          then [JSDocMissingRequiredTag (Text.intercalate " or " requiredTags) pos]
+          else []
+   in concatMap checkRequirement requirements
+
+-- | Validate JSDoc required fields.
+validateJSDocRequiredFields :: JSDocComment -> [ValidationError]
+validateJSDocRequiredFields jsDoc =
+  let pos = jsDocPosition jsDoc
+      tags = jsDocTags jsDoc
+      tagNames = map jsDocTagName tags
+   in validateClassRequirements pos tagNames
+      ++ validateModuleRequirements pos tagNames
+      ++ validateCallbackRequirements pos tagNames
+
+validateClassRequirements :: TokenPosn -> [Text] -> [ValidationError]
+validateClassRequirements pos tagNames =
+  let hasTag tag = tag `elem` tagNames
+   in if hasTag "class" && not (hasTag "constructor")
+        then [JSDocMissingRequiredTag "constructor" pos]
+        else []
+
+validateModuleRequirements :: TokenPosn -> [Text] -> [ValidationError]
+validateModuleRequirements pos tagNames =
+  let hasTag tag = tag `elem` tagNames
+   in if hasTag "module" && not (any hasTag ["description", "since"])
+        then [JSDocMissingRequiredTag "description or since" pos]
+        else []
+
+validateCallbackRequirements :: TokenPosn -> [Text] -> [ValidationError]
+validateCallbackRequirements pos tagNames =
+  let hasTag tag = tag `elem` tagNames
+   in if hasTag "callback" && not (hasTag "param" || hasTag "returns")
+        then [JSDocMissingRequiredTag "param or returns" pos]
+        else []
+
+-- | Validate JSDoc generic types.
+validateJSDocGenericTypes :: JSDocComment -> [ValidationError]
+validateJSDocGenericTypes jsDoc =
+  let pos = jsDocPosition jsDoc
+   in concatMap (validateGenericInTag pos) (jsDocTags jsDoc)
+
+validateGenericInTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateGenericInTag pos tag =
+  case jsDocTagType tag of
+    Just jsDocType -> validateGenericType pos jsDocType
+    Nothing -> []
+
+validateGenericType :: TokenPosn -> JSDocType -> [ValidationError]
+validateGenericType pos jsDocType = case jsDocType of
+  JSDocGenericType baseName args ->
+    let baseErrors = if Text.null baseName then [JSDocInvalidGenericType "empty base type" pos] else []
+        argsErrors = if null args then [JSDocInvalidGenericType "missing type arguments" pos] else []
+        recursiveErrors = concatMap (validateGenericType pos) args
+    in baseErrors ++ argsErrors ++ recursiveErrors
+  JSDocArrayType elementType -> validateGenericType pos elementType
+  JSDocUnionType types -> concatMap (validateGenericType pos) types
+  JSDocFunctionType paramTypes returnType ->
+    concatMap (validateGenericType pos) paramTypes ++ validateGenericType pos returnType
+  JSDocOptionalType baseType -> validateGenericType pos baseType
+  JSDocNullableType baseType -> validateGenericType pos baseType
+  JSDocNonNullableType baseType -> validateGenericType pos baseType
+  _ -> []
+
+-- | Validate JSDoc function types.
+validateJSDocFunctionTypes :: JSDocComment -> [ValidationError]
+validateJSDocFunctionTypes jsDoc =
+  let pos = jsDocPosition jsDoc
+   in concatMap (validateFunctionInTag pos) (jsDocTags jsDoc)
+
+validateFunctionInTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateFunctionInTag pos tag =
+  case jsDocTagType tag of
+    Just jsDocType -> validateFunctionType pos jsDocType
+    Nothing -> []
+
+validateFunctionType :: TokenPosn -> JSDocType -> [ValidationError]
+validateFunctionType pos jsDocType = case jsDocType of
+  JSDocFunctionType paramTypes returnType ->
+    let paramErrors = concatMap (\t -> validateJSDocTypeStructure t pos) paramTypes
+        returnErrors = validateJSDocTypeStructure returnType pos
+    in paramErrors ++ returnErrors
+  JSDocArrayType elementType -> validateFunctionType pos elementType
+  JSDocUnionType types -> concatMap (validateFunctionType pos) types
+  JSDocOptionalType baseType -> validateFunctionType pos baseType
+  JSDocNullableType baseType -> validateFunctionType pos baseType
+  JSDocNonNullableType baseType -> validateFunctionType pos baseType
+  _ -> []
+
+-- Helper functions for validation
+isValidEmail :: Text -> Bool
+isValidEmail email =
+  Text.any (== '@') email && Text.any (== '.') email && Text.length email > 5
+
+isValidVersion :: Text -> Bool
+isValidVersion version =
+  let versionPattern = Text.all (\c -> c >= '0' && c <= '9' || c == '.')
+  in versionPattern version && not (Text.null version)
+
+isValidReference :: Text -> Bool
+isValidReference reference =
+  not (Text.null reference) && Text.length reference > 2
+
+-- | Cross-reference resolution and validation
+validateJSDocCrossReferences :: JSDocComment -> [ValidationError]
+validateJSDocCrossReferences jsDoc =
+  let pos = jsDocPosition jsDoc
+      tags = jsDocTags jsDoc
+   in concatMap (validateCrossReference pos) tags
+
+validateCrossReference :: TokenPosn -> JSDocTag -> [ValidationError]
+validateCrossReference pos tag = case jsDocTagSpecific tag of
+  Just (JSDocMemberOfTag parent forced) ->
+    validateMemberOfReference pos parent forced
+  Just (JSDocSeeTag reference displayText) ->
+    validateSeeReference pos reference displayText
+  _ -> []
+
+validateMemberOfReference :: TokenPosn -> Text -> Bool -> [ValidationError]
+validateMemberOfReference pos parent forced =
+  let errors = []
+      parentErrors = if Text.null parent
+                    then [JSDocInvalidReferenceFormat "empty parent reference" pos]
+                    else []
+      formatErrors = if not (isValidIdentifier parent)
+                    then [JSDocInvalidReferenceFormat ("invalid parent format: " <> parent) pos]
+                    else []
+   in errors ++ parentErrors ++ formatErrors
+
+validateSeeReference :: TokenPosn -> Text -> Maybe Text -> [ValidationError]
+validateSeeReference pos reference displayText =
+  let errors = []
+      refErrors = if not (isValidSeeReference reference)
+                 then [JSDocInvalidReferenceFormat reference pos]
+                 else []
+   in errors ++ refErrors
+
+isValidIdentifier :: Text -> Bool
+isValidIdentifier text =
+  not (Text.null text) &&
+  Text.all (\c -> c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.' || c == '#') text
+
+isValidSeeReference :: Text -> Bool
+isValidSeeReference reference =
+  not (Text.null reference) &&
+  (Text.isPrefixOf "http" reference ||
+   Text.isPrefixOf "{@link" reference ||
+   isValidIdentifier reference)
+
+-- | Advanced JSDoc semantic validation
+validateJSDocSemantics :: JSDocComment -> [ValidationError]
+validateJSDocSemantics jsDoc =
+  let pos = jsDocPosition jsDoc
+      tags = jsDocTags jsDoc
+      tagNames = map jsDocTagName tags
+   in validateSemanticConsistency pos tagNames tags
+      ++ validateContextualRequirements pos tagNames
+      ++ validateInheritanceRules pos tags
+
+validateSemanticConsistency :: TokenPosn -> [Text] -> [JSDocTag] -> [ValidationError]
+validateSemanticConsistency pos tagNames tags =
+  let errors = []
+      asyncErrors = if "async" `elem` tagNames && not ("returns" `elem` tagNames)
+                   then [JSDocMissingRequiredTag "returns with Promise type for async functions" pos]
+                   else []
+      generatorErrors = if "generator" `elem` tagNames && not ("yields" `elem` tagNames)
+                       then [JSDocMissingRequiredTag "yields for generator functions" pos]
+                       else []
+   in errors ++ asyncErrors ++ generatorErrors
+
+validateContextualRequirements :: TokenPosn -> [Text] -> [ValidationError]
+validateContextualRequirements pos tagNames =
+  let errors = []
+      overrideErrors = if "override" `elem` tagNames && not ("extends" `elem` tagNames || "implements" `elem` tagNames)
+                      then [JSDocMissingRequiredTag "extends or implements for override" pos]
+                      else []
+      abstractErrors = if "abstract" `elem` tagNames && "final" `elem` tagNames
+                      then [JSDocInvalidTagCombination "abstract" "final" pos]
+                      else []
+   in errors ++ overrideErrors ++ abstractErrors
+
+validateInheritanceRules :: TokenPosn -> [JSDocTag] -> [ValidationError]
+validateInheritanceRules pos tags =
+  let errors = []
+      extendsTags = filter (\tag -> jsDocTagName tag == "extends") tags
+      implementsTags = filter (\tag -> jsDocTagName tag == "implements") tags
+      multipleExtendsErrors = if length extendsTags > 1
+                             then [JSDocInvalidTagCombination "multiple extends" "single inheritance" pos]
+                             else []
+   in errors ++ multipleExtendsErrors
+
+-- | Validate JSDoc example code blocks
+validateJSDocExamples :: JSDocComment -> [ValidationError]
+validateJSDocExamples jsDoc =
+  let pos = jsDocPosition jsDoc
+      tags = jsDocTags jsDoc
+      exampleTags = filter (\tag -> jsDocTagName tag == "example") tags
+   in concatMap (validateExampleTag pos) exampleTags
+
+validateExampleTag :: TokenPosn -> JSDocTag -> [ValidationError]
+validateExampleTag pos tag =
+  case jsDocTagDescription tag of
+    Nothing -> [JSDocMissingParameter "example code" pos]
+    Just code -> validateExampleCode pos code
+
+validateExampleCode :: TokenPosn -> Text -> [ValidationError]
+validateExampleCode pos code =
+  let errors = []
+      emptyErrors = if Text.null (Text.strip code)
+                   then [JSDocInvalidType "empty example code" pos]
+                   else []
+      tooLongErrors = if Text.length code > 2000
+                     then [JSDocInvalidType "example code too long" pos]
+                     else []
+   in errors ++ emptyErrors ++ tooLongErrors
+
+-- ============================================================================
+-- Runtime Validation Functions (Consolidated from Runtime.Validator)
+-- ============================================================================
+
+-- | Validate runtime function call against JSDoc.
+validateRuntimeCall :: JSDocComment -> [RuntimeValue] -> Either [ValidationError] [RuntimeValue]
+validateRuntimeCall jsDoc args =
+  let paramTags = filter (\tag -> jsDocTagName tag == "param") (jsDocTags jsDoc)
+      pos = jsDocPosition jsDoc
+      paramValidation = validateParameterCount pos (length paramTags) (length args)
+      typeValidation = zipWith (validateRuntimeParameter pos) paramTags args
+   in case paramValidation ++ concat typeValidation of
+        [] -> Right args
+        errors -> Left errors
+
+validateParameterCount :: TokenPosn -> Int -> Int -> [ValidationError]
+validateParameterCount pos expected actual
+  | expected == actual = []
+  | otherwise = [RuntimeParameterCountMismatch expected actual pos]
+
+validateRuntimeParameter :: TokenPosn -> JSDocTag -> RuntimeValue -> [ValidationError]
+validateRuntimeParameter pos tag value =
+  case jsDocTagType tag of
+    Nothing -> []
+    Just expectedType -> validateRuntimeValueInternal pos expectedType value
+
+-- | Validate runtime parameters against JSDoc specifications.
+validateRuntimeParameters :: JSDocComment -> [RuntimeValue] -> [ValidationError]
+validateRuntimeParameters jsDoc values =
+  let paramTags = filter (\tag -> jsDocTagName tag == "param") (jsDocTags jsDoc)
+      pos = jsDocPosition jsDoc
+   in validateParameterCount pos (length paramTags) (length values)
+     ++ concat (zipWith (validateRuntimeParameter pos) paramTags values)
+
+-- | Validate runtime return value against JSDoc.
+validateRuntimeReturn :: JSDocComment -> RuntimeValue -> Either ValidationError RuntimeValue
+validateRuntimeReturn jsDoc returnValue =
+  let returnTags = filter (\tag -> jsDocTagName tag == "returns" || jsDocTagName tag == "return") (jsDocTags jsDoc)
+      pos = jsDocPosition jsDoc
+   in case returnTags of
+        [] -> Right returnValue
+        (tag : _) -> case jsDocTagType tag of
+          Nothing -> Right returnValue
+          Just expectedType ->
+            case validateRuntimeValueInternal pos expectedType returnValue of
+              [] -> Right returnValue
+              (err : _) -> Left err
+
+validateRuntimeValueInternal :: TokenPosn -> JSDocType -> RuntimeValue -> [ValidationError]
+validateRuntimeValueInternal pos expectedType actualValue = case (expectedType, actualValue) of
+  (JSDocBasicType "string", JSString _) -> []
+  (JSDocBasicType "number", JSNumber _) -> []
+  (JSDocBasicType "boolean", JSBoolean _) -> []
+  (JSDocBasicType "object", JSObject _) -> []
+  (JSDocBasicType "function", RuntimeJSFunction _) -> []
+  (JSDocBasicType "undefined", JSUndefined) -> []
+  (JSDocBasicType "null", JSNull) -> []
+  (JSDocBasicType "any", _) -> []
+  (JSDocBasicType "void", _) -> []
+  (JSDocArrayType elementType, JSArray elements) ->
+    concatMap (validateRuntimeValueInternal pos elementType) elements
+  (JSDocUnionType types, value) ->
+    if any (\t -> null (validateRuntimeValueInternal pos t value)) types
+      then []
+      else [RuntimeUnionTypeError (map showJSDocType types) (showRuntimeValue value) pos]
+  (JSDocObjectType fields, JSObject obj) ->
+    validateObjectFields pos fields obj
+  (JSDocFunctionType _paramTypes _returnType, RuntimeJSFunction _) -> []
+  (JSDocGenericType baseName _args, value) ->
+    validateRuntimeValueInternal pos (JSDocBasicType baseName) value
+  (JSDocOptionalType baseType, value) ->
+    case value of
+      JSUndefined -> []
+      _ -> validateRuntimeValueInternal pos baseType value
+  (JSDocNullableType baseType, value) ->
+    case value of
+      JSNull -> []
+      _ -> validateRuntimeValueInternal pos baseType value
+  (JSDocNonNullableType baseType, value) ->
+    case value of
+      JSNull -> [RuntimeNullConstraintViolation (showJSDocType baseType) pos]
+      JSUndefined -> [RuntimeNullConstraintViolation (showJSDocType baseType) pos]
+      _ -> validateRuntimeValueInternal pos baseType value
+  (JSDocEnumType enumName enumValues, value) ->
+    validateEnumRuntimeValue pos enumName enumValues value
+  (expectedType, actualValue) ->
+    [RuntimeTypeError (showJSDocType expectedType) (showRuntimeValue actualValue) pos]
+
+-- | Validate runtime value against enum specification
+validateEnumRuntimeValue :: TokenPosn -> Text -> [JSDocEnumValue] -> RuntimeValue -> [ValidationError]
+validateEnumRuntimeValue pos enumName enumValues actualValue =
+  case actualValue of
+    JSString stringValue ->
+      if any (\enumVal -> isEnumValueMatch enumVal stringValue) enumValues
+        then []
+        else [RuntimeTypeError (showEnumValues enumValues) ("string: " <> stringValue) pos]
+    JSNumber numValue ->
+      let numText = Text.pack (show numValue)
+      in if any (\enumVal -> isEnumValueMatch enumVal numText) enumValues
+           then []
+           else [RuntimeTypeError (showEnumValues enumValues) ("number: " <> numText) pos]
+    _ ->
+      [RuntimeTypeError (enumName <> " enum") (showRuntimeValue actualValue) pos]
+  where
+    isEnumValueMatch :: JSDocEnumValue -> Text -> Bool
+    isEnumValueMatch enumVal targetValue =
+      case jsDocEnumValueLiteral enumVal of
+        Nothing -> jsDocEnumValueName enumVal == targetValue  -- Match by name
+        Just literal ->
+          -- Remove quotes for string literals and compare
+          let cleanLiteral = if (Text.isPrefixOf "\"" literal && Text.isSuffixOf "\"" literal) ||
+                               (Text.isPrefixOf "'" literal && Text.isSuffixOf "'" literal)
+                            then Text.drop 1 (Text.dropEnd 1 literal)
+                            else literal
+          in cleanLiteral == targetValue
+
+    showEnumValues :: [JSDocEnumValue] -> Text
+    showEnumValues values = enumName <> " {" <> Text.intercalate ", " (map jsDocEnumValueName values) <> "}"
+
+validateObjectFields :: TokenPosn -> [JSDocObjectField] -> [(Text, RuntimeValue)] -> [ValidationError]
+validateObjectFields pos fields obj =
+  let fieldMap = Map.fromList obj
+   in concatMap (validateRequiredField pos fieldMap) fields
+
+validateRequiredField :: TokenPosn -> Map.Map Text RuntimeValue -> JSDocObjectField -> [ValidationError]
+validateRequiredField pos fieldMap field =
+  let fieldName = jsDocFieldName field
+      fieldType = jsDocFieldType field
+      isOptional = jsDocFieldOptional field
+   in case Map.lookup fieldName fieldMap of
+        Nothing ->
+          if isOptional
+            then []
+            else [RuntimeObjectFieldMissing "object" fieldName pos]
+        Just value -> validateRuntimeValueInternal pos fieldType value
+
+-- | Show JSDoc type as text.
+showJSDocType :: JSDocType -> Text
+showJSDocType jsDocType = case jsDocType of
+  JSDocBasicType name -> name
+  JSDocArrayType elementType -> showJSDocType elementType <> "[]"
+  JSDocUnionType types -> Text.intercalate " | " (map showJSDocType types)
+  JSDocObjectType _ -> "object"
+  JSDocFunctionType paramTypes returnType ->
+    "function(" <> Text.intercalate ", " (map showJSDocType paramTypes) <> "): " <> showJSDocType returnType
+  JSDocGenericType baseName args ->
+    baseName <> "<" <> Text.intercalate ", " (map showJSDocType args) <> ">"
+  JSDocOptionalType baseType -> showJSDocType baseType <> "="
+  JSDocNullableType baseType -> "?" <> showJSDocType baseType
+  JSDocNonNullableType baseType -> "!" <> showJSDocType baseType
+  JSDocEnumType enumName enumValues ->
+    if null enumValues then enumName else enumName <> " {" <> Text.intercalate ", " (map jsDocEnumValueName enumValues) <> "}"
+
+-- | Show runtime value type as text.
+showRuntimeValue :: RuntimeValue -> Text
+showRuntimeValue runtimeValue = case runtimeValue of
+  JSUndefined -> "undefined"
+  JSNull -> "null"
+  JSBoolean _ -> "boolean"
+  JSNumber _ -> "number"
+  JSString _ -> "string"
+  JSObject _ -> "object"
+  JSArray _ -> "array"
+  RuntimeJSFunction _ -> "function"
+
+-- | Format validation error as text.
+formatValidationError :: ValidationError -> Text
+formatValidationError = Text.pack . errorToString
+
+-- | Default runtime validation configuration.
+defaultValidationConfig :: RuntimeValidationConfig
+defaultValidationConfig = RuntimeValidationConfig
+  { _validationEnabled = True,
+    _strictTypeChecking = False,
+    _allowImplicitConversions = True,
+    _reportWarnings = True,
+    _validateReturnTypes = True
+  }
+
+-- | Development validation configuration (strict).
+developmentConfig :: RuntimeValidationConfig
+developmentConfig = RuntimeValidationConfig
+  { _validationEnabled = True,
+    _strictTypeChecking = True,
+    _allowImplicitConversions = False,
+    _reportWarnings = True,
+    _validateReturnTypes = True
+  }
+
+-- | Production validation configuration (lenient).
+productionConfig :: RuntimeValidationConfig
+productionConfig = RuntimeValidationConfig
+  { _validationEnabled = True,
+    _strictTypeChecking = False,
+    _allowImplicitConversions = True,
+    _reportWarnings = False,
+    _validateReturnTypes = False
+  }
+
+-- | Convenience function for testing - validates runtime value without position.
+validateRuntimeValue :: JSDocType -> RuntimeValue -> Either [ValidationError] RuntimeValue
+validateRuntimeValue expectedType actualValue =
+  let pos = TokenPn 0 1 1  -- dummy position for tests
+      errors = validateRuntimeValueInternal pos expectedType actualValue
+   in case errors of
+        [] -> Right actualValue
+        errs -> Left errs

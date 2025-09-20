@@ -1,0 +1,25 @@
+-- Analysis of multi-variable declaration semantics
+--
+-- Source: "var used = 1, unused = 2; console.log(used);"
+--
+-- JavaScript semantic:
+-- This declares two variables:
+-- - used = 1    (has side effect: assignment, and is referenced later)
+-- - unused = 2  (has side effect: assignment, but is never referenced)
+--
+-- Tree shaking decision:
+-- - The 'used' variable must be preserved (referenced in console.log)
+-- - The 'unused' variable CAN be eliminated because:
+--   * Its side effect (assignment) is not observable if the variable is never read
+--   * The assignment creates a binding that is never used
+--
+-- Correct result: "var used = 1; console.log(used);"
+--
+-- So the logic should be:
+-- For variables with initializers: preserve IF used OR if side effect is observable
+-- In this case, unused variable's side effect is NOT observable since it's never read
+--
+-- However, we need to be careful about:
+-- var x = sideEffectFunction(); // Even if x is unused, we must preserve the call
+-- vs 
+-- var x = 1; // If x is unused, we can eliminate this (literal assignment)

@@ -589,9 +589,447 @@ renderComment comment = case comment of
         ("position", renderPosition pos),
         ("text", escapeJSONString text)
       ]
+  Token.JSDocA pos jsDoc ->
+    formatJSONObject
+      [ ("type", "\"JSDoc\""),
+        ("position", renderPosition pos),
+        ("jsDoc", renderJSDocToJSON jsDoc)
+      ]
   Token.NoComment ->
     formatJSONObject
       [ ("type", "\"NoComment\"")
+      ]
+
+-- | Render JSDoc comment to JSON.
+renderJSDocToJSON :: Token.JSDocComment -> Text
+renderJSDocToJSON jsDoc =
+  formatJSONObject
+    [ ("position", renderPosition (Token.jsDocPosition jsDoc)),
+      ("description", maybe "null" (escapeJSONString . Text.unpack) (Token.jsDocDescription jsDoc)),
+      ("tags", "[" <> Text.intercalate ", " (map renderJSDocTagToJSON (Token.jsDocTags jsDoc)) <> "]")
+    ]
+
+-- | Render JSDoc tag to JSON.
+renderJSDocTagToJSON :: Token.JSDocTag -> Text
+renderJSDocTagToJSON tag =
+  formatJSONObject
+    [ ("name", escapeJSONString (Text.unpack (Token.jsDocTagName tag))),
+      ("type", maybe "null" renderJSDocTypeToJSON (Token.jsDocTagType tag)),
+      ("paramName", maybe "null" (escapeJSONString . Text.unpack) (Token.jsDocTagParamName tag)),
+      ("description", maybe "null" (escapeJSONString . Text.unpack) (Token.jsDocTagDescription tag)),
+      ("position", renderPosition (Token.jsDocTagPosition tag)),
+      ("specific", maybe "null" renderJSDocTagSpecificToJSON (Token.jsDocTagSpecific tag))
+    ]
+
+-- | Render JSDoc type to JSON.
+renderJSDocTypeToJSON :: Token.JSDocType -> Text
+renderJSDocTypeToJSON jsDocType = case jsDocType of
+  Token.JSDocBasicType name ->
+    formatJSONObject
+      [ ("kind", "\"BasicType\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocArrayType elementType ->
+    formatJSONObject
+      [ ("kind", "\"ArrayType\""),
+        ("elementType", renderJSDocTypeToJSON elementType)
+      ]
+  Token.JSDocUnionType types ->
+    formatJSONObject
+      [ ("kind", "\"UnionType\""),
+        ("types", "[" <> Text.intercalate ", " (map renderJSDocTypeToJSON types) <> "]")
+      ]
+  Token.JSDocObjectType fields ->
+    formatJSONObject
+      [ ("kind", "\"ObjectType\""),
+        ("fields", "[" <> Text.intercalate ", " (map renderJSDocObjectFieldToJSON fields) <> "]")
+      ]
+  Token.JSDocFunctionType paramTypes returnType ->
+    formatJSONObject
+      [ ("kind", "\"FunctionType\""),
+        ("paramTypes", "[" <> Text.intercalate ", " (map renderJSDocTypeToJSON paramTypes) <> "]"),
+        ("returnType", renderJSDocTypeToJSON returnType)
+      ]
+  Token.JSDocGenericType baseName args ->
+    formatJSONObject
+      [ ("kind", "\"GenericType\""),
+        ("baseName", escapeJSONString (Text.unpack baseName)),
+        ("args", "[" <> Text.intercalate ", " (map renderJSDocTypeToJSON args) <> "]")
+      ]
+  Token.JSDocOptionalType baseType ->
+    formatJSONObject
+      [ ("kind", "\"OptionalType\""),
+        ("baseType", renderJSDocTypeToJSON baseType)
+      ]
+  Token.JSDocNullableType baseType ->
+    formatJSONObject
+      [ ("kind", "\"NullableType\""),
+        ("baseType", renderJSDocTypeToJSON baseType)
+      ]
+  Token.JSDocNonNullableType baseType ->
+    formatJSONObject
+      [ ("kind", "\"NonNullableType\""),
+        ("baseType", renderJSDocTypeToJSON baseType)
+      ]
+  Token.JSDocEnumType enumName enumValues ->
+    formatJSONObject
+      [ ("kind", "\"EnumType\""),
+        ("name", escapeJSONString (Text.unpack enumName)),
+        ("values", "[" <> Text.intercalate ", " (map renderJSDocEnumValueToJSON enumValues) <> "]")
+      ]
+
+-- | Render JSDoc enum value to JSON.
+renderJSDocEnumValueToJSON :: Token.JSDocEnumValue -> Text
+renderJSDocEnumValueToJSON enumValue =
+  let fields = [ ("name", escapeJSONString (Text.unpack (Token.jsDocEnumValueName enumValue))) ] ++
+               (case Token.jsDocEnumValueLiteral enumValue of
+                  Nothing -> []
+                  Just literal -> [ ("literal", escapeJSONString (Text.unpack literal)) ]) ++
+               (case Token.jsDocEnumValueDescription enumValue of
+                  Nothing -> []
+                  Just desc -> [ ("description", escapeJSONString (Text.unpack desc)) ])
+  in formatJSONObject fields
+
+-- | Render JSDoc property to JSON.
+renderJSDocPropertyToJSON :: Token.JSDocProperty -> Text
+renderJSDocPropertyToJSON property =
+  formatJSONObject
+    [ ("name", escapeJSONString (Text.unpack (Token.jsDocPropertyName property))),
+      ("type", maybe "null" renderJSDocTypeToJSON (Token.jsDocPropertyType property)),
+      ("optional", if Token.jsDocPropertyOptional property then "true" else "false"),
+      ("description", maybe "null" (escapeJSONString . Text.unpack) (Token.jsDocPropertyDescription property))
+    ]
+
+-- | Render JSDoc object field to JSON.
+renderJSDocObjectFieldToJSON :: Token.JSDocObjectField -> Text
+renderJSDocObjectFieldToJSON field =
+  formatJSONObject
+    [ ("name", escapeJSONString (Text.unpack (Token.jsDocFieldName field))),
+      ("type", renderJSDocTypeToJSON (Token.jsDocFieldType field)),
+      ("optional", if Token.jsDocFieldOptional field then "true" else "false")
+    ]
+
+-- | Render JSDoc tag specific information to JSON.
+renderJSDocTagSpecificToJSON :: Token.JSDocTagSpecific -> Text
+renderJSDocTagSpecificToJSON tagSpecific = case tagSpecific of
+  Token.JSDocParamTag optional variadic defaultValue ->
+    formatJSONObject
+      [ ("kind", "\"ParamTag\""),
+        ("optional", if optional then "true" else "false"),
+        ("variadic", if variadic then "true" else "false"),
+        ("defaultValue", maybe "null" (escapeJSONString . Text.unpack) defaultValue)
+      ]
+  Token.JSDocReturnTag promise ->
+    formatJSONObject
+      [ ("kind", "\"ReturnTag\""),
+        ("promise", if promise then "true" else "false")
+      ]
+  Token.JSDocAuthorTag name email ->
+    formatJSONObject
+      [ ("kind", "\"AuthorTag\""),
+        ("name", escapeJSONString (Text.unpack name)),
+        ("email", maybe "null" (escapeJSONString . Text.unpack) email)
+      ]
+  Token.JSDocVersionTag version ->
+    formatJSONObject
+      [ ("kind", "\"VersionTag\""),
+        ("version", escapeJSONString (Text.unpack version))
+      ]
+  Token.JSDocSinceTag version ->
+    formatJSONObject
+      [ ("kind", "\"SinceTag\""),
+        ("version", escapeJSONString (Text.unpack version))
+      ]
+  Token.JSDocAccessTag access ->
+    formatJSONObject
+      [ ("kind", "\"AccessTag\""),
+        ("access", escapeJSONString (show access))
+      ]
+  Token.JSDocDescriptionTag text ->
+    formatJSONObject
+      [ ("kind", "\"DescriptionTag\""),
+        ("text", escapeJSONString (Text.unpack text))
+      ]
+  Token.JSDocTypeTag jsDocType ->
+    formatJSONObject
+      [ ("kind", "\"TypeTag\""),
+        ("type", renderJSDocTypeToJSON jsDocType)
+      ]
+  Token.JSDocPropertyTag name maybeType optional maybeDescription ->
+    formatJSONObject
+      [ ("kind", "\"PropertyTag\""),
+        ("name", escapeJSONString (Text.unpack name)),
+        ("type", maybe "null" renderJSDocTypeToJSON maybeType),
+        ("optional", if optional then "true" else "false"),
+        ("description", maybe "null" (escapeJSONString . Text.unpack) maybeDescription)
+      ]
+  Token.JSDocDefaultTag value ->
+    formatJSONObject
+      [ ("kind", "\"DefaultTag\""),
+        ("value", escapeJSONString (Text.unpack value))
+      ]
+  Token.JSDocConstantTag maybeValue ->
+    formatJSONObject
+      [ ("kind", "\"ConstantTag\""),
+        ("value", maybe "null" (escapeJSONString . Text.unpack) maybeValue)
+      ]
+  Token.JSDocGlobalTag ->
+    formatJSONObject
+      [ ("kind", "\"GlobalTag\"")
+      ]
+  Token.JSDocAliasTag name ->
+    formatJSONObject
+      [ ("kind", "\"AliasTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocAugmentsTag parent ->
+    formatJSONObject
+      [ ("kind", "\"AugmentsTag\""),
+        ("parent", escapeJSONString (Text.unpack parent))
+      ]
+  Token.JSDocBorrowsTag from maybeAs ->
+    formatJSONObject
+      [ ("kind", "\"BorrowsTag\""),
+        ("from", escapeJSONString (Text.unpack from)),
+        ("as", maybe "null" (escapeJSONString . Text.unpack) maybeAs)
+      ]
+  Token.JSDocClassDescTag description ->
+    formatJSONObject
+      [ ("kind", "\"ClassDescTag\""),
+        ("description", escapeJSONString (Text.unpack description))
+      ]
+  Token.JSDocCopyrightTag notice ->
+    formatJSONObject
+      [ ("kind", "\"CopyrightTag\""),
+        ("notice", escapeJSONString (Text.unpack notice))
+      ]
+  Token.JSDocExportsTag name ->
+    formatJSONObject
+      [ ("kind", "\"ExportsTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocExternalTag name maybeDescription ->
+    formatJSONObject
+      [ ("kind", "\"ExternalTag\""),
+        ("name", escapeJSONString (Text.unpack name)),
+        ("description", maybe "null" (escapeJSONString . Text.unpack) maybeDescription)
+      ]
+  Token.JSDocFileTag description ->
+    formatJSONObject
+      [ ("kind", "\"FileTag\""),
+        ("description", escapeJSONString (Text.unpack description))
+      ]
+  Token.JSDocFunctionTag ->
+    formatJSONObject
+      [ ("kind", "\"FunctionTag\"")
+      ]
+  Token.JSDocHideConstructorTag ->
+    formatJSONObject
+      [ ("kind", "\"HideConstructorTag\"")
+      ]
+  Token.JSDocImplementsTag interface ->
+    formatJSONObject
+      [ ("kind", "\"ImplementsTag\""),
+        ("interface", escapeJSONString (Text.unpack interface))
+      ]
+  Token.JSDocInheritDocTag ->
+    formatJSONObject
+      [ ("kind", "\"InheritDocTag\"")
+      ]
+  Token.JSDocInstanceTag ->
+    formatJSONObject
+      [ ("kind", "\"InstanceTag\"")
+      ]
+  Token.JSDocInterfaceTag maybeName ->
+    formatJSONObject
+      [ ("kind", "\"InterfaceTag\""),
+        ("name", maybe "null" (escapeJSONString . Text.unpack) maybeName)
+      ]
+  Token.JSDocKindTag kind ->
+    formatJSONObject
+      [ ("kind", "\"KindTag\""),
+        ("kindValue", escapeJSONString (Text.unpack kind))
+      ]
+  Token.JSDocLendsTag name ->
+    formatJSONObject
+      [ ("kind", "\"LendsTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocLicenseTag license ->
+    formatJSONObject
+      [ ("kind", "\"LicenseTag\""),
+        ("license", escapeJSONString (Text.unpack license))
+      ]
+  Token.JSDocMemberTag maybeName maybeType ->
+    formatJSONObject
+      [ ("kind", "\"MemberTag\""),
+        ("name", maybe "null" (escapeJSONString . Text.unpack) maybeName),
+        ("type", maybe "null" (escapeJSONString . Text.unpack) maybeType)
+      ]
+  Token.JSDocMixesTag mixin ->
+    formatJSONObject
+      [ ("kind", "\"MixesTag\""),
+        ("mixin", escapeJSONString (Text.unpack mixin))
+      ]
+  Token.JSDocMixinTag ->
+    formatJSONObject
+      [ ("kind", "\"MixinTag\"")
+      ]
+  Token.JSDocNameTag name ->
+    formatJSONObject
+      [ ("kind", "\"NameTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocRequiresTag module' ->
+    formatJSONObject
+      [ ("kind", "\"RequiresTag\""),
+        ("module", escapeJSONString (Text.unpack module'))
+      ]
+  Token.JSDocSummaryTag summary ->
+    formatJSONObject
+      [ ("kind", "\"SummaryTag\""),
+        ("summary", escapeJSONString (Text.unpack summary))
+      ]
+  Token.JSDocThisTag thisType ->
+    formatJSONObject
+      [ ("kind", "\"ThisTag\""),
+        ("type", renderJSDocTypeToJSON thisType)
+      ]
+  Token.JSDocTodoTag todo ->
+    formatJSONObject
+      [ ("kind", "\"TodoTag\""),
+        ("todo", escapeJSONString (Text.unpack todo))
+      ]
+  Token.JSDocTutorialTag tutorial ->
+    formatJSONObject
+      [ ("kind", "\"TutorialTag\""),
+        ("tutorial", escapeJSONString (Text.unpack tutorial))
+      ]
+  Token.JSDocVariationTag variation ->
+    formatJSONObject
+      [ ("kind", "\"VariationTag\""),
+        ("variation", escapeJSONString (Text.unpack variation))
+      ]
+  Token.JSDocYieldsTag maybeType maybeDescription ->
+    formatJSONObject
+      [ ("kind", "\"YieldsTag\""),
+        ("type", maybe "null" renderJSDocTypeToJSON maybeType),
+        ("description", maybe "null" (escapeJSONString . Text.unpack) maybeDescription)
+      ]
+  Token.JSDocThrowsTag maybeDescription ->
+    formatJSONObject
+      [ ("kind", "\"ThrowsTag\""),
+        ("description", maybe "null" (escapeJSONString . Text.unpack) maybeDescription)
+      ]
+  Token.JSDocExampleTag maybeLanguage maybeCaption ->
+    formatJSONObject
+      [ ("kind", "\"ExampleTag\""),
+        ("language", maybe "null" (escapeJSONString . Text.unpack) maybeLanguage),
+        ("caption", maybe "null" (escapeJSONString . Text.unpack) maybeCaption)
+      ]
+  Token.JSDocSeeTag reference maybeDisplayText ->
+    formatJSONObject
+      [ ("kind", "\"SeeTag\""),
+        ("reference", escapeJSONString (Text.unpack reference)),
+        ("displayText", maybe "null" (escapeJSONString . Text.unpack) maybeDisplayText)
+      ]
+  Token.JSDocDeprecatedTag maybeSince maybeReplacement ->
+    formatJSONObject
+      [ ("kind", "\"DeprecatedTag\""),
+        ("since", maybe "null" (escapeJSONString . Text.unpack) maybeSince),
+        ("replacement", maybe "null" (escapeJSONString . Text.unpack) maybeReplacement)
+      ]
+  Token.JSDocNamespaceTag path ->
+    formatJSONObject
+      [ ("kind", "\"NamespaceTag\""),
+        ("path", escapeJSONString (Text.unpack path))
+      ]
+  Token.JSDocClassTag maybeName maybeExtends ->
+    formatJSONObject
+      [ ("kind", "\"ClassTag\""),
+        ("name", maybe "null" (escapeJSONString . Text.unpack) maybeName),
+        ("extends", maybe "null" (escapeJSONString . Text.unpack) maybeExtends)
+      ]
+  Token.JSDocModuleTag name maybeType ->
+    formatJSONObject
+      [ ("kind", "\"ModuleTag\""),
+        ("name", escapeJSONString (Text.unpack name)),
+        ("type", maybe "null" (escapeJSONString . Text.unpack) maybeType)
+      ]
+  Token.JSDocMemberOfTag parent forced ->
+    formatJSONObject
+      [ ("kind", "\"MemberOfTag\""),
+        ("parent", escapeJSONString (Text.unpack parent)),
+        ("forced", if forced then "true" else "false")
+      ]
+  Token.JSDocTypedefTag name properties ->
+    formatJSONObject
+      [ ("kind", "\"TypedefTag\""),
+        ("name", escapeJSONString (Text.unpack name)),
+        ("properties", formatJSONArray (map renderJSDocPropertyToJSON properties))
+      ]
+  Token.JSDocEnumTag name maybeBaseType enumValues ->
+    formatJSONObject
+      [ ("kind", "\"EnumTag\""),
+        ("name", escapeJSONString (Text.unpack name)),
+        ("baseType", maybe "null" renderJSDocTypeToJSON maybeBaseType),
+        ("values", formatJSONArray (map renderJSDocEnumValueToJSON enumValues))
+      ]
+  Token.JSDocCallbackTag name ->
+    formatJSONObject
+      [ ("kind", "\"CallbackTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocEventTag name ->
+    formatJSONObject
+      [ ("kind", "\"EventTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocFiresTag name ->
+    formatJSONObject
+      [ ("kind", "\"FiresTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocListensTag name ->
+    formatJSONObject
+      [ ("kind", "\"ListensTag\""),
+        ("name", escapeJSONString (Text.unpack name))
+      ]
+  Token.JSDocIgnoreTag ->
+    formatJSONObject
+      [ ("kind", "\"IgnoreTag\"")
+      ]
+  Token.JSDocInnerTag ->
+    formatJSONObject
+      [ ("kind", "\"InnerTag\"")
+      ]
+  Token.JSDocReadOnlyTag ->
+    formatJSONObject
+      [ ("kind", "\"ReadOnlyTag\"")
+      ]
+  Token.JSDocStaticTag ->
+    formatJSONObject
+      [ ("kind", "\"StaticTag\"")
+      ]
+  Token.JSDocOverrideTag ->
+    formatJSONObject
+      [ ("kind", "\"OverrideTag\"")
+      ]
+  Token.JSDocAbstractTag ->
+    formatJSONObject
+      [ ("kind", "\"AbstractTag\"")
+      ]
+  Token.JSDocFinalTag ->
+    formatJSONObject
+      [ ("kind", "\"FinalTag\"")
+      ]
+  Token.JSDocGeneratorTag ->
+    formatJSONObject
+      [ ("kind", "\"GeneratorTag\"")
+      ]
+  Token.JSDocAsyncTag ->
+    formatJSONObject
+      [ ("kind", "\"AsyncTag\"")
       ]
 
 -- | Escape a string for JSON representation.

@@ -290,7 +290,255 @@ renderCommentToXML comment = case comment of
     formatXMLElement "whitespace" [] $
       renderPositionToXML pos
         <> formatXMLElement "content" [("value", escapeXMLString content)] mempty
+  Token.JSDocA pos jsDoc ->
+    formatXMLElement "jsdoc" [] $
+      renderPositionToXML pos <> renderJSDocToXML jsDoc
   Token.NoComment -> formatXMLElement "no-comment" [] mempty
+
+-- | Render JSDoc comment to XML
+renderJSDocToXML :: Token.JSDocComment -> Text
+renderJSDocToXML jsDoc =
+  formatXMLElement "jsdoc-comment" [] $
+    renderPositionToXML (Token.jsDocPosition jsDoc)
+      <> maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) (Token.jsDocDescription jsDoc)
+      <> formatXMLElement "tags" [] (mconcat (map renderJSDocTagToXML (Token.jsDocTags jsDoc)))
+
+-- | Render JSDoc tag to XML
+renderJSDocTagToXML :: Token.JSDocTag -> Text
+renderJSDocTagToXML tag =
+  formatXMLElement "jsdoc-tag" [("name", Token.jsDocTagName tag)] $
+    renderPositionToXML (Token.jsDocTagPosition tag)
+      <> maybe mempty renderJSDocTypeToXML (Token.jsDocTagType tag)
+      <> maybe mempty (formatXMLElement "param-name" [] . Text.pack . Text.unpack) (Token.jsDocTagParamName tag)
+      <> maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) (Token.jsDocTagDescription tag)
+      <> maybe mempty renderJSDocTagSpecificToXML (Token.jsDocTagSpecific tag)
+
+-- | Render JSDoc type to XML
+renderJSDocTypeToXML :: Token.JSDocType -> Text
+renderJSDocTypeToXML jsDocType = case jsDocType of
+  Token.JSDocBasicType name ->
+    formatXMLElement "basic-type" [("name", name)] mempty
+  Token.JSDocArrayType elementType ->
+    formatXMLElement "array-type" [] (renderJSDocTypeToXML elementType)
+  Token.JSDocUnionType types ->
+    formatXMLElement "union-type" [] (mconcat (map renderJSDocTypeToXML types))
+  Token.JSDocObjectType fields ->
+    formatXMLElement "object-type" [] (mconcat (map renderJSDocObjectFieldToXML fields))
+  Token.JSDocFunctionType paramTypes returnType ->
+    formatXMLElement "function-type" [] $
+      formatXMLElement "params" [] (mconcat (map renderJSDocTypeToXML paramTypes))
+        <> formatXMLElement "return" [] (renderJSDocTypeToXML returnType)
+  Token.JSDocGenericType baseName args ->
+    formatXMLElement "generic-type" [("base-name", baseName)] $
+      formatXMLElement "args" [] (mconcat (map renderJSDocTypeToXML args))
+  Token.JSDocOptionalType baseType ->
+    formatXMLElement "optional-type" [] (renderJSDocTypeToXML baseType)
+  Token.JSDocNullableType baseType ->
+    formatXMLElement "nullable-type" [] (renderJSDocTypeToXML baseType)
+  Token.JSDocNonNullableType baseType ->
+    formatXMLElement "non-nullable-type" [] (renderJSDocTypeToXML baseType)
+  Token.JSDocEnumType enumName enumValues ->
+    formatXMLElement "enum-type" [("name", enumName)] $
+      mconcat (map renderJSDocEnumValueToXML enumValues)
+
+-- | Render JSDoc enum value to XML
+renderJSDocEnumValueToXML :: Token.JSDocEnumValue -> Text
+renderJSDocEnumValueToXML enumValue =
+  let attributes = [("name", Token.jsDocEnumValueName enumValue)] ++
+                   (case Token.jsDocEnumValueLiteral enumValue of
+                      Nothing -> []
+                      Just literal -> [("literal", literal)])
+      content = case Token.jsDocEnumValueDescription enumValue of
+                  Nothing -> mempty
+                  Just desc -> formatXMLElement "description" [] (Text.pack . Text.unpack $ desc)
+  in formatXMLElement "enum-value" attributes content
+
+-- | Render JSDoc property to XML
+renderJSDocPropertyToXML :: Token.JSDocProperty -> Text
+renderJSDocPropertyToXML property =
+  let attributes = [ ("name", Token.jsDocPropertyName property),
+                     ("optional", if Token.jsDocPropertyOptional property then "true" else "false") ]
+      content = maybe mempty (formatXMLElement "type" [] . renderJSDocTypeToXML) (Token.jsDocPropertyType property)
+                <> maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) (Token.jsDocPropertyDescription property)
+  in formatXMLElement "jsdoc-property" attributes content
+
+-- | Render JSDoc object field to XML
+renderJSDocObjectFieldToXML :: Token.JSDocObjectField -> Text
+renderJSDocObjectFieldToXML field =
+  formatXMLElement
+    "object-field"
+    [ ("name", Token.jsDocFieldName field),
+      ("optional", if Token.jsDocFieldOptional field then "true" else "false")
+    ]
+    (renderJSDocTypeToXML (Token.jsDocFieldType field))
+
+-- | Render JSDoc tag specific information to XML.
+renderJSDocTagSpecificToXML :: Token.JSDocTagSpecific -> Text
+renderJSDocTagSpecificToXML tagSpecific = case tagSpecific of
+  Token.JSDocParamTag optional variadic defaultValue ->
+    formatXMLElement "param-specific" [] $
+      formatXMLElement "optional" [] (if optional then "true" else "false")
+        <> formatXMLElement "variadic" [] (if variadic then "true" else "false")
+        <> maybe mempty (formatXMLElement "default-value" [] . Text.pack . Text.unpack) defaultValue
+  Token.JSDocReturnTag promise ->
+    formatXMLElement "return-specific" [] $
+      formatXMLElement "promise" [] (if promise then "true" else "false")
+  Token.JSDocDescriptionTag text ->
+    formatXMLElement "description-specific" [] (Text.pack (Text.unpack text))
+  Token.JSDocTypeTag jsDocType ->
+    formatXMLElement "type-specific" [] (renderJSDocTypeToXML jsDocType)
+  Token.JSDocPropertyTag name maybeType optional maybeDescription ->
+    formatXMLElement "property-specific" [] $
+      formatXMLElement "name" [] (Text.pack (Text.unpack name))
+        <> maybe mempty (formatXMLElement "type" [] . renderJSDocTypeToXML) maybeType
+        <> formatXMLElement "optional" [] (if optional then "true" else "false")
+        <> maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) maybeDescription
+  Token.JSDocDefaultTag value ->
+    formatXMLElement "default-specific" [] (Text.pack (Text.unpack value))
+  Token.JSDocConstantTag maybeValue ->
+    formatXMLElement "constant-specific" [] $
+      maybe mempty (formatXMLElement "value" [] . Text.pack . Text.unpack) maybeValue
+  Token.JSDocGlobalTag ->
+    formatXMLElement "global-specific" [] mempty
+  Token.JSDocAliasTag name ->
+    formatXMLElement "alias-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocAugmentsTag parent ->
+    formatXMLElement "augments-specific" [] (Text.pack (Text.unpack parent))
+  Token.JSDocBorrowsTag from maybeAs ->
+    formatXMLElement "borrows-specific" [] $
+      formatXMLElement "from" [] (Text.pack (Text.unpack from))
+        <> maybe mempty (formatXMLElement "as" [] . Text.pack . Text.unpack) maybeAs
+  Token.JSDocClassDescTag description ->
+    formatXMLElement "classdesc-specific" [] (Text.pack (Text.unpack description))
+  Token.JSDocCopyrightTag notice ->
+    formatXMLElement "copyright-specific" [] (Text.pack (Text.unpack notice))
+  Token.JSDocExportsTag name ->
+    formatXMLElement "exports-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocExternalTag name maybeDescription ->
+    formatXMLElement "external-specific" [] $
+      formatXMLElement "name" [] (Text.pack (Text.unpack name))
+        <> maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) maybeDescription
+  Token.JSDocFileTag description ->
+    formatXMLElement "file-specific" [] (Text.pack (Text.unpack description))
+  Token.JSDocFunctionTag ->
+    formatXMLElement "function-specific" [] mempty
+  Token.JSDocHideConstructorTag ->
+    formatXMLElement "hideconstructor-specific" [] mempty
+  Token.JSDocImplementsTag interface ->
+    formatXMLElement "implements-specific" [] (Text.pack (Text.unpack interface))
+  Token.JSDocInheritDocTag ->
+    formatXMLElement "inheritdoc-specific" [] mempty
+  Token.JSDocInstanceTag ->
+    formatXMLElement "instance-specific" [] mempty
+  Token.JSDocInterfaceTag maybeName ->
+    formatXMLElement "interface-specific" [] $
+      maybe mempty (formatXMLElement "name" [] . Text.pack . Text.unpack) maybeName
+  Token.JSDocKindTag kind ->
+    formatXMLElement "kind-specific" [] (Text.pack (Text.unpack kind))
+  Token.JSDocLendsTag name ->
+    formatXMLElement "lends-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocLicenseTag license ->
+    formatXMLElement "license-specific" [] (Text.pack (Text.unpack license))
+  Token.JSDocMemberTag maybeName maybeType ->
+    formatXMLElement "member-specific" [] $
+      maybe mempty (formatXMLElement "name" [] . Text.pack . Text.unpack) maybeName
+        <> maybe mempty (formatXMLElement "type" [] . Text.pack . Text.unpack) maybeType
+  Token.JSDocMixesTag mixin ->
+    formatXMLElement "mixes-specific" [] (Text.pack (Text.unpack mixin))
+  Token.JSDocMixinTag ->
+    formatXMLElement "mixin-specific" [] mempty
+  Token.JSDocNameTag name ->
+    formatXMLElement "name-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocRequiresTag module' ->
+    formatXMLElement "requires-specific" [] (Text.pack (Text.unpack module'))
+  Token.JSDocSummaryTag summary ->
+    formatXMLElement "summary-specific" [] (Text.pack (Text.unpack summary))
+  Token.JSDocThisTag thisType ->
+    formatXMLElement "this-specific" [] (renderJSDocTypeToXML thisType)
+  Token.JSDocTodoTag todo ->
+    formatXMLElement "todo-specific" [] (Text.pack (Text.unpack todo))
+  Token.JSDocTutorialTag tutorial ->
+    formatXMLElement "tutorial-specific" [] (Text.pack (Text.unpack tutorial))
+  Token.JSDocVariationTag variation ->
+    formatXMLElement "variation-specific" [] (Text.pack (Text.unpack variation))
+  Token.JSDocYieldsTag maybeType maybeDescription ->
+    formatXMLElement "yields-specific" [] $
+      maybe mempty (formatXMLElement "type" [] . renderJSDocTypeToXML) maybeType
+        <> maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) maybeDescription
+  Token.JSDocThrowsTag maybeDescription ->
+    formatXMLElement "throws-specific" [] $
+      maybe mempty (formatXMLElement "description" [] . Text.pack . Text.unpack) maybeDescription
+  Token.JSDocExampleTag maybeLanguage maybeCaption ->
+    formatXMLElement "example-specific" [] $
+      maybe mempty (formatXMLElement "language" [] . Text.pack . Text.unpack) maybeLanguage
+        <> maybe mempty (formatXMLElement "caption" [] . Text.pack . Text.unpack) maybeCaption
+  Token.JSDocSeeTag reference maybeDisplayText ->
+    formatXMLElement "see-specific" [] $
+      formatXMLElement "reference" [] (Text.pack (Text.unpack reference))
+        <> maybe mempty (formatXMLElement "display-text" [] . Text.pack . Text.unpack) maybeDisplayText
+  Token.JSDocDeprecatedTag maybeSince maybeReplacement ->
+    formatXMLElement "deprecated-specific" [] $
+      maybe mempty (formatXMLElement "since" [] . Text.pack . Text.unpack) maybeSince
+        <> maybe mempty (formatXMLElement "replacement" [] . Text.pack . Text.unpack) maybeReplacement
+  Token.JSDocAuthorTag name email ->
+    formatXMLElement "author-specific" [] $
+      formatXMLElement "name" [] (Text.pack (Text.unpack name))
+        <> maybe mempty (formatXMLElement "email" [] . Text.pack . Text.unpack) email
+  Token.JSDocVersionTag version ->
+    formatXMLElement "version-specific" [] (Text.pack (Text.unpack version))
+  Token.JSDocSinceTag version ->
+    formatXMLElement "since-specific" [] (Text.pack (Text.unpack version))
+  Token.JSDocAccessTag access ->
+    formatXMLElement "access-specific" [] (Text.pack (show access))
+  Token.JSDocNamespaceTag path ->
+    formatXMLElement "namespace-specific" [] (Text.pack (Text.unpack path))
+  Token.JSDocClassTag maybeName maybeExtends ->
+    formatXMLElement "class-specific" [] $
+      maybe mempty (formatXMLElement "name" [] . Text.pack . Text.unpack) maybeName
+        <> maybe mempty (formatXMLElement "extends" [] . Text.pack . Text.unpack) maybeExtends
+  Token.JSDocModuleTag name maybeType ->
+    formatXMLElement "module-specific" [] $
+      formatXMLElement "name" [] (Text.pack (Text.unpack name))
+        <> maybe mempty (formatXMLElement "type" [] . Text.pack . Text.unpack) maybeType
+  Token.JSDocMemberOfTag parent forced ->
+    formatXMLElement "memberof-specific" [] $
+      formatXMLElement "parent" [] (Text.pack (Text.unpack parent))
+        <> formatXMLElement "forced" [] (if forced then "true" else "false")
+  Token.JSDocTypedefTag name properties ->
+    formatXMLElement "typedef-specific" [] $
+      formatXMLElement "name" [] (Text.pack (Text.unpack name))
+        <> formatXMLElement "properties" [] (mconcat (map renderJSDocPropertyToXML properties))
+  Token.JSDocEnumTag name maybeBaseType enumValues ->
+    formatXMLElement "enum-specific" [] $
+      formatXMLElement "name" [] (Text.pack (Text.unpack name))
+        <> maybe mempty (formatXMLElement "base-type" [] . renderJSDocTypeToXML) maybeBaseType
+        <> formatXMLElement "values" [] (mconcat (map renderJSDocEnumValueToXML enumValues))
+  Token.JSDocCallbackTag name ->
+    formatXMLElement "callback-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocEventTag name ->
+    formatXMLElement "event-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocFiresTag name ->
+    formatXMLElement "fires-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocListensTag name ->
+    formatXMLElement "listens-specific" [] (Text.pack (Text.unpack name))
+  Token.JSDocIgnoreTag ->
+    formatXMLElement "ignore-specific" [] mempty
+  Token.JSDocInnerTag ->
+    formatXMLElement "inner-specific" [] mempty
+  Token.JSDocReadOnlyTag ->
+    formatXMLElement "readonly-specific" [] mempty
+  Token.JSDocStaticTag ->
+    formatXMLElement "static-specific" [] mempty
+  Token.JSDocOverrideTag ->
+    formatXMLElement "override-specific" [] mempty
+  Token.JSDocAbstractTag ->
+    formatXMLElement "abstract-specific" [] mempty
+  Token.JSDocFinalTag ->
+    formatXMLElement "final-specific" [] mempty
+  Token.JSDocGeneratorTag ->
+    formatXMLElement "generator-specific" [] mempty
+  Token.JSDocAsyncTag ->
+    formatXMLElement "async-specific" [] mempty
 
 -- | Render binary operator to XML
 renderBinOpToXML :: AST.JSBinOp -> Text

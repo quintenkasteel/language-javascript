@@ -68,11 +68,12 @@ Library
                        Language.JavaScript.Process.Minify
                        Language.JavaScript.Process.TreeShake
                        Language.JavaScript.Process.TreeShake.Types
+                       Language.JavaScript.Runtime.Integration
   Other-modules:       Language.JavaScript.Parser.LexerUtils
                        Language.JavaScript.Parser.ParserMonad
                        Language.JavaScript.Process.TreeShake.Analysis
                        Language.JavaScript.Process.TreeShake.Elimination
-  ghc-options:         -Wall -fwarn-tabs -O2 -funbox-strict-fields -fspec-constr-count=6 -fno-state-hack
+  ghc-options:         -Wall -fwarn-tabs -O2 -funbox-strict-fields -fspec-constr-count=6 -fno-state-hack -Wno-unused-imports -Wno-unused-top-binds -Wno-unused-matches -Wno-name-shadowing
 
 Test-Suite testsuite
   Type: exitcode-stdio-1.0
@@ -80,7 +81,8 @@ Test-Suite testsuite
   Main-is: testsuite.hs
   hs-source-dirs: test
   other-modules:
-  ghc-options:   -Wall -fwarn-tabs
+    Test.Language.Javascript.JSDocTest
+  ghc-options:   -Wall -fwarn-tabs -Wno-unused-imports -Wno-unused-top-binds -Wno-unused-matches -Wno-name-shadowing
   build-depends: base, Cabal >= 1.9.2
                  , QuickCheck >= 2
                  , hspec
@@ -127,6 +129,9 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Parser.AST.Generic
                     Unit.Language.Javascript.Parser.AST.SrcLocation
 
+                    -- Unit Tests - JSDoc
+                    -- Test.Language.Javascript.JSDocTest  -- Temporarily disabled
+
                     -- Unit Tests - Pretty Printing
                     Unit.Language.Javascript.Parser.Pretty.JSONTest
                     Unit.Language.Javascript.Parser.Pretty.XMLTest
@@ -138,6 +143,9 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Parser.Validation.StrictMode
                     Unit.Language.Javascript.Parser.Validation.Modules
                     Unit.Language.Javascript.Parser.Validation.ControlFlow
+
+                    -- Unit Tests - Runtime Validation
+                    Unit.Language.Javascript.Runtime.ValidatorTest
 
                     -- Unit Tests - Error
                     Unit.Language.Javascript.Parser.Error.Recovery

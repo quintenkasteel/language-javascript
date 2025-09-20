@@ -114,7 +114,12 @@ stringToken :: TokenPosn -> String -> Token
 stringToken loc str = StringToken loc (str) []
 
 commentToken :: TokenPosn -> String -> Token
-commentToken loc str = CommentToken loc (str) []
+commentToken loc str
+  | isJSDocComment str =
+      case parseJSDocFromComment loc str of
+        Just jsDoc -> CommentToken loc str [JSDocA loc jsDoc]
+        Nothing -> CommentToken loc str [CommentA loc str]
+  | otherwise = CommentToken loc str [CommentA loc str]
 
 wsToken :: TokenPosn -> String -> Token
 wsToken loc str = WsToken loc (str) []

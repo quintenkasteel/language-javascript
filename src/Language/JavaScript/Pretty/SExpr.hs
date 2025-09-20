@@ -357,10 +357,316 @@ renderCommentToSExpr comment = case comment of
         renderPositionToSExpr pos,
         escapeSExprString content
       ]
+  Token.JSDocA pos jsDoc ->
+    formatSExprList
+      [ "jsdoc",
+        renderPositionToSExpr pos,
+        renderJSDocToSExpr jsDoc
+      ]
   Token.NoComment ->
     formatSExprList
       [ "no-comment"
       ]
+
+-- | Render JSDoc comment to S-expression
+renderJSDocToSExpr :: Token.JSDocComment -> Text
+renderJSDocToSExpr jsDoc =
+  formatSExprList
+    [ "jsdoc-comment",
+      renderPositionToSExpr (Token.jsDocPosition jsDoc),
+      maybe "nil" (escapeSExprString . Text.unpack) (Token.jsDocDescription jsDoc),
+      formatSExprList ("tags" : map renderJSDocTagToSExpr (Token.jsDocTags jsDoc))
+    ]
+
+-- | Render JSDoc tag to S-expression
+renderJSDocTagToSExpr :: Token.JSDocTag -> Text
+renderJSDocTagToSExpr tag =
+  formatSExprList
+    [ "jsdoc-tag",
+      escapeSExprString (Text.unpack (Token.jsDocTagName tag)),
+      maybe "nil" renderJSDocTypeToSExpr (Token.jsDocTagType tag),
+      maybe "nil" (escapeSExprString . Text.unpack) (Token.jsDocTagParamName tag),
+      maybe "nil" (escapeSExprString . Text.unpack) (Token.jsDocTagDescription tag),
+      renderPositionToSExpr (Token.jsDocTagPosition tag),
+      maybe "nil" renderJSDocTagSpecificToSExpr (Token.jsDocTagSpecific tag)
+    ]
+
+-- | Render JSDoc type to S-expression
+renderJSDocTypeToSExpr :: Token.JSDocType -> Text
+renderJSDocTypeToSExpr jsDocType = case jsDocType of
+  Token.JSDocBasicType name ->
+    formatSExprList ["basic-type", escapeSExprString (Text.unpack name)]
+  Token.JSDocArrayType elementType ->
+    formatSExprList ["array-type", renderJSDocTypeToSExpr elementType]
+  Token.JSDocUnionType types ->
+    formatSExprList ("union-type" : map renderJSDocTypeToSExpr types)
+  Token.JSDocObjectType fields ->
+    formatSExprList ["object-type", formatSExprList ("fields" : map renderJSDocObjectFieldToSExpr fields)]
+  Token.JSDocFunctionType paramTypes returnType ->
+    formatSExprList
+      [ "function-type",
+        formatSExprList ("params" : map renderJSDocTypeToSExpr paramTypes),
+        formatSExprList ["return", renderJSDocTypeToSExpr returnType]
+      ]
+  Token.JSDocGenericType baseName args ->
+    formatSExprList
+      [ "generic-type",
+        escapeSExprString (Text.unpack baseName),
+        formatSExprList ("args" : map renderJSDocTypeToSExpr args)
+      ]
+  Token.JSDocOptionalType baseType ->
+    formatSExprList ["optional-type", renderJSDocTypeToSExpr baseType]
+  Token.JSDocNullableType baseType ->
+    formatSExprList ["nullable-type", renderJSDocTypeToSExpr baseType]
+  Token.JSDocNonNullableType baseType ->
+    formatSExprList ["non-nullable-type", renderJSDocTypeToSExpr baseType]
+  Token.JSDocEnumType enumName enumValues ->
+    formatSExprList
+      [ "enum-type",
+        escapeSExprString (Text.unpack enumName),
+        formatSExprList ("values" : map renderJSDocEnumValueToSExpr enumValues)
+      ]
+
+-- | Render JSDoc enum value to S-expression
+renderJSDocEnumValueToSExpr :: Token.JSDocEnumValue -> Text
+renderJSDocEnumValueToSExpr enumValue =
+  let nameExpr = escapeSExprString (Text.unpack (Token.jsDocEnumValueName enumValue))
+      literalExpr = case Token.jsDocEnumValueLiteral enumValue of
+        Nothing -> "nil"
+        Just literal -> escapeSExprString (Text.unpack literal)
+      descExpr = case Token.jsDocEnumValueDescription enumValue of
+        Nothing -> "nil"
+        Just desc -> escapeSExprString (Text.unpack desc)
+  in formatSExprList ["enum-value", nameExpr, literalExpr, descExpr]
+
+-- | Render JSDoc property to S-expression
+renderJSDocPropertyToSExpr :: Token.JSDocProperty -> Text
+renderJSDocPropertyToSExpr property =
+  let nameExpr = escapeSExprString (Text.unpack (Token.jsDocPropertyName property))
+      typeExpr = case Token.jsDocPropertyType property of
+        Nothing -> "nil"
+        Just jsDocType -> renderJSDocTypeToSExpr jsDocType
+      optionalExpr = if Token.jsDocPropertyOptional property then "optional" else "required"
+      descExpr = case Token.jsDocPropertyDescription property of
+        Nothing -> "nil"
+        Just desc -> escapeSExprString (Text.unpack desc)
+  in formatSExprList ["jsdoc-property", nameExpr, typeExpr, optionalExpr, descExpr]
+
+-- | Render JSDoc object field to S-expression
+renderJSDocObjectFieldToSExpr :: Token.JSDocObjectField -> Text
+renderJSDocObjectFieldToSExpr field =
+  formatSExprList
+    [ "object-field",
+      escapeSExprString (Text.unpack (Token.jsDocFieldName field)),
+      renderJSDocTypeToSExpr (Token.jsDocFieldType field),
+      if Token.jsDocFieldOptional field then "optional" else "required"
+    ]
+
+-- | Render JSDoc tag specific information to S-expression.
+renderJSDocTagSpecificToSExpr :: Token.JSDocTagSpecific -> Text
+renderJSDocTagSpecificToSExpr tagSpecific = case tagSpecific of
+  Token.JSDocParamTag optional variadic defaultValue ->
+    formatSExprList
+      [ "param-specific",
+        if optional then "optional" else "required",
+        if variadic then "variadic" else "fixed",
+        maybe "nil" (escapeSExprString . Text.unpack) defaultValue
+      ]
+  Token.JSDocReturnTag promise ->
+    formatSExprList
+      [ "return-specific",
+        if promise then "promise" else "value"
+      ]
+  Token.JSDocDescriptionTag text ->
+    formatSExprList ["description-specific", escapeSExprString (Text.unpack text)]
+  Token.JSDocTypeTag jsDocType ->
+    formatSExprList ["type-specific", renderJSDocTypeToSExpr jsDocType]
+  Token.JSDocPropertyTag name maybeType optional maybeDescription ->
+    formatSExprList
+      [ "property-specific",
+        escapeSExprString (Text.unpack name),
+        maybe "nil" renderJSDocTypeToSExpr maybeType,
+        if optional then "optional" else "required",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeDescription
+      ]
+  Token.JSDocDefaultTag value ->
+    formatSExprList ["default-specific", escapeSExprString (Text.unpack value)]
+  Token.JSDocConstantTag maybeValue ->
+    formatSExprList
+      [ "constant-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeValue
+      ]
+  Token.JSDocGlobalTag ->
+    formatSExprList ["global-specific"]
+  Token.JSDocAliasTag name ->
+    formatSExprList ["alias-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocAugmentsTag parent ->
+    formatSExprList ["augments-specific", escapeSExprString (Text.unpack parent)]
+  Token.JSDocBorrowsTag from maybeAs ->
+    formatSExprList
+      [ "borrows-specific",
+        escapeSExprString (Text.unpack from),
+        maybe "nil" (escapeSExprString . Text.unpack) maybeAs
+      ]
+  Token.JSDocClassDescTag description ->
+    formatSExprList ["classdesc-specific", escapeSExprString (Text.unpack description)]
+  Token.JSDocCopyrightTag notice ->
+    formatSExprList ["copyright-specific", escapeSExprString (Text.unpack notice)]
+  Token.JSDocExportsTag name ->
+    formatSExprList ["exports-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocExternalTag name maybeDescription ->
+    formatSExprList
+      [ "external-specific",
+        escapeSExprString (Text.unpack name),
+        maybe "nil" (escapeSExprString . Text.unpack) maybeDescription
+      ]
+  Token.JSDocFileTag description ->
+    formatSExprList ["file-specific", escapeSExprString (Text.unpack description)]
+  Token.JSDocFunctionTag ->
+    formatSExprList ["function-specific"]
+  Token.JSDocHideConstructorTag ->
+    formatSExprList ["hideconstructor-specific"]
+  Token.JSDocImplementsTag interface ->
+    formatSExprList ["implements-specific", escapeSExprString (Text.unpack interface)]
+  Token.JSDocInheritDocTag ->
+    formatSExprList ["inheritdoc-specific"]
+  Token.JSDocInstanceTag ->
+    formatSExprList ["instance-specific"]
+  Token.JSDocInterfaceTag maybeName ->
+    formatSExprList
+      [ "interface-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeName
+      ]
+  Token.JSDocKindTag kind ->
+    formatSExprList ["kind-specific", escapeSExprString (Text.unpack kind)]
+  Token.JSDocLendsTag name ->
+    formatSExprList ["lends-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocLicenseTag license ->
+    formatSExprList ["license-specific", escapeSExprString (Text.unpack license)]
+  Token.JSDocMemberTag maybeName maybeType ->
+    formatSExprList
+      [ "member-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeName,
+        maybe "nil" (escapeSExprString . Text.unpack) maybeType
+      ]
+  Token.JSDocMixesTag mixin ->
+    formatSExprList ["mixes-specific", escapeSExprString (Text.unpack mixin)]
+  Token.JSDocMixinTag ->
+    formatSExprList ["mixin-specific"]
+  Token.JSDocNameTag name ->
+    formatSExprList ["name-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocRequiresTag module' ->
+    formatSExprList ["requires-specific", escapeSExprString (Text.unpack module')]
+  Token.JSDocSummaryTag summary ->
+    formatSExprList ["summary-specific", escapeSExprString (Text.unpack summary)]
+  Token.JSDocThisTag thisType ->
+    formatSExprList ["this-specific", renderJSDocTypeToSExpr thisType]
+  Token.JSDocTodoTag todo ->
+    formatSExprList ["todo-specific", escapeSExprString (Text.unpack todo)]
+  Token.JSDocTutorialTag tutorial ->
+    formatSExprList ["tutorial-specific", escapeSExprString (Text.unpack tutorial)]
+  Token.JSDocVariationTag variation ->
+    formatSExprList ["variation-specific", escapeSExprString (Text.unpack variation)]
+  Token.JSDocYieldsTag maybeType maybeDescription ->
+    formatSExprList
+      [ "yields-specific",
+        maybe "nil" renderJSDocTypeToSExpr maybeType,
+        maybe "nil" (escapeSExprString . Text.unpack) maybeDescription
+      ]
+  Token.JSDocThrowsTag maybeDescription ->
+    formatSExprList
+      [ "throws-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeDescription
+      ]
+  Token.JSDocExampleTag maybeLanguage maybeCaption ->
+    formatSExprList
+      [ "example-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeLanguage,
+        maybe "nil" (escapeSExprString . Text.unpack) maybeCaption
+      ]
+  Token.JSDocSeeTag reference maybeDisplayText ->
+    formatSExprList
+      [ "see-specific",
+        escapeSExprString (Text.unpack reference),
+        maybe "nil" (escapeSExprString . Text.unpack) maybeDisplayText
+      ]
+  Token.JSDocDeprecatedTag maybeSince maybeReplacement ->
+    formatSExprList
+      [ "deprecated-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeSince,
+        maybe "nil" (escapeSExprString . Text.unpack) maybeReplacement
+      ]
+  Token.JSDocAuthorTag name email ->
+    formatSExprList
+      [ "author-specific",
+        escapeSExprString (Text.unpack name),
+        maybe "nil" (escapeSExprString . Text.unpack) email
+      ]
+  Token.JSDocVersionTag version ->
+    formatSExprList ["version-specific", escapeSExprString (Text.unpack version)]
+  Token.JSDocSinceTag version ->
+    formatSExprList ["since-specific", escapeSExprString (Text.unpack version)]
+  Token.JSDocAccessTag access ->
+    formatSExprList ["access-specific", escapeSExprString (show access)]
+  Token.JSDocNamespaceTag path ->
+    formatSExprList ["namespace-specific", escapeSExprString (Text.unpack path)]
+  Token.JSDocClassTag maybeName maybeExtends ->
+    formatSExprList
+      [ "class-specific",
+        maybe "nil" (escapeSExprString . Text.unpack) maybeName,
+        maybe "nil" (escapeSExprString . Text.unpack) maybeExtends
+      ]
+  Token.JSDocModuleTag name maybeType ->
+    formatSExprList
+      [ "module-specific",
+        escapeSExprString (Text.unpack name),
+        maybe "nil" (escapeSExprString . Text.unpack) maybeType
+      ]
+  Token.JSDocMemberOfTag parent forced ->
+    formatSExprList
+      [ "memberof-specific",
+        escapeSExprString (Text.unpack parent),
+        if forced then "forced" else "natural"
+      ]
+  Token.JSDocTypedefTag name properties ->
+    formatSExprList
+      [ "typedef-specific",
+        escapeSExprString (Text.unpack name),
+        formatSExprList ("properties" : map renderJSDocPropertyToSExpr properties)
+      ]
+  Token.JSDocEnumTag name maybeBaseType enumValues ->
+    formatSExprList
+      [ "enum-specific",
+        escapeSExprString (Text.unpack name),
+        maybe "nil" renderJSDocTypeToSExpr maybeBaseType,
+        formatSExprList ("values" : map renderJSDocEnumValueToSExpr enumValues)
+      ]
+  Token.JSDocCallbackTag name ->
+    formatSExprList ["callback-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocEventTag name ->
+    formatSExprList ["event-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocFiresTag name ->
+    formatSExprList ["fires-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocListensTag name ->
+    formatSExprList ["listens-specific", escapeSExprString (Text.unpack name)]
+  Token.JSDocIgnoreTag ->
+    formatSExprList ["ignore-specific"]
+  Token.JSDocInnerTag ->
+    formatSExprList ["inner-specific"]
+  Token.JSDocReadOnlyTag ->
+    formatSExprList ["readonly-specific"]
+  Token.JSDocStaticTag ->
+    formatSExprList ["static-specific"]
+  Token.JSDocOverrideTag ->
+    formatSExprList ["override-specific"]
+  Token.JSDocAbstractTag ->
+    formatSExprList ["abstract-specific"]
+  Token.JSDocFinalTag ->
+    formatSExprList ["final-specific"]
+  Token.JSDocGeneratorTag ->
+    formatSExprList ["generator-specific"]
+  Token.JSDocAsyncTag ->
+    formatSExprList ["async-specific"]
 
 -- | Render binary operator to S-expression
 renderBinOpToSExpr :: AST.JSBinOp -> Text
