@@ -179,6 +179,7 @@ instance MinifyJS JSExpression where
   fix a (JSYieldExpression _ x) = JSYieldExpression a (fixSpace x)
   fix a (JSYieldFromExpression _ _ x) = JSYieldFromExpression a emptyAnnot (fixEmpty x)
   fix a (JSImportMeta _ _) = JSImportMeta a emptyAnnot
+  fix a (JSImportCall _ _ expr _) = JSImportCall a emptyAnnot (fixEmpty expr) emptyAnnot
   fix a (JSSpreadExpression _ e) = JSSpreadExpression a (fixEmpty e)
   fix a (JSBigIntLiteral _ s) = JSBigIntLiteral a s
   fix a (JSOptionalMemberDot e _ p) = JSOptionalMemberDot (fix a e) emptyAnnot (fixEmpty p)
@@ -354,6 +355,7 @@ instance MinifyJS JSExportDeclaration where
   fix a (JSExportAllAsFrom star _as ident from _) = JSExportAllAsFrom (fix a star) emptyAnnot (fix a ident) (fix a from) noSemi
   fix a (JSExportFrom x1 from _) = JSExportFrom (fix a x1) (fix a from) noSemi
   fix _ (JSExportLocals x1 _) = JSExportLocals (fix emptyAnnot x1) noSemi
+  fix _ (JSExportDefault _ stmt _) = JSExportDefault spaceAnnot (fixStmt spaceAnnot noSemi stmt) noSemi
   fix _ (JSExport x1 _) = JSExport (fixStmt spaceAnnot noSemi x1) noSemi
 
 instance MinifyJS JSExportClause where
@@ -397,6 +399,7 @@ instance MinifyJS JSObjectProperty where
 instance MinifyJS JSMethodDefinition where
   fix a (JSMethodDefinition n _ ps _ b) = JSMethodDefinition (fix a n) emptyAnnot (fixEmpty ps) emptyAnnot (fixEmpty b)
   fix _ (JSGeneratorMethodDefinition _ n _ ps _ b) = JSGeneratorMethodDefinition emptyAnnot (fixEmpty n) emptyAnnot (fixEmpty ps) emptyAnnot (fixEmpty b)
+  fix _ (JSAsyncMethodDefinition _ n _ ps _ b) = JSAsyncMethodDefinition emptyAnnot (fixEmpty n) emptyAnnot (fixEmpty ps) emptyAnnot (fixEmpty b)
   fix a (JSPropertyAccessor s n _ ps _ b) = JSPropertyAccessor (fix a s) (fixSpace n) emptyAnnot (fixEmpty ps) emptyAnnot (fixEmpty b)
 
 instance MinifyJS JSPropertyName where

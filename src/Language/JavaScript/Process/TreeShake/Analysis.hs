@@ -48,11 +48,11 @@ module Language.JavaScript.Process.TreeShake.Analysis
   )
 where
 
-import Control.Lens ((&), (.~), (%~), (^.))
-import Control.Monad.State.Strict (State, gets, modify, execState, runState)
-import qualified Control.Monad.State.Strict as State
-import Data.Char (isAlphaNum)
+import Control.Lens ((&), (.~), (%~), (^.), (?~))
+import Control.Monad.State.Strict (State, gets, modify, execState)
+import Data.Foldable (traverse_, for_)
 import qualified Data.Map.Strict as Map
+import Data.Semigroup ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST
@@ -114,8 +114,8 @@ buildUsageMap opts ast = _usageMap $ analyzeUsageWithOptions opts ast
 
 -- | Main AST analysis dispatcher.
 analyzeAST :: JSAST -> AnalysisM ()
-analyzeAST (JSAstProgram statements _) = mapM_ analyzeStatement statements
-analyzeAST (JSAstModule moduleItems _) = mapM_ analyzeModuleItem moduleItems  
+analyzeAST (JSAstProgram statements _) = traverse_ analyzeStatement statements
+analyzeAST (JSAstModule moduleItems _) = traverse_ analyzeModuleItem moduleItems  
 analyzeAST (JSAstStatement stmt _) = analyzeStatement stmt
 analyzeAST (JSAstExpression expr _) = analyzeExpression expr
 analyzeAST (JSAstLiteral expr _) = analyzeExpression expr
@@ -125,36 +125,36 @@ analyzeStatement :: JSStatement -> AnalysisM ()
 analyzeStatement stmt = case stmt of
   JSVariable _ varList _ -> do
     -- First pass: declare variables in current scope
-    mapM_ declareFromExpression (fromCommaList varList)
+    traverse_ declareFromExpression (fromCommaList varList)
     -- Second pass: analyze initializers only
-    mapM_ analyzeVariableInitializer (fromCommaList varList)
+    traverse_ analyzeVariableInitializer (fromCommaList varList)
     
   JSLet _ varList _ -> do
-    mapM_ declareFromExpression (fromCommaList varList)
-    mapM_ analyzeVariableInitializer (fromCommaList varList)
+    traverse_ declareFromExpression (fromCommaList varList)
+    traverse_ analyzeVariableInitializer (fromCommaList varList)
     
   JSConstant _ varList _ -> do
-    mapM_ declareFromExpression (fromCommaList varList)
-    mapM_ analyzeVariableInitializer (fromCommaList varList)
+    traverse_ declareFromExpression (fromCommaList varList)
+    traverse_ analyzeVariableInitializer (fromCommaList varList)
     
   JSFunction _ ident _ params _ body _ -> do
     -- Declare function in current scope
     declareIdentifier ident
     -- Create function scope and analyze body
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
   JSAsyncFunction _ _ ident _ params _ body _ -> do
     declareIdentifier ident
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
   JSGenerator _ _ ident _ params _ body _ -> do
     declareIdentifier ident
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
   JSIf _ _ condition _ thenStmt -> do
@@ -167,9 +167,9 @@ analyzeStatement stmt = case stmt of
     analyzeStatement elseStmt
     
   JSFor _ _ init _ condition _ increment _ body -> do
-    mapM_ analyzeExpression (fromCommaList init)
-    mapM_ analyzeExpression (fromCommaList condition)
-    mapM_ analyzeExpression (fromCommaList increment)
+    traverse_ analyzeExpression (fromCommaList init)
+    traverse_ analyzeExpression (fromCommaList condition)
+    traverse_ analyzeExpression (fromCommaList increment)
     analyzeStatement body
     
   JSForIn _ _ var _ obj _ body -> do
@@ -198,12 +198,12 @@ analyzeStatement stmt = case stmt of
     
   JSTry _ body catches finally -> do
     analyzeBlock body
-    mapM_ analyzeTryCatch catches
+    traverse_ analyzeTryCatch catches
     analyzeTryFinally finally
     
   JSSwitch _ _ expr _ _ cases _ _ -> do
     analyzeExpression expr
-    mapM_ analyzeSwitchCase cases
+    traverse_ analyzeSwitchCase cases
     
   JSWith _ _ expr _ body _ -> do
     analyzeExpression expr
@@ -213,8 +213,8 @@ analyzeStatement stmt = case stmt of
     declareIdentifier ident
     analyzeStatement stmt
     
-  JSStatementBlock _ stmts _ _ -> 
-    withBlockScope $ mapM_ analyzeStatement stmts
+  JSStatementBlock _ stmts _ _ ->
+    withBlockScope $ traverse_ analyzeStatement stmts
     
   JSExpressionStatement expr _ ->
     analyzeExpression expr
@@ -230,13 +230,13 @@ analyzeStatement stmt = case stmt of
       then do
         markHasEvalCall
         markPotentialEvalIdentifiers args
-      else mapM_ analyzeExpression (fromCommaList args)
+      else traverse_ analyzeExpression (fromCommaList args)
     markSideEffect
     
   JSClass _ ident heritage _ elements _ _ -> do
     declareIdentifier ident
     analyzeClassHeritage heritage
-    mapM_ analyzeClassElement elements
+    traverse_ analyzeClassElement elements
     
   JSEmptyStatement _ -> pure ()
   
@@ -253,10 +253,10 @@ analyzeStatement stmt = case stmt of
   
   -- For loop variants with variable declarations
   JSForVar _ _ _ varList _ condition _ increment _ body -> do
-    mapM_ declareFromExpression (fromCommaList varList)
-    mapM_ analyzeVariableInitializer (fromCommaList varList)
-    mapM_ analyzeExpression (fromCommaList condition)
-    mapM_ analyzeExpression (fromCommaList increment)
+    traverse_ declareFromExpression (fromCommaList varList)
+    traverse_ analyzeVariableInitializer (fromCommaList varList)
+    traverse_ analyzeExpression (fromCommaList condition)
+    traverse_ analyzeExpression (fromCommaList increment)
     analyzeStatement body
     
   JSForVarIn _ _ _ var _ obj _ body -> do
@@ -269,41 +269,41 @@ analyzeStatement stmt = case stmt of
     analyzeExpression obj
     analyzeStatement body
     
-  JSForLet _ _ _ varList _ condition _ increment _ body -> do
+  JSForLet _ _ _ varList _ condition _ increment _ body ->
     withBlockScope $ do
-      mapM_ declareFromExpression (fromCommaList varList)
-      mapM_ analyzeVariableInitializer (fromCommaList varList)
-      mapM_ analyzeExpression (fromCommaList condition)
-      mapM_ analyzeExpression (fromCommaList increment)
+      traverse_ declareFromExpression (fromCommaList varList)
+      traverse_ analyzeVariableInitializer (fromCommaList varList)
+      traverse_ analyzeExpression (fromCommaList condition)
+      traverse_ analyzeExpression (fromCommaList increment)
       analyzeStatement body
       
-  JSForLetIn _ _ _ var _ obj _ body -> do
-    withBlockScope $ do
-      declareFromExpression var
-      analyzeExpression obj
-      analyzeStatement body
-      
-  JSForLetOf _ _ _ var _ obj _ body -> do
+  JSForLetIn _ _ _ var _ obj _ body ->
     withBlockScope $ do
       declareFromExpression var
       analyzeExpression obj
       analyzeStatement body
       
-  JSForConst _ _ _ varList _ condition _ increment _ body -> do
-    withBlockScope $ do
-      mapM_ declareFromExpression (fromCommaList varList)
-      mapM_ analyzeVariableInitializer (fromCommaList varList)
-      mapM_ analyzeExpression (fromCommaList condition)
-      mapM_ analyzeExpression (fromCommaList increment)
-      analyzeStatement body
-      
-  JSForConstIn _ _ _ var _ obj _ body -> do
+  JSForLetOf _ _ _ var _ obj _ body ->
     withBlockScope $ do
       declareFromExpression var
       analyzeExpression obj
       analyzeStatement body
       
-  JSForConstOf _ _ _ var _ obj _ body -> do
+  JSForConst _ _ _ varList _ condition _ increment _ body ->
+    withBlockScope $ do
+      traverse_ declareFromExpression (fromCommaList varList)
+      traverse_ analyzeVariableInitializer (fromCommaList varList)
+      traverse_ analyzeExpression (fromCommaList condition)
+      traverse_ analyzeExpression (fromCommaList increment)
+      analyzeStatement body
+      
+  JSForConstIn _ _ _ var _ obj _ body ->
+    withBlockScope $ do
+      declareFromExpression var
+      analyzeExpression obj
+      analyzeStatement body
+      
+  JSForConstOf _ _ _ var _ obj _ body ->
     withBlockScope $ do
       declareFromExpression var
       analyzeExpression obj
@@ -318,7 +318,7 @@ analyzeExpression expr = case expr of
   JSIdentifier _ name -> 
     markIdentifierUsed (Text.pack name)
     
-  JSVarInitExpression var initializer -> do
+  JSVarInitExpression _var initializer ->
     -- Don't analyze the variable name - it's a declaration, not a usage
     -- Only analyze the initializer for references
     analyzeVarInitializer initializer
@@ -335,10 +335,10 @@ analyzeExpression expr = case expr of
       then do
         markHasEvalCall
         markPotentialEvalIdentifiers args
-      else mapM_ analyzeExpression (fromCommaList args)
+      else traverse_ analyzeExpression (fromCommaList args)
     markSideEffect
     
-  JSCallExpressionDot target _ prop -> do
+  JSCallExpressionDot target _ _prop -> do
     analyzeExpression target
     -- Don't analyze prop - it's a property name, not a variable reference
     markSideEffect
@@ -364,7 +364,7 @@ analyzeExpression expr = case expr of
       JSVarInitExpression {} -> markObjectWithDynamicAccess target  -- obj[x = y]
       _ -> pure ()
     
-  JSOptionalMemberDot target _ prop -> do
+  JSOptionalMemberDot target _ _prop ->
     analyzeExpression target
     -- Don't analyze prop - it's a property name, not a variable reference
     
@@ -374,14 +374,13 @@ analyzeExpression expr = case expr of
     
   JSOptionalCallExpression target _ args _ -> do
     analyzeExpression target
-    mapM_ analyzeExpression (fromCommaList args)
+    traverse_ analyzeExpression (fromCommaList args)
     markSideEffect
     
   JSNewExpression _ target -> do
     analyzeExpression target
     -- Special handling for dynamic code execution (eval, Function constructor)
-    when (isDynamicCodeCall target) $ do
-      markHasEvalCall
+    when (isDynamicCodeCall target) markHasEvalCall
     markSideEffect
     
   JSMemberNew _ target _ args _ -> do
@@ -391,7 +390,7 @@ analyzeExpression expr = case expr of
       then do
         markHasEvalCall
         markPotentialEvalIdentifiers args
-      else mapM_ analyzeExpression (fromCommaList args)
+      else traverse_ analyzeExpression (fromCommaList args)
     markSideEffect
     
   JSUnaryExpression op operand -> do
@@ -417,7 +416,7 @@ analyzeExpression expr = case expr of
     analyzeExpression right
     
   JSArrayLiteral _ elements _ ->
-    mapM_ analyzeArrayElement elements
+    traverse_ analyzeArrayElement elements
     
   JSObjectLiteral _ props _ ->
     analyzeObjectPropertyList props
@@ -425,10 +424,10 @@ analyzeExpression expr = case expr of
   JSFunctionExpression _ ident _ params _ body -> do
     declareIdentifier ident
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
-  JSArrowExpression params _ body -> do
+  JSArrowExpression params _ body ->
     withFunctionScope $ do
       analyzeArrowParams params
       analyzeConciseBody body
@@ -450,12 +449,12 @@ analyzeExpression expr = case expr of
     
   JSTemplateLiteral maybeTag _ _ parts -> do
     maybe (pure ()) analyzeExpression maybeTag
-    mapM_ analyzeTemplatePart parts
+    traverse_ analyzeTemplatePart parts
     
   JSClassExpression _ ident heritage _ elements _ -> do
     declareIdentifier ident
     analyzeClassHeritage heritage
-    mapM_ analyzeClassElement elements
+    traverse_ analyzeClassElement elements
     
   JSExpressionParen _ expr _ ->
     analyzeExpression expr
@@ -470,36 +469,24 @@ analyzeExpression expr = case expr of
   JSStringLiteral {} -> pure ()
   JSRegEx {} -> pure ()
   JSImportMeta {} -> pure ()
-
-  -- Modern JavaScript Patterns that actually exist
-  JSSpreadExpression _ expr ->
-    analyzeExpression expr
-
-  JSTemplateLiteral maybeTag _ _ parts -> do
-    maybe (pure ()) analyzeExpression maybeTag
-    mapM_ analyzeTemplatePart parts
-
-  JSYieldExpression _ maybeExpr ->
-    maybe (pure ()) analyzeExpression maybeExpr
-
-  JSBigIntLiteral {} -> pure ()
+  JSImportCall _ _ expr _ -> analyzeExpression expr
 
   -- Additional expression patterns
   JSAsyncFunctionExpression _ _ ident _ params _ body -> do
     declareIdentifier ident
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
   JSGeneratorExpression _ _ ident _ params _ body -> do
     declareIdentifier ident
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
   JSMemberExpression target _ args _ -> do
     analyzeExpression target
-    mapM_ analyzeExpression (fromCommaList args)
+    traverse_ analyzeExpression (fromCommaList args)
     markSideEffect
 
 -- | Analyze module items (imports/exports).
@@ -524,33 +511,23 @@ analyzeImportDeclaration importDecl = do
     (_importedNames importInfo)
   
   -- Handle default import
-  case _importDefault importInfo of
-    Just name -> declareImportedIdentifier name
-    Nothing -> pure ()
+  for_ (_importDefault importInfo) declareImportedIdentifier
     
   -- Handle namespace import
-  case _importNamespace importInfo of
-    Just name -> declareImportedIdentifier name
-    Nothing -> pure ()
+  for_ (_importNamespace importInfo) declareImportedIdentifier
 
 -- | Analyze export declarations and mark exports.
 analyzeExportDeclaration :: JSExportDeclaration -> AnalysisM ()
 analyzeExportDeclaration exportDecl = do
   let exportInfos = extractExportInfo exportDecl
-  
+
   -- Mark all exported identifiers
-  mapM_ (markIdentifierExported . _exportedName) exportInfos
-  
+  traverse_ (markIdentifierExported . _exportedName) exportInfos
+
   -- Analyze exported statements
   case exportDecl of
     JSExport stmt _ -> analyzeStatement stmt
-    JSExportDefault _ stmt _ -> do
-      analyzeStatement stmt
-      -- Mark the default export identifier if it's an identifier
-      case stmt of
-        JSExpressionStatement (JSIdentifier _ name) _ ->
-          markIdentifierExported (Text.pack name)
-        _ -> pure ()
+    JSExportDefault _ stmt _ -> analyzeStatement stmt
     _ -> pure ()
 
 -- Helper Functions
@@ -623,7 +600,7 @@ declareIdentifier (JSIdentName _ name) = do
   let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
   let updatedInfo = currentInfo
         & scopeDepth .~ scopeLevel
-        & declarationLocation .~ Just (TokenPn 0 0 0)  -- TODO: Get real position
+        & declarationLocation ?~ TokenPn 0 0 0  -- TODO: Get real position
   
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
   
@@ -655,7 +632,7 @@ declareImportedIdentifier identifier = do
   let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
   let updatedInfo = currentInfo
         & scopeDepth .~ 0  -- Module scope
-        & declarationLocation .~ Just (TokenPn 0 0 0)
+        & declarationLocation ?~ TokenPn 0 0 0
   
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
 
@@ -673,11 +650,9 @@ markIdentifierUsed identifier = do
 
 -- | Mark property as used via member access (obj.prop).
 markPropertyUsed :: JSExpression -> JSExpression -> AnalysisM ()
-markPropertyUsed _target prop = do
+markPropertyUsed _target prop =
   -- Extract property name and mark it as used
-  case extractIdentifierName prop of
-    Just propName -> markIdentifierUsed propName
-    Nothing -> pure ()  -- Complex property expressions are not tracked yet
+  for_ (extractIdentifierName prop) markIdentifierUsed
 
 -- | Mark object as having dynamic property access and mark all its properties as used.
 markObjectWithDynamicAccess :: JSExpression -> AnalysisM ()
@@ -750,16 +725,16 @@ analyzeObjectPropertyList (JSCTLNone props) = analyzeObjectProperties props
 
 -- | Analyze object properties.
 analyzeObjectProperties :: JSCommaList JSObjectProperty -> AnalysisM ()
-analyzeObjectProperties props = mapM_ analyzeObjectProperty (fromCommaList props)
+analyzeObjectProperties props = traverse_ analyzeObjectProperty (fromCommaList props)
 
 -- | Analyze individual object property.
 analyzeObjectProperty :: JSObjectProperty -> AnalysisM ()
 analyzeObjectProperty prop = case prop of
   JSPropertyNameandValue name _ exprs -> do
     analyzePropertyName name
-    mapM_ analyzeExpression exprs
+    traverse_ analyzeExpression exprs
     
-  JSPropertyIdentRef _ name -> do
+  JSPropertyIdentRef _ name ->
     -- ES6 shorthand {prop} is equivalent to {prop: prop}, so mark the identifier as used
     markIdentifierUsed (Text.pack name)
   
@@ -781,24 +756,30 @@ analyzeMethodDefinition method = case method of
   JSMethodDefinition name _ params _ body -> do
     analyzePropertyName name
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
   JSGeneratorMethodDefinition _ name _ params _ body -> do
     analyzePropertyName name
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
-      
+
+  JSAsyncMethodDefinition _ name _ params _ body -> do
+    analyzePropertyName name
+    withFunctionScope $ do
+      traverse_ declareFromExpression (fromCommaList params)
+      analyzeBlock body
+
   JSPropertyAccessor _ name _ params _ body -> do
     analyzePropertyName name
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
 
 -- | Analyze block statements.
 analyzeBlock :: JSBlock -> AnalysisM ()
-analyzeBlock (JSBlock _ stmts _) = mapM_ analyzeStatement stmts
+analyzeBlock (JSBlock _ stmts _) = traverse_ analyzeStatement stmts
 
 -- | Analyze variable initializer.
 analyzeVarInitializer :: JSVarInitializer -> AnalysisM ()
@@ -810,7 +791,7 @@ analyzeArrowParams :: JSArrowParameterList -> AnalysisM ()
 analyzeArrowParams (JSUnparenthesizedArrowParameter ident) = 
   declareIdentifier ident
 analyzeArrowParams (JSParenthesizedArrowParameterList _ params _) =
-  mapM_ declareFromExpression (fromCommaList params)
+  traverse_ declareFromExpression (fromCommaList params)
 
 -- | Analyze concise body.
 analyzeConciseBody :: JSConciseBody -> AnalysisM ()
@@ -836,9 +817,9 @@ analyzeTryFinally JSNoFinally = pure ()
 analyzeSwitchCase :: JSSwitchParts -> AnalysisM ()
 analyzeSwitchCase (JSCase _ expr _ stmts) = do
   analyzeExpression expr
-  mapM_ analyzeStatement stmts
-analyzeSwitchCase (JSDefault _ _ stmts) = 
-  mapM_ analyzeStatement stmts
+  traverse_ analyzeStatement stmts
+analyzeSwitchCase (JSDefault _ _ stmts) =
+  traverse_ analyzeStatement stmts
 
 -- | Analyze class heritage.
 analyzeClassHeritage :: JSClassHeritage -> AnalysisM ()
@@ -855,11 +836,11 @@ analyzeClassElement element = case element of
     maybe (pure ()) analyzeExpression maybeInit
   JSPrivateMethod _ _ _ params _ body -> 
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
   JSPrivateAccessor _ _ _ _ params _ body ->
     withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
+      traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
 
 
@@ -872,13 +853,13 @@ buildScopeStack :: ScopeStack
 buildScopeStack = [createGlobalScope]
 
 findDeclarations :: JSAST -> AnalysisM ()
-findDeclarations ast = analyzeAST ast
+findDeclarations = analyzeAST
 
 findReferences :: JSAST -> AnalysisM ()  
-findReferences ast = analyzeAST ast
+findReferences = analyzeAST
 
 analyzeIdentifierUsage :: Text.Text -> TokenPosn -> AnalysisM ()
-analyzeIdentifierUsage identifier pos = do
+analyzeIdentifierUsage identifier _pos = do
   currentMap <- gets _analysisUsageMap
   let currentUsage = Map.findWithDefault Types.defaultUsageInfo identifier currentMap
       updatedUsage = currentUsage
@@ -887,10 +868,10 @@ analyzeIdentifierUsage identifier pos = do
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedUsage currentMap }
 
 trackCallExpressions :: JSExpression -> AnalysisM ()
-trackCallExpressions expr = analyzeExpression expr
+trackCallExpressions = analyzeExpression
 
 analyzeModuleSystem :: JSAST -> AnalysisM ()
-analyzeModuleSystem ast = analyzeAST ast
+analyzeModuleSystem = analyzeAST
 
 extractImportInfo :: JSImportDeclaration -> ImportInfo
 extractImportInfo (JSImportDeclaration clause (JSFromClause _ _ moduleName) _ _) =
@@ -914,18 +895,18 @@ extractImportInfo (JSImportDeclarationBare _ moduleName _ _) =
 
 extractExportInfo :: JSExportDeclaration -> [ExportInfo]
 extractExportInfo (JSExport stmt _) = extractExportInfoFromStatement stmt
-extractExportInfo (JSExportLocals (JSExportClause _ specifiers _) _) = 
-  map extractFromExportSpecifier (fromCommaList specifiers)
+extractExportInfo (JSExportDefault _ stmt _) = extractDefaultExportInfo stmt
+extractExportInfo (JSExportLocals (JSExportClause _ specifiers _) _) =
+  fmap extractFromExportSpecifier (fromCommaList specifiers)
 extractExportInfo (JSExportFrom clause (JSFromClause _ _ moduleName) _) =
-  map (setExportModule $ Text.pack moduleName) $ 
-    extractExportInfoFromClause clause
+  fmap (setExportModule (Text.pack moduleName)) (extractExportInfoFromClause clause)
 extractExportInfo _ = []
 
 buildDependencyGraph :: [ModuleDependency] -> [ModuleDependency]
 buildDependencyGraph deps = deps
 
 analyzeSideEffects :: JSAST -> AnalysisM ()
-analyzeSideEffects ast = analyzeAST ast
+analyzeSideEffects = analyzeAST
 
 hasSideEffects :: JSAST -> Bool
 hasSideEffects ast = case ast of
@@ -941,7 +922,7 @@ hasSideEffects ast = case ast of
       JSLet _ decls _ -> any hasVarDeclSideEffects (fromCommaList decls) 
       JSConstant _ decls _ -> any hasVarDeclSideEffects (fromCommaList decls)
       JSReturn _ (Just expr) _ -> hasExpressionSideEffects expr
-      JSThrow _ expr _ -> True  -- Always has side effects
+      JSThrow _ _expr _ -> True  -- Always has side effects
       JSIf _ _ test _ thenStmt -> 
         hasExpressionSideEffects test || 
         hasStatementSideEffects thenStmt
@@ -1048,9 +1029,9 @@ isExportedIdentifier identifier ast =
 extractImportNames :: JSImportClause -> Set.Set Text.Text
 extractImportNames clause = case clause of
   JSImportClauseNamed (JSImportsNamed _ specifiers _) ->
-    Set.fromList $ map extractImportSpecifierName (fromCommaList specifiers)
+    Set.fromList (fmap extractImportSpecifierName (fromCommaList specifiers))
   JSImportClauseDefaultNamed _ _ (JSImportsNamed _ specifiers _) ->
-    Set.fromList $ map extractImportSpecifierName (fromCommaList specifiers)
+    Set.fromList (fmap extractImportSpecifierName (fromCommaList specifiers))
   _ -> Set.empty
 
 extractImportSpecifierName :: JSImportSpecifier -> Text.Text
@@ -1074,11 +1055,11 @@ extractExportInfoFromStatement stmt = case stmt of
   JSFunction _ (JSIdentName _ name) _ _ _ _ _ ->
     [createExportInfo (Text.pack name)]
   JSVariable _ varList _ ->
-    map (createExportInfo . extractVarName) (fromCommaList varList)
+    fmap (createExportInfo . extractVarName) (fromCommaList varList)
   JSLet _ varList _ ->
-    map (createExportInfo . extractVarName) (fromCommaList varList)
+    fmap (createExportInfo . extractVarName) (fromCommaList varList)
   JSConstant _ varList _ ->
-    map (createExportInfo . extractVarName) (fromCommaList varList)
+    fmap (createExportInfo . extractVarName) (fromCommaList varList)
   _ -> []
   where
     extractVarName (JSIdentifier _ name) = Text.pack name
@@ -1114,7 +1095,35 @@ setExportModule moduleName exportInfo = exportInfo { _exportModule = Just module
 
 extractExportInfoFromClause :: JSExportClause -> [ExportInfo]
 extractExportInfoFromClause (JSExportClause _ specifiers _) =
-  map extractFromExportSpecifier (fromCommaList specifiers)
+  fmap extractFromExportSpecifier (fromCommaList specifiers)
+
+-- | Extract export information from default export statements.
+extractDefaultExportInfo :: JSStatement -> [ExportInfo]
+extractDefaultExportInfo stmt = case stmt of
+  -- export default function name() { ... }
+  JSFunction _ (JSIdentName _ name) _ _ _ _ _ ->
+    [createDefaultExportInfo (Text.pack name)]
+  -- export default class Name { ... }
+  JSClass _ (JSIdentName _ name) _ _ _ _ _ ->
+    [createDefaultExportInfo (Text.pack name)]
+  -- export default identifier;
+  JSExpressionStatement (JSIdentifier _ name) _ ->
+    [createDefaultExportInfo (Text.pack name)]
+  -- export default expression;
+  JSExpressionStatement _ _ ->
+    [createDefaultExportInfo "default"]
+  _ -> []
+
+-- | Create export info for default exports.
+createDefaultExportInfo :: Text.Text -> ExportInfo
+createDefaultExportInfo name = ExportInfo
+  { _exportedName = name
+  , _localName = Just name
+  , _exportModule = Nothing
+  , _exportLocation = TokenPn 0 0 0
+  , _isDefaultExport = True
+  , _isExportTypeOnly = False
+  }
 
 -- Helper functions
 
@@ -1127,16 +1136,11 @@ countSideEffects = Map.size . Map.filter (^. Types.hasSideEffects)
 fromCommaList :: JSCommaList a -> [a]
 fromCommaList JSLNil = []
 fromCommaList (JSLOne x) = [x]
-fromCommaList (JSLCons rest _ x) = fromCommaList rest ++ [x]
+fromCommaList (JSLCons rest _ x) = fromCommaList rest <> [x]
 
 when :: Applicative f => Bool -> f () -> f ()
 when True action = action
 when False _ = pure ()
-
--- | Check if expression is an eval call.
-isEvalCall :: JSExpression -> Bool
-isEvalCall (JSIdentifier _ "eval") = True
-isEvalCall _ = False
 
 -- | Check if expression represents dynamic code execution (eval or Function constructor)
 isDynamicCodeCall :: JSExpression -> Bool
@@ -1148,30 +1152,22 @@ isDynamicCodeCall _ = False
 markHasEvalCall :: AnalysisM ()
 markHasEvalCall = modify (\s -> s { _analysisHasEval = True, _analysisEvalCount = _analysisEvalCount s + 1 })
 
--- | Mark all currently declared identifiers as used (for eval safety).
-markAllIdentifiersAsUsed :: AnalysisM ()
-markAllIdentifiersAsUsed = do
-  usageMap <- gets _analysisUsageMap
-  let allIdentifiers = Map.keys usageMap
-  mapM_ markIdentifierUsed allIdentifiers
-
 -- | Analyze arguments to eval/Function calls and mark potential identifiers as used.
 markPotentialEvalIdentifiers :: JSCommaList JSExpression -> AnalysisM ()
 markPotentialEvalIdentifiers args = do
   usageMap <- gets _analysisUsageMap
   let allIdentifiers = Set.fromList (Map.keys usageMap)
-  mapM_ (analyzeStringLiteralForIdentifiers allIdentifiers) (fromCommaList args)
+  traverse_ (analyzeStringLiteralForIdentifiers allIdentifiers) (fromCommaList args)
 
 -- | Analyze a string literal argument to eval/Function and mark identifiers as used.
 analyzeStringLiteralForIdentifiers :: Set.Set Text.Text -> JSExpression -> AnalysisM ()
 analyzeStringLiteralForIdentifiers knownIdentifiers expr = case expr of
   JSStringLiteral _ quotedStr -> do
     -- Remove quotes and extract content
-    let unquoted = Text.dropWhile (== '"') $ Text.dropWhileEnd (== '"') $
-                   Text.dropWhile (== '\'') $ Text.dropWhileEnd (== '\'') $
-                   Text.pack quotedStr
+    let unquoted = Text.dropWhile (== '"') (Text.dropWhileEnd (== '"')
+                   (Text.dropWhile (== '\'') (Text.dropWhileEnd (== '\'') (Text.pack quotedStr))))
     let foundIdentifiers = extractIdentifiersFromJSString unquoted knownIdentifiers
-    mapM_ markIdentifierUsed foundIdentifiers
+    traverse_ markIdentifierUsed foundIdentifiers
   _ -> pure ()  -- Not a string literal, skip
 
 -- | Extract identifiers from JavaScript code string that match known identifiers.
@@ -1181,29 +1177,4 @@ extractIdentifiersFromJSString jsCode knownIdentifiers =
       foundIdentifiers = filter (`Text.isInfixOf` jsCode) potentialIdentifiers
   in foundIdentifiers
 
--- | Check if eval was called in this analysis.
-hasEvalInContext :: AnalysisM Bool
-hasEvalInContext = gets _analysisHasEval
-
--- | Analyze array pattern elements (destructuring).
-analyzeArrayPatternElement :: JSArrayElement -> AnalysisM ()
-analyzeArrayPatternElement (JSArrayElement expr) = analyzeExpression expr
-analyzeArrayPatternElement (JSArrayComma _) = pure ()
-
--- | Analyze object pattern properties (destructuring).
-analyzeObjectPatternProperty :: JSObjectProperty -> AnalysisM ()
-analyzeObjectPatternProperty prop = case prop of
-  JSPropertyNameandValue name _ values -> do
-    analyzePropertyName name
-    mapM_ analyzeExpression values
-  JSPropertyIdentRef _ ident ->
-    declareIdentifier (JSIdentName JSNoAnnot ident)
-  JSObjectMethod (JSMethodDefinition name _ params _ body) -> do
-    analyzePropertyName name
-    withFunctionScope $ do
-      mapM_ declareFromExpression (fromCommaList params)
-      analyzeBlock body
-  JSObjectSpread _ expr ->
-    analyzeExpression expr
-  _ -> pure ()  -- Handle other property types
 
