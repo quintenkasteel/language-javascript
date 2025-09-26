@@ -1110,6 +1110,8 @@ validateExpression ctx expr = case expr of
     validateYieldExpression ctx (Just expr)
   JSImportMeta import_annot _dot ->
     [ImportMetaOutsideModule (extractAnnotationPos import_annot) | not (contextInModule ctx)]
+  JSImportCall _import _lparen expr _rparen ->
+    validateExpression ctx expr
 
 -- | Validate module items with import/export semantics.
 validateModuleItem :: ValidationContext -> JSModuleItem -> [ValidationError]
@@ -2157,6 +2159,7 @@ extractExpressionPos expr = case expr of
   JSYieldExpression annot _ -> extractAnnotationPos annot
   JSYieldFromExpression annot _ _ -> extractAnnotationPos annot
   JSImportMeta annot _ -> extractAnnotationPos annot
+  JSImportCall annot _ _ _ -> extractAnnotationPos annot
   JSSpreadExpression annot _ -> extractAnnotationPos annot
   JSOptionalMemberDot obj _ _ -> extractExpressionPos obj
   JSOptionalMemberSquare obj _ _ _ -> extractExpressionPos obj

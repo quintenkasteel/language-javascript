@@ -376,6 +376,7 @@ IdentifierName : Identifier {$1}
              | 'for'        { AST.JSIdentifier (mkJSAnnot $1) ("for") }
              | 'function'   { AST.JSIdentifier (mkJSAnnot $1) ("function") }
              | 'if'         { AST.JSIdentifier (mkJSAnnot $1) ("if") }
+             | 'import'     { AST.JSIdentifier (mkJSAnnot $1) ("import") }
              | 'in'         { AST.JSIdentifier (mkJSAnnot $1) ("in") }
              | 'instanceof' { AST.JSIdentifier (mkJSAnnot $1) ("instanceof") }
              | 'let'        { AST.JSIdentifier (mkJSAnnot $1) ("let") }
@@ -545,6 +546,7 @@ PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) ("th
                   | TemplateLiteral          { mkJSTemplateLiteral Nothing $1 {- 'PrimaryExpression6' -} }
                   | LParen Expression RParen { AST.JSExpressionParen $1 $2 $3 }
                   | ImportMeta               { $1 {- 'PrimaryExpression7' -} }
+                  | ImportCall               { $1 {- 'PrimaryExpression8' -} }
 
 -- Identifier ::                                                            See 7.6
 --         IdentifierName but not ReservedWord
@@ -565,6 +567,9 @@ ImportMeta :: { AST.JSExpression }
 ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == ("meta")
                                      then return (AST.JSImportMeta (mkJSAnnot $1) (mkJSAnnot $2))
                                      else parseError $3 }
+
+ImportCall :: { AST.JSExpression }
+ImportCall : 'import' LParen Expression RParen { AST.JSImportCall (mkJSAnnot $1) $2 $3 $4 }
 
 SpreadExpression :: { AST.JSExpression }
 SpreadExpression : Spread AssignmentExpression  { AST.JSSpreadExpression $1 $2 {- 'SpreadExpression' -} }
@@ -656,6 +661,12 @@ MethodDefinition : PropertyName LParen RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 $4 $5 $6 }
                  | '*' PropertyName LParen FormalParameterList Comma RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 $4 $6 $7 }
+                 | Async PropertyName LParen RParen FunctionBody
+                     { AST.JSAsyncMethodDefinition $1 $2 $3 AST.JSLNil $4 $5 }
+                 | Async PropertyName LParen FormalParameterList RParen FunctionBody
+                     { AST.JSAsyncMethodDefinition $1 $2 $3 $4 $5 $6 }
+                 | Async PropertyName LParen FormalParameterList Comma RParen FunctionBody
+                     { AST.JSAsyncMethodDefinition $1 $2 $3 $4 $6 $7 }
                  -- Should be "get" in next, but is not a Token
                  | 'get' PropertyName LParen RParen FunctionBody
                      { AST.JSPropertyAccessor (AST.JSAccessorGet (mkJSAnnot $1)) $2 $3 AST.JSLNil $4 $5 }
@@ -1595,6 +1606,12 @@ ExportDeclaration : Mul FromClause AutoSemi
                          { AST.JSExport $1 $2         {- 'ExportDeclaration5' -} }
                   | ClassDeclaration AutoSemi
                          { AST.JSExport $1 $2         {- 'ExportDeclaration6' -} }
+                  | Default FunctionDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3   {- 'ExportDeclaration7' -} }
+                  | Default ClassDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3   {- 'ExportDeclaration8' -} }
+                  | Default AssignmentExpression AutoSemi
+                         { AST.JSExportDefault $1 (expressionToStatement $2 $3) $3   {- 'ExportDeclaration9' -} }
 
 -- ExportClause :
 --           { }

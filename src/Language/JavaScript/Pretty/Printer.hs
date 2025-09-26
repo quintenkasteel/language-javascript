@@ -48,7 +48,7 @@ renderJS node = bb
 
 renderToString :: JSAST -> String
 -- need to be careful to not lose the unicode encoding on output
-renderToString js = US.decode $ LB.unpack $ toLazyByteString $ renderJS js
+renderToString js = US.decode (LB.unpack (toLazyByteString (renderJS js)))
 
 renderToText :: JSAST -> Text
 -- need to be careful to not lose the unicode encoding on output
@@ -104,6 +104,7 @@ instance RenderJS JSExpression where
   (|>) pacc (JSYieldExpression y x) = pacc |> y |> "yield" |> x
   (|>) pacc (JSYieldFromExpression y s x) = pacc |> y |> "yield" |> s |> "*" |> x
   (|>) pacc (JSImportMeta i d) = pacc |> i |> "import" |> d |> ".meta"
+  (|>) pacc (JSImportCall i lb expr rb) = pacc |> i |> "import" |> lb |> expr |> rb
   (|>) pacc (JSSpreadExpression a e) = pacc |> a |> "..." |> e
   (|>) pacc (JSBigIntLiteral annot s) = pacc |> annot |> s
   (|>) pacc (JSOptionalMemberDot e a p) = pacc |> e |> a |> "?." |> p
@@ -143,8 +144,8 @@ instance RenderJS TokenPosn where
       (bbline, ccur') = if lcur < ltgt then (str (replicate (ltgt - lcur) '\n'), 1) else (mempty, ccur)
       bbcol = if ccur' < ctgt then str (replicate (ctgt - ccur') ' ') else mempty
       bb' = bbline <> bbcol
-      lnew = if lcur < ltgt then ltgt else lcur
-      cnew = if ccur' < ctgt then ctgt else ccur'
+      lnew = max lcur ltgt
+      cnew = max ccur' ctgt
 
 instance RenderJS [CommentAnnotation] where
   (|>) = foldl' (|>)
@@ -296,6 +297,7 @@ instance RenderJS JSObjectProperty where
 instance RenderJS JSMethodDefinition where
   (|>) pacc (JSMethodDefinition n alp ps arp b) = pacc |> n |> alp |> "(" |> ps |> arp |> ")" |> b
   (|>) pacc (JSGeneratorMethodDefinition s n alp ps arp b) = pacc |> s |> "*" |> n |> alp |> "(" |> ps |> arp |> ")" |> b
+  (|>) pacc (JSAsyncMethodDefinition s n alp ps arp b) = pacc |> s |> "async" |> " " |> n |> alp |> "(" |> ps |> arp |> ")" |> b
   (|>) pacc (JSPropertyAccessor s n alp ps arp b) = pacc |> s |> n |> alp |> "(" |> ps |> arp |> ")" |> b
 
 instance RenderJS JSPropertyName where
@@ -353,6 +355,7 @@ instance RenderJS JSExportDeclaration where
   (|>) pacc (JSExportAllFrom star from semi) = pacc |> star |> from |> semi
   (|>) pacc (JSExportAllAsFrom star as ident from semi) = pacc |> star |> as |> ident |> from |> semi
   (|>) pacc (JSExport x1 s) = pacc |> x1 |> s
+  (|>) pacc (JSExportDefault ann stmt s) = pacc |> ann |> "default" |> " " |> stmt |> s
   (|>) pacc (JSExportLocals xs semi) = pacc |> xs |> semi
   (|>) pacc (JSExportFrom xs from semi) = pacc |> xs |> from |> semi
 
