@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoOverloadedStrings #-}
@@ -11,12 +12,15 @@ module Language.JavaScript.Pretty.Printer
 where
 
 import Blaze.ByteString.Builder (Builder, toLazyByteString)
+#if ! MIN_VERSION_base(4,13,0)
+import Data.Monoid (mempty)
+import Data.Semigroup ((<>))
+#endif
+
 import qualified Blaze.ByteString.Builder.Char.Utf8 as BS
 import qualified Codec.Binary.UTF8.String as US
 import qualified Data.ByteString.Lazy as LB
 import Data.List
-import Data.Monoid (mempty)
-import Data.Semigroup ((<>))
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Text.Lazy (Text)
@@ -24,12 +28,6 @@ import qualified Data.Text.Lazy.Encoding as LT
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
-  ( CommentAnnotation(..)
-  , JSDocComment(..)
-  , JSDocTag(..)
-  , JSDocType(..)
-  , JSDocEnumValue(..)
-  )
 
 -- ---------------------------------------------------------------------
 
@@ -50,7 +48,7 @@ renderJS node = bb
 
 renderToString :: JSAST -> String
 -- need to be careful to not lose the unicode encoding on output
-renderToString js = (US.decode . LB.unpack) . toLazyByteString $ renderJS js
+renderToString js = US.decode $ LB.unpack $ toLazyByteString $ renderJS js
 
 renderToText :: JSAST -> Text
 -- need to be careful to not lose the unicode encoding on output
@@ -59,61 +57,6 @@ renderToText = LT.decodeUtf8 . toLazyByteString . renderJS
 class RenderJS a where
   -- Render node.
   (|>) :: PosAccum -> a -> PosAccum
-
--- | Render JSDoc comment to pretty printed text
-renderJSDoc :: JSDocComment -> String
-renderJSDoc jsDoc =
-  let description = maybe "" (\desc -> "  " ++ Text.unpack desc ++ "\n") (jsDocDescription jsDoc)
-      tags = map renderJSDocTag (jsDocTags jsDoc)
-      tagLines = if null tags then "" else unlines (map ("  " ++) tags)
-  in "/**\n" ++ description ++ tagLines ++ " */"
-
--- | Render individual JSDoc tag to string
-renderJSDocTag :: JSDocTag -> String
-renderJSDocTag tag =
-  let tagName = "@" ++ Text.unpack (jsDocTagName tag)
-      typeStr = maybe "" renderJSDocTypeString (jsDocTagType tag)
-      paramStr = maybe "" (" " ++) (fmap Text.unpack (jsDocTagParamName tag))
-      descStr = maybe "" (" - " ++) (fmap Text.unpack (jsDocTagDescription tag))
-  in tagName ++ typeStr ++ paramStr ++ descStr
-
--- | Render JSDoc type to string
-renderJSDocTypeString :: JSDocType -> String
-renderJSDocTypeString jsDocType = case jsDocType of
-  JSDocBasicType name -> " {" ++ Text.unpack name ++ "}"
-  JSDocArrayType elementType -> " {" ++ renderJSDocTypeString' elementType ++ "[]}"
-  JSDocUnionType types -> " {" ++ intercalate "|" (map renderJSDocTypeString' types) ++ "}"
-  JSDocObjectType _ -> " {object}"
-  JSDocFunctionType paramTypes returnType ->
-    " {function(" ++ intercalate ", " (map renderJSDocTypeString' paramTypes) ++ "): " ++ renderJSDocTypeString' returnType ++ "}"
-  JSDocGenericType baseName args ->
-    " {" ++ Text.unpack baseName ++ "<" ++ intercalate ", " (map renderJSDocTypeString' args) ++ ">}"
-  JSDocOptionalType baseType -> " {" ++ renderJSDocTypeString' baseType ++ "=}"
-  JSDocNullableType baseType -> " {?" ++ renderJSDocTypeString' baseType ++ "}"
-  JSDocNonNullableType baseType -> " {!" ++ renderJSDocTypeString' baseType ++ "}"
-  JSDocEnumType enumName enumValues -> " {" ++
-    (if null enumValues
-       then Text.unpack enumName
-       else Text.unpack enumName ++ " {" ++ intercalate ", " (map (Text.unpack . jsDocEnumValueName) enumValues) ++ "}") ++ "}"
-
--- | Helper to render JSDoc type without surrounding braces
-renderJSDocTypeString' :: JSDocType -> String
-renderJSDocTypeString' jsDocType = case jsDocType of
-  JSDocBasicType name -> Text.unpack name
-  JSDocArrayType elementType -> renderJSDocTypeString' elementType ++ "[]"
-  JSDocUnionType types -> intercalate "|" (map renderJSDocTypeString' types)
-  JSDocObjectType _ -> "object"
-  JSDocFunctionType paramTypes returnType ->
-    "function(" ++ intercalate ", " (map renderJSDocTypeString' paramTypes) ++ "): " ++ renderJSDocTypeString' returnType
-  JSDocGenericType baseName args ->
-    Text.unpack baseName ++ "<" ++ intercalate ", " (map renderJSDocTypeString' args) ++ ">"
-  JSDocOptionalType baseType -> renderJSDocTypeString' baseType ++ "="
-  JSDocNullableType baseType -> "?" ++ renderJSDocTypeString' baseType
-  JSDocNonNullableType baseType -> "!" ++ renderJSDocTypeString' baseType
-  JSDocEnumType enumName enumValues ->
-    if null enumValues
-      then Text.unpack enumName
-      else Text.unpack enumName ++ " {" ++ intercalate ", " (map (Text.unpack . jsDocEnumValueName) enumValues) ++ "}"
 
 instance RenderJS JSAST where
   (|>) pacc (JSAstProgram xs a) = pacc |> xs |> a
@@ -158,7 +101,6 @@ instance RenderJS JSExpression where
   (|>) pacc (JSTemplateLiteral t a h ps) = pacc |> t |> a |> h |> ps
   (|>) pacc (JSUnaryExpression op x) = pacc |> op |> x
   (|>) pacc (JSVarInitExpression x1 x2) = pacc |> x1 |> x2
-  (|>) pacc (JSParameterExpression x1 x2) = pacc |> x1 |> x2
   (|>) pacc (JSYieldExpression y x) = pacc |> y |> "yield" |> x
   (|>) pacc (JSYieldFromExpression y s x) = pacc |> y |> "yield" |> s |> "*" |> x
   (|>) pacc (JSImportMeta i d) = pacc |> i |> "import" |> d |> ".meta"
@@ -201,8 +143,8 @@ instance RenderJS TokenPosn where
       (bbline, ccur') = if lcur < ltgt then (str (replicate (ltgt - lcur) '\n'), 1) else (mempty, ccur)
       bbcol = if ccur' < ctgt then str (replicate (ctgt - ccur') ' ') else mempty
       bb' = bbline <> bbcol
-      lnew = max lcur ltgt
-      cnew = max ccur' ctgt
+      lnew = if lcur < ltgt then ltgt else lcur
+      cnew = if ccur' < ctgt then ctgt else ccur'
 
 instance RenderJS [CommentAnnotation] where
   (|>) = foldl' (|>)
@@ -211,7 +153,6 @@ instance RenderJS CommentAnnotation where
   (|>) pacc NoComment = pacc
   (|>) pacc (CommentA p s) = pacc |> p |> s
   (|>) pacc (WhiteSpace p s) = pacc |> p |> s
-  (|>) pacc (JSDocA p jsDoc) = pacc |> p |> renderJSDoc jsDoc
 
 instance RenderJS [JSExpression] where
   (|>) = foldl' (|>)
@@ -354,7 +295,6 @@ instance RenderJS JSObjectProperty where
 
 instance RenderJS JSMethodDefinition where
   (|>) pacc (JSMethodDefinition n alp ps arp b) = pacc |> n |> alp |> "(" |> ps |> arp |> ")" |> b
-  (|>) pacc (JSAsyncMethodDefinition s n alp ps arp b) = pacc |> s |> "async " |> n |> alp |> "(" |> ps |> arp |> ")" |> b
   (|>) pacc (JSGeneratorMethodDefinition s n alp ps arp b) = pacc |> s |> "*" |> n |> alp |> "(" |> ps |> arp |> ")" |> b
   (|>) pacc (JSPropertyAccessor s n alp ps arp b) = pacc |> s |> n |> alp |> "(" |> ps |> arp |> ")" |> b
 
@@ -413,7 +353,6 @@ instance RenderJS JSExportDeclaration where
   (|>) pacc (JSExportAllFrom star from semi) = pacc |> star |> from |> semi
   (|>) pacc (JSExportAllAsFrom star as ident from semi) = pacc |> star |> as |> ident |> from |> semi
   (|>) pacc (JSExport x1 s) = pacc |> x1 |> s
-  (|>) pacc (JSExportDefault defAnnot stmt semi) = pacc |> defAnnot |> "default" |> stmt |> semi
   (|>) pacc (JSExportLocals xs semi) = pacc |> xs |> semi
   (|>) pacc (JSExportFrom xs from semi) = pacc |> xs |> from |> semi
 
