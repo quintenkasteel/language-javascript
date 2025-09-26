@@ -199,8 +199,9 @@ data JSExportDeclaration
   | -- | exports, autosemi
     JSExportLocals JSExportClause !JSSemi
   | -- | body, autosemi
-    --  | JSExportDefault
     JSExport !JSStatement !JSSemi
+  | -- | default, expression/declaration, semi
+    JSExportDefault !JSAnnot !JSStatement !JSSemi
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSExportClause
@@ -711,6 +712,7 @@ instance ShowStripped JSExportDeclaration where
   ss (JSExportFrom xs from _) = "JSExportFrom (" <> (ss xs <> ("," <> (ss from <> ")")))
   ss (JSExportLocals xs _) = "JSExportLocals (" <> (ss xs <> ")")
   ss (JSExport x1 _) = "JSExport (" <> (ss x1 <> ")")
+  ss (JSExportDefault _ x1 _) = "JSExportDefault (" <> (ss x1 <> ")")
 
 instance ShowStripped JSExportClause where
   ss (JSExportClause _ xs _) = "JSExportClause (" <> (ss xs <> ")")

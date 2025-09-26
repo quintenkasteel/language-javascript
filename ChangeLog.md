@@ -1,6 +1,6 @@
 # ChangeLog for `language-javascript`
 
-## 0.8.0.0 -- 2025-08-29
+## 0.8.0.0 -- 2025-09-26
 
 ### ✨ New Features
 + **ES2021 Numeric Separators**: Full support for underscore (_) separators in all numeric literals:

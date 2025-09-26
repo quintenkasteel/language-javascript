@@ -1595,6 +1595,14 @@ ExportDeclaration : Mul FromClause AutoSemi
                          { AST.JSExport $1 $2         {- 'ExportDeclaration5' -} }
                   | ClassDeclaration AutoSemi
                          { AST.JSExport $1 $2         {- 'ExportDeclaration6' -} }
+                  | Default FunctionDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3 {- 'ExportDeclarationDefault1' -} }
+                  | Default GeneratorDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3 {- 'ExportDeclarationDefault2' -} }
+                  | Default ClassDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3 {- 'ExportDeclarationDefault3' -} }
+                  | Default AssignmentExpression AutoSemi
+                         { AST.JSExportDefault $1 (AST.JSExpressionStatement $2 (AST.JSSemiAuto)) $3 {- 'ExportDeclarationDefault4' -} }
 
 -- ExportClause :
 --           { }

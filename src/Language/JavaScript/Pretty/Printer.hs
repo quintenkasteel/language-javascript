@@ -411,6 +411,7 @@ instance RenderJS JSExportDeclaration where
   (|>) pacc (JSExportAllFrom star from semi) = pacc |> star |> from |> semi
   (|>) pacc (JSExportAllAsFrom star as ident from semi) = pacc |> star |> as |> ident |> from |> semi
   (|>) pacc (JSExport x1 s) = pacc |> x1 |> s
+  (|>) pacc (JSExportDefault defAnnot stmt semi) = pacc |> defAnnot |> "default" |> stmt |> semi
   (|>) pacc (JSExportLocals xs semi) = pacc |> xs |> semi
   (|>) pacc (JSExportFrom xs from semi) = pacc |> xs |> from |> semi
 

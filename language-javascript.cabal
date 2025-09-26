@@ -20,8 +20,8 @@ Extra-source-files:  README.md
                      ChangeLog.md
                      .ghci
                      test/Unicode.js
-                     test/k.js
-                     test/unicode.txt
+                     test/fixtures/k.js
+                     test/fixtures/unicode.txt
                      src/Language/JavaScript/Parser/Lexer.x
 
 -- Version requirement upped for test support in later Cabal

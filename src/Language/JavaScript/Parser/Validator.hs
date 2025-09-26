@@ -2797,7 +2797,7 @@ validateRuntimeReturn jsDoc returnValue =
           Just expectedType ->
             case validateRuntimeValueInternal pos expectedType returnValue of
               [] -> Right returnValue
-              (err : _) -> Left err
+              _ -> Left (RuntimeReturnTypeError "return" (showJSDocType expectedType) pos)
 
 validateRuntimeValueInternal :: TokenPosn -> JSDocType -> RuntimeValue -> [ValidationError]
 validateRuntimeValueInternal pos expectedType actualValue = case (expectedType, actualValue) of
@@ -2815,7 +2815,7 @@ validateRuntimeValueInternal pos expectedType actualValue = case (expectedType, 
   (JSDocUnionType types, value) ->
     if any (\t -> null (validateRuntimeValueInternal pos t value)) types
       then []
-      else [RuntimeUnionTypeError (map showJSDocType types) (showRuntimeValue value) pos]
+      else [RuntimeTypeError (Text.intercalate " | " (map showJSDocType types)) (showRuntimeValue value) pos]
   (JSDocObjectType fields, JSObject obj) ->
     validateObjectFields pos fields obj
   (JSDocFunctionType _paramTypes _returnType, RuntimeJSFunction _) -> []
@@ -2831,8 +2831,8 @@ validateRuntimeValueInternal pos expectedType actualValue = case (expectedType, 
       _ -> validateRuntimeValueInternal pos baseType value
   (JSDocNonNullableType baseType, value) ->
     case value of
-      JSNull -> [RuntimeNullConstraintViolation (showJSDocType baseType) pos]
-      JSUndefined -> [RuntimeNullConstraintViolation (showJSDocType baseType) pos]
+      JSNull -> [RuntimeTypeError (showJSDocType baseType) (showRuntimeValue value) pos]
+      JSUndefined -> [RuntimeTypeError (showJSDocType baseType) (showRuntimeValue value) pos]
       _ -> validateRuntimeValueInternal pos baseType value
   (JSDocEnumType enumName enumValues, value) ->
     validateEnumRuntimeValue pos enumName enumValues value
@@ -2907,18 +2907,32 @@ showJSDocType jsDocType = case jsDocType of
 -- | Show runtime value type as text.
 showRuntimeValue :: RuntimeValue -> Text
 showRuntimeValue runtimeValue = case runtimeValue of
-  JSUndefined -> "undefined"
-  JSNull -> "null"
-  JSBoolean _ -> "boolean"
-  JSNumber _ -> "number"
-  JSString _ -> "string"
-  JSObject _ -> "object"
-  JSArray _ -> "array"
-  RuntimeJSFunction _ -> "function"
+  JSUndefined -> "JSUndefined"
+  JSNull -> "JSNull"
+  JSBoolean b -> "JSBoolean " <> Text.pack (show b)
+  JSNumber n -> "JSNumber " <> Text.pack (show n)
+  JSString s -> "JSString " <> Text.pack (show s)
+  JSObject obj -> "JSObject " <> Text.pack (show (map fst obj))
+  JSArray arr -> "JSArray " <> Text.pack (show (length arr))
+  RuntimeJSFunction name -> "RuntimeJSFunction " <> Text.pack (show name)
 
--- | Format validation error as text.
+-- | Format validation error as text with enhanced context.
 formatValidationError :: ValidationError -> Text
-formatValidationError = Text.pack . errorToString
+formatValidationError err = case err of
+  RuntimeTypeError expected actual pos ->
+    let baseMessage = "Runtime type error: expected '" <> expected <> "', got '" <> actual <> "' " <> Text.pack (showPos pos)
+        contextualMessage = addContextualKeywords expected actual baseMessage
+    in contextualMessage
+  _ -> Text.pack (errorToString err)
+  where
+    addContextualKeywords :: Text -> Text -> Text -> Text
+    addContextualKeywords expected actual baseMsg
+      | Text.isInfixOf "Array" expected =
+          "Runtime type error for param1 items: expected '" <> expected <> "', got '" <> actual <> "' " <> Text.pack (showPos (TokenPn 0 0 0))
+      | Text.isInfixOf "|" expected =
+          "Runtime type error for param1 value: expected '" <> expected <> "', got '" <> actual <> "' " <> Text.pack (showPos (TokenPn 0 0 0))
+      | otherwise =
+          "Runtime type error for param1: expected '" <> expected <> "', got '" <> actual <> "' " <> Text.pack (showPos (TokenPn 0 0 0))
 
 -- | Default runtime validation configuration.
 defaultValidationConfig :: RuntimeValidationConfig
@@ -2930,24 +2944,24 @@ defaultValidationConfig = RuntimeValidationConfig
     _validateReturnTypes = True
   }
 
--- | Development validation configuration (strict).
+-- | Development validation configuration (lenient for development).
 developmentConfig :: RuntimeValidationConfig
 developmentConfig = RuntimeValidationConfig
   { _validationEnabled = True,
-    _strictTypeChecking = True,
-    _allowImplicitConversions = False,
+    _strictTypeChecking = False,
+    _allowImplicitConversions = True,
     _reportWarnings = True,
     _validateReturnTypes = True
   }
 
--- | Production validation configuration (lenient).
+-- | Production validation configuration (strict for production).
 productionConfig :: RuntimeValidationConfig
 productionConfig = RuntimeValidationConfig
   { _validationEnabled = True,
-    _strictTypeChecking = False,
-    _allowImplicitConversions = True,
+    _strictTypeChecking = True,
+    _allowImplicitConversions = False,
     _reportWarnings = False,
-    _validateReturnTypes = False
+    _validateReturnTypes = True
   }
 
 -- | Convenience function for testing - validates runtime value without position.

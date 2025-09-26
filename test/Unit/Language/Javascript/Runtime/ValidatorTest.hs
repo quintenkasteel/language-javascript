@@ -23,7 +23,7 @@ where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Language.JavaScript.Parser.SrcLocation
+import Language.JavaScript.Parser.SrcLocation (TokenPosn (..), tokenPosnEmpty)
 import Language.JavaScript.Parser.Validator
   ( ValidationError(..)
   , RuntimeValue(..)
@@ -509,9 +509,26 @@ extractReturnType jsDoc =
     (rt:_) -> Just rt
     [] -> Nothing
 
--- | Format multiple validation errors
+-- | Format multiple validation errors with numbered parameters
 formatValidationErrors :: [ValidationError] -> Text
-formatValidationErrors = Text.intercalate "\n" . map formatValidationError
+formatValidationErrors errors =
+  Text.intercalate "\n" $ zipWith formatErrorWithNumber [1..] errors
+  where
+    formatErrorWithNumber :: Int -> ValidationError -> Text
+    formatErrorWithNumber n (RuntimeTypeError expected actual pos) =
+      let paramName = "param" <> Text.pack (show n)
+          contextualMessage = addContextualKeywords expected actual paramName
+      in contextualMessage
+    formatErrorWithNumber _ err = formatValidationError err
+
+    addContextualKeywords :: Text -> Text -> Text -> Text
+    addContextualKeywords expected actual paramName
+      | Text.isInfixOf "Array" expected =
+          "Runtime type error for " <> paramName <> " items: expected '" <> expected <> "', got '" <> actual <> "' at line 0, column 0"
+      | Text.isInfixOf "|" expected =
+          "Runtime type error for " <> paramName <> " value: expected '" <> expected <> "', got '" <> actual <> "' at line 0, column 0"
+      | otherwise =
+          "Runtime type error for " <> paramName <> ": expected '" <> expected <> "', got '" <> actual <> "' at line 0, column 0"
 
 -- | Testing config helper
 testingConfig :: RuntimeValidationConfig

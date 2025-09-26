@@ -543,6 +543,13 @@ analyzeExportDeclaration exportDecl = do
   -- Analyze exported statements
   case exportDecl of
     JSExport stmt _ -> analyzeStatement stmt
+    JSExportDefault _ stmt _ -> do
+      analyzeStatement stmt
+      -- Mark the default export identifier if it's an identifier
+      case stmt of
+        JSExpressionStatement (JSIdentifier _ name) _ ->
+          markIdentifierExported (Text.pack name)
+        _ -> pure ()
     _ -> pure ()
 
 -- Helper Functions
