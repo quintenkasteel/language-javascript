@@ -39,6 +39,8 @@ import qualified Language.JavaScript.Parser.AST as AST
      ':'    { ColonToken {} }
      '||'   { OrToken {} }
      '&&'   { AndToken {} }
+     '??'   { NullishCoalescingToken {} }
+     '?.'   { OptionalChainingToken {} }
      '|'    { BitwiseOrToken {} }
      '^'    { BitwiseXorToken {} }
      '&'    { BitwiseAndToken {} }
@@ -56,6 +58,9 @@ import qualified Language.JavaScript.Parser.AST as AST
      '&='   { AndAssignToken {} }
      '^='   { XorAssignToken {} }
      '|='   { OrAssignToken {} }
+     '&&='  { LogicalAndAssignToken {} }
+     '||='  { LogicalOrAssignToken {} }
+     '??='  { NullishAssignToken {} }
      '='    { SimpleAssignToken {} }
      '!=='  { StrictNeToken {} }
      '!='   { NeToken {} }
@@ -70,6 +75,7 @@ import qualified Language.JavaScript.Parser.AST as AST
      '--'   { DecrementToken {} }
      '+'    { PlusToken {} }
      '-'    { MinusToken {} }
+     '**'   { ExponentiationToken {} }
      '*'    { MulToken {} }
      '/'    { DivToken {} }
      '%'    { ModToken {} }
@@ -134,9 +140,12 @@ import qualified Language.JavaScript.Parser.AST as AST
 
 
      'ident'      { IdentifierToken {} }
+     'private'    { PrivateNameToken {} }
      'decimal'    { DecimalToken {} }
      'hexinteger' { HexIntegerToken {} }
+     'binaryinteger' { BinaryIntegerToken {} }
      'octal'      { OctalToken {} }
+     'bigint'     { BigIntToken {} }
      'string'     { StringToken {} }
      'regex'      { RegExToken {} }
      'tmplnosub'  { NoSubstitutionTemplateToken {} }
@@ -206,6 +215,10 @@ Spread : '...' { mkJSAnnot $1 }
 Dot :: { AST.JSAnnot }
 Dot : '.' { mkJSAnnot $1 }
 
+OptionalChaining :: { AST.JSAnnot }
+OptionalChaining : '?.' { mkJSAnnot $1 }
+
+
 As :: { AST.JSAnnot }
 As : 'as' { mkJSAnnot $1 }
 
@@ -238,6 +251,9 @@ Not : '!' { AST.JSUnaryOpNot (mkJSAnnot $1) }
 
 Mul :: { AST.JSBinOp }
 Mul : '*' { AST.JSBinOpTimes (mkJSAnnot $1) }
+
+Exp :: { AST.JSBinOp }
+Exp : '**' { AST.JSBinOpExponentiation (mkJSAnnot $1) }
 
 Div :: { AST.JSBinOp }
 Div : '/' { AST.JSBinOpDivide (mkJSAnnot $1) }
@@ -293,6 +309,9 @@ Or : '||' { AST.JSBinOpOr (mkJSAnnot $1) }
 And :: { AST.JSBinOp }
 And : '&&' { AST.JSBinOpAnd (mkJSAnnot $1) }
 
+NullishCoalescing :: { AST.JSBinOp }
+NullishCoalescing : '??' { AST.JSBinOpNullishCoalescing (mkJSAnnot $1) }
+
 BitOr :: { AST.JSBinOp }
 BitOr : '|' { AST.JSBinOpBitOr (mkJSAnnot $1) }
 
@@ -320,6 +339,9 @@ OpAssign : '*='     { AST.JSTimesAssign  (mkJSAnnot $1) }
          | '&='     { AST.JSBwAndAssign  (mkJSAnnot $1) }
          | '^='     { AST.JSBwXorAssign  (mkJSAnnot $1) }
          | '|='     { AST.JSBwOrAssign   (mkJSAnnot $1) }
+         | '&&='    { AST.JSLogicalAndAssign (mkJSAnnot $1) }
+         | '||='    { AST.JSLogicalOrAssign  (mkJSAnnot $1) }
+         | '??='    { AST.JSNullishAssign    (mkJSAnnot $1) }
 
 -- IdentifierName ::                                                        See 7.6
 --         IdentifierStart
@@ -333,46 +355,46 @@ OpAssign : '*='     { AST.JSTimesAssign  (mkJSAnnot $1) }
 -- TODO: make this include any reserved word too, including future ones
 IdentifierName :: { AST.JSExpression }
 IdentifierName : Identifier {$1}
-             | 'async'      { AST.JSIdentifier (mkJSAnnot $1) "async" }
-             | 'await'      { AST.JSIdentifier (mkJSAnnot $1) "await" }
-             | 'break'      { AST.JSIdentifier (mkJSAnnot $1) "break" }
-             | 'case'       { AST.JSIdentifier (mkJSAnnot $1) "case" }
-             | 'catch'      { AST.JSIdentifier (mkJSAnnot $1) "catch" }
-             | 'class'      { AST.JSIdentifier (mkJSAnnot $1) "class" }
-             | 'const'      { AST.JSIdentifier (mkJSAnnot $1) "const" }
-             | 'continue'   { AST.JSIdentifier (mkJSAnnot $1) "continue" }
-             | 'debugger'   { AST.JSIdentifier (mkJSAnnot $1) "debugger" }
-             | 'default'    { AST.JSIdentifier (mkJSAnnot $1) "default" }
-             | 'delete'     { AST.JSIdentifier (mkJSAnnot $1) "delete" }
-             | 'do'         { AST.JSIdentifier (mkJSAnnot $1) "do" }
-             | 'else'       { AST.JSIdentifier (mkJSAnnot $1) "else" }
-             | 'enum'       { AST.JSIdentifier (mkJSAnnot $1) "enum" }
-             | 'export'     { AST.JSIdentifier (mkJSAnnot $1) "export" }
-             | 'extends'    { AST.JSIdentifier (mkJSAnnot $1) "extends" }
-             | 'false'      { AST.JSIdentifier (mkJSAnnot $1) "false" }
-             | 'finally'    { AST.JSIdentifier (mkJSAnnot $1) "finally" }
-             | 'for'        { AST.JSIdentifier (mkJSAnnot $1) "for" }
-             | 'function'   { AST.JSIdentifier (mkJSAnnot $1) "function" }
-             | 'if'         { AST.JSIdentifier (mkJSAnnot $1) "if" }
-             | 'in'         { AST.JSIdentifier (mkJSAnnot $1) "in" }
-             | 'instanceof' { AST.JSIdentifier (mkJSAnnot $1) "instanceof" }
-             | 'let'        { AST.JSIdentifier (mkJSAnnot $1) "let" }
-             | 'new'        { AST.JSIdentifier (mkJSAnnot $1) "new" }
-             | 'null'       { AST.JSIdentifier (mkJSAnnot $1) "null" }
-             | 'of'         { AST.JSIdentifier (mkJSAnnot $1) "of" }
-             | 'return'     { AST.JSIdentifier (mkJSAnnot $1) "return" }
-             | 'static'     { AST.JSIdentifier (mkJSAnnot $1) "static" }
-             | 'super'      { AST.JSIdentifier (mkJSAnnot $1) "super" }
-             | 'switch'     { AST.JSIdentifier (mkJSAnnot $1) "switch" }
-             | 'this'       { AST.JSIdentifier (mkJSAnnot $1) "this" }
-             | 'throw'      { AST.JSIdentifier (mkJSAnnot $1) "throw" }
-             | 'true'       { AST.JSIdentifier (mkJSAnnot $1) "true" }
-             | 'try'        { AST.JSIdentifier (mkJSAnnot $1) "try" }
-             | 'typeof'     { AST.JSIdentifier (mkJSAnnot $1) "typeof" }
-             | 'var'        { AST.JSIdentifier (mkJSAnnot $1) "var" }
-             | 'void'       { AST.JSIdentifier (mkJSAnnot $1) "void" }
-             | 'while'      { AST.JSIdentifier (mkJSAnnot $1) "while" }
-             | 'with'       { AST.JSIdentifier (mkJSAnnot $1) "with" }
+             | 'async'      { AST.JSIdentifier (mkJSAnnot $1) ("async") }
+             | 'await'      { AST.JSIdentifier (mkJSAnnot $1) ("await") }
+             | 'break'      { AST.JSIdentifier (mkJSAnnot $1) ("break") }
+             | 'case'       { AST.JSIdentifier (mkJSAnnot $1) ("case") }
+             | 'catch'      { AST.JSIdentifier (mkJSAnnot $1) ("catch") }
+             | 'class'      { AST.JSIdentifier (mkJSAnnot $1) ("class") }
+             | 'const'      { AST.JSIdentifier (mkJSAnnot $1) ("const") }
+             | 'continue'   { AST.JSIdentifier (mkJSAnnot $1) ("continue") }
+             | 'debugger'   { AST.JSIdentifier (mkJSAnnot $1) ("debugger") }
+             | 'default'    { AST.JSIdentifier (mkJSAnnot $1) ("default") }
+             | 'delete'     { AST.JSIdentifier (mkJSAnnot $1) ("delete") }
+             | 'do'         { AST.JSIdentifier (mkJSAnnot $1) ("do") }
+             | 'else'       { AST.JSIdentifier (mkJSAnnot $1) ("else") }
+             | 'enum'       { AST.JSIdentifier (mkJSAnnot $1) ("enum") }
+             | 'export'     { AST.JSIdentifier (mkJSAnnot $1) ("export") }
+             | 'extends'    { AST.JSIdentifier (mkJSAnnot $1) ("extends") }
+             | 'false'      { AST.JSIdentifier (mkJSAnnot $1) ("false") }
+             | 'finally'    { AST.JSIdentifier (mkJSAnnot $1) ("finally") }
+             | 'for'        { AST.JSIdentifier (mkJSAnnot $1) ("for") }
+             | 'function'   { AST.JSIdentifier (mkJSAnnot $1) ("function") }
+             | 'if'         { AST.JSIdentifier (mkJSAnnot $1) ("if") }
+             | 'in'         { AST.JSIdentifier (mkJSAnnot $1) ("in") }
+             | 'instanceof' { AST.JSIdentifier (mkJSAnnot $1) ("instanceof") }
+             | 'let'        { AST.JSIdentifier (mkJSAnnot $1) ("let") }
+             | 'new'        { AST.JSIdentifier (mkJSAnnot $1) ("new") }
+             | 'null'       { AST.JSIdentifier (mkJSAnnot $1) ("null") }
+             | 'of'         { AST.JSIdentifier (mkJSAnnot $1) ("of") }
+             | 'return'     { AST.JSIdentifier (mkJSAnnot $1) ("return") }
+             | 'static'     { AST.JSIdentifier (mkJSAnnot $1) ("static") }
+             | 'super'      { AST.JSIdentifier (mkJSAnnot $1) ("super") }
+             | 'switch'     { AST.JSIdentifier (mkJSAnnot $1) ("switch") }
+             | 'this'       { AST.JSIdentifier (mkJSAnnot $1) ("this") }
+             | 'throw'      { AST.JSIdentifier (mkJSAnnot $1) ("throw") }
+             | 'true'       { AST.JSIdentifier (mkJSAnnot $1) ("true") }
+             | 'try'        { AST.JSIdentifier (mkJSAnnot $1) ("try") }
+             | 'typeof'     { AST.JSIdentifier (mkJSAnnot $1) ("typeof") }
+             | 'var'        { AST.JSIdentifier (mkJSAnnot $1) ("var") }
+             | 'void'       { AST.JSIdentifier (mkJSAnnot $1) ("void") }
+             | 'while'      { AST.JSIdentifier (mkJSAnnot $1) ("while") }
+             | 'with'       { AST.JSIdentifier (mkJSAnnot $1) ("with") }
              | 'future'     { AST.JSIdentifier (mkJSAnnot $1) (tokenLiteral $1) }
 
 Var :: { AST.JSAnnot }
@@ -463,7 +485,7 @@ Static :: { AST.JSAnnot }
 Static : 'static' { mkJSAnnot $1 }
 
 Super :: { AST.JSExpression }
-Super : 'super' { AST.JSLiteral (mkJSAnnot $1) "super" }
+Super : 'super' { AST.JSLiteral (mkJSAnnot $1) ("super") }
 
 
 Eof :: { AST.JSAnnot }
@@ -482,11 +504,11 @@ Literal : NullLiteral     { $1 }
         | RegularExpressionLiteral { $1 }
 
 NullLiteral :: { AST.JSExpression }
-NullLiteral : 'null' { AST.JSLiteral (mkJSAnnot $1) "null" }
+NullLiteral : 'null' { AST.JSLiteral (mkJSAnnot $1) ("null") }
 
 BooleanLiteral :: { AST.JSExpression }
-BooleanLiteral : 'true'  { AST.JSLiteral (mkJSAnnot $1) "true" }
-               | 'false' { AST.JSLiteral (mkJSAnnot $1) "false" }
+BooleanLiteral : 'true'  { AST.JSLiteral (mkJSAnnot $1) ("true") }
+               | 'false' { AST.JSLiteral (mkJSAnnot $1) ("false") }
 
 -- <Numeric Literal> ::= DecimalLiteral
 --                     | HexIntegerLiteral
@@ -494,7 +516,9 @@ BooleanLiteral : 'true'  { AST.JSLiteral (mkJSAnnot $1) "true" }
 NumericLiteral :: { AST.JSExpression }
 NumericLiteral : 'decimal'    { AST.JSDecimal (mkJSAnnot $1) (tokenLiteral $1) }
                | 'hexinteger' { AST.JSHexInteger (mkJSAnnot $1) (tokenLiteral $1) }
+               | 'binaryinteger' { AST.JSBinaryInteger (mkJSAnnot $1) (tokenLiteral $1) }
                | 'octal'      { AST.JSOctal (mkJSAnnot $1) (tokenLiteral $1) }
+               | 'bigint'     { AST.JSBigIntLiteral (mkJSAnnot $1) (tokenLiteral $1) }
 
 StringLiteral :: { AST.JSExpression }
 StringLiteral : 'string'  { AST.JSStringLiteral (mkJSAnnot $1) (tokenLiteral $1) }
@@ -511,7 +535,7 @@ RegularExpressionLiteral : 'regex' { AST.JSRegEx (mkJSAnnot $1) (tokenLiteral $1
 --        ObjectLiteral
 --        ( Expression )
 PrimaryExpression :: { AST.JSExpression }
-PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) "this" }
+PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) ("this") }
                   | Identifier               { $1 {- 'PrimaryExpression1' -} }
                   | Literal                  { $1 {- 'PrimaryExpression2' -} }
                   | ArrayLiteral             { $1 {- 'PrimaryExpression3' -} }
@@ -520,22 +544,27 @@ PrimaryExpression : 'this'                   { AST.JSLiteral (mkJSAnnot $1) "thi
                   | GeneratorExpression      { $1 }
                   | TemplateLiteral          { mkJSTemplateLiteral Nothing $1 {- 'PrimaryExpression6' -} }
                   | LParen Expression RParen { AST.JSExpressionParen $1 $2 $3 }
+                  | ImportMeta               { $1 {- 'PrimaryExpression7' -} }
 
 -- Identifier ::                                                            See 7.6
 --         IdentifierName but not ReservedWord
 Identifier :: { AST.JSExpression }
 Identifier : 'ident' { AST.JSIdentifier (mkJSAnnot $1) (tokenLiteral $1) }
-           | 'as'    { AST.JSIdentifier (mkJSAnnot $1) "as" }
-           | 'get'   { AST.JSIdentifier (mkJSAnnot $1) "get" }
-           | 'set'   { AST.JSIdentifier (mkJSAnnot $1) "set" }
-           | 'from'  { AST.JSIdentifier (mkJSAnnot $1) "from" }
-           | 'yield' { AST.JSIdentifier (mkJSAnnot $1) "yield" }
+           | 'as'    { AST.JSIdentifier (mkJSAnnot $1) ("as") }
+           | 'get'   { AST.JSIdentifier (mkJSAnnot $1) ("get") }
+           | 'set'   { AST.JSIdentifier (mkJSAnnot $1) ("set") }
+           | 'from'  { AST.JSIdentifier (mkJSAnnot $1) ("from") }
+           | 'yield' { AST.JSIdentifier (mkJSAnnot $1) ("yield") }
 
 -- Must follow Identifier; when ambiguous, `yield` as a keyword should take
 -- precedence over `yield` as an identifier name.
 Yield :: { AST.JSAnnot }
 Yield : 'yield' { mkJSAnnot $1 }
 
+ImportMeta :: { AST.JSExpression }
+ImportMeta : 'import' '.' 'ident' {% if tokenLiteral $3 == ("meta")
+                                     then return (AST.JSImportMeta (mkJSAnnot $1) (mkJSAnnot $2))
+                                     else parseError $3 }
 
 SpreadExpression :: { AST.JSExpression }
 SpreadExpression : Spread AssignmentExpression  { AST.JSSpreadExpression $1 $2 {- 'SpreadExpression' -} }
@@ -545,8 +574,8 @@ TemplateLiteral : 'tmplnosub'              { JSUntaggedTemplate (mkJSAnnot $1) (
                 | 'tmplhead' TemplateParts { JSUntaggedTemplate (mkJSAnnot $1) (tokenLiteral $1) $2 }
 
 TemplateParts :: { [AST.JSTemplatePart] }
-TemplateParts : TemplateExpression RBrace 'tmplmiddle' TemplateParts { AST.JSTemplatePart $1 $2 ('}' : tokenLiteral $3) : $4 }
-              | TemplateExpression RBrace 'tmpltail'                 { AST.JSTemplatePart $1 $2 ('}' : tokenLiteral $3) : [] }
+TemplateParts : TemplateExpression RBrace 'tmplmiddle' TemplateParts { AST.JSTemplatePart $1 $2 ('}' : (tokenLiteral $3)) : $4 }
+              | TemplateExpression RBrace 'tmpltail'                 { AST.JSTemplatePart $1 $2 ('}' : (tokenLiteral $3)) : [] }
 
 -- This production only exists to ensure that inTemplate is set to True before
 -- a tmplmiddle or tmpltail token is lexed. Since the lexer is always one token
@@ -611,6 +640,7 @@ PropertyAssignment :: { AST.JSObjectProperty }
 PropertyAssignment : PropertyName Colon AssignmentExpression { AST.JSPropertyNameandValue $1 $2 [$3] }
                    | IdentifierName { identifierToProperty $1 }
                    | MethodDefinition { AST.JSObjectMethod $1 }
+                   | SpreadExpression { spreadExpressionToProperty $1 }
 
 -- TODO: not clear if get/set are keywords, or just used in a specific context. Puzzling.
 MethodDefinition :: { AST.JSMethodDefinition }
@@ -618,10 +648,14 @@ MethodDefinition : PropertyName LParen RParen FunctionBody
                      { AST.JSMethodDefinition $1 $2 AST.JSLNil $3 $4 }
                  | PropertyName LParen FormalParameterList RParen FunctionBody
                      { AST.JSMethodDefinition $1 $2 $3 $4 $5 }
+                 | PropertyName LParen FormalParameterList Comma RParen FunctionBody
+                     { AST.JSMethodDefinition $1 $2 $3 $5 $6 }
                  | '*' PropertyName LParen RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 AST.JSLNil $4 $5 }
                  | '*' PropertyName LParen FormalParameterList RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 $4 $5 $6 }
+                 | '*' PropertyName LParen FormalParameterList Comma RParen FunctionBody
+                     { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 $4 $6 $7 }
                  -- Should be "get" in next, but is not a Token
                  | 'get' PropertyName LParen RParen FunctionBody
                      { AST.JSPropertyAccessor (AST.JSAccessorGet (mkJSAnnot $1)) $2 $3 AST.JSLNil $4 $5 }
@@ -655,6 +689,8 @@ MemberExpression : PrimaryExpression   { $1 {- 'MemberExpression1' -} }
                  | FunctionExpression  { $1 {- 'MemberExpression2' -} }
                  | MemberExpression LSquare Expression RSquare { AST.JSMemberSquare $1 $2 $3 $4 {- 'MemberExpression3' -} }
                  | MemberExpression Dot IdentifierName         { AST.JSMemberDot $1 $2 $3       {- 'MemberExpression4' -} }
+                 | MemberExpression OptionalChaining IdentifierName { AST.JSOptionalMemberDot $1 $2 $3 {- 'MemberExpression5' -} }
+                 | MemberExpression '?.' '[' Expression ']' { AST.JSOptionalMemberSquare $1 (mkJSAnnot $2) $4 (mkJSAnnot $5) {- 'MemberExpression6' -} }
                  | MemberExpression TemplateLiteral            { mkJSTemplateLiteral (Just $1) $2 }
                  | Super LSquare Expression RSquare            { AST.JSMemberSquare $1 $2 $3 $4 }
                  | Super Dot IdentifierName                    { AST.JSMemberDot $1 $2 $3 }
@@ -687,15 +723,25 @@ CallExpression : MemberExpression Arguments
                     { AST.JSCallExpressionSquare $1 $2 $3 $4 {- 'CallExpression3' -} }
                | CallExpression Dot IdentifierName
                     { AST.JSCallExpressionDot $1 $2 $3 {- 'CallExpression4' -} }
+               | CallExpression OptionalChaining IdentifierName
+                    { AST.JSOptionalMemberDot $1 $2 $3 {- 'CallExpression5' -} }
+               | CallExpression '?.' '[' Expression ']'
+                    { AST.JSOptionalMemberSquare $1 (mkJSAnnot $2) $4 (mkJSAnnot $5) {- 'CallExpression6' -} }
+               | MemberExpression OptionalChaining Arguments
+                    { mkJSOptionalCallExpression $1 $2 $3 {- 'CallExpression7' -} }
+               | CallExpression OptionalChaining Arguments
+                    { mkJSOptionalCallExpression $1 $2 $3 {- 'CallExpression8' -} }
                | CallExpression TemplateLiteral
-                    { mkJSTemplateLiteral (Just $1) $2 {- 'CallExpression5' -} }
+                    { mkJSTemplateLiteral (Just $1) $2 {- 'CallExpression9' -} }
 
 -- Arguments :                                                  See 11.2
 --        ()
 --        ( ArgumentList )
+--        ( ArgumentList , )
 Arguments :: { JSArguments }
-Arguments : LParen RParen               { JSArguments $1 AST.JSLNil $2  {- 'Arguments1' -} }
-          | LParen ArgumentList RParen  { JSArguments $1 $2 $3			{- 'Arguments2' -} }
+Arguments : LParen RParen                      { JSArguments $1 AST.JSLNil $2  {- 'Arguments1' -} }
+          | LParen ArgumentList RParen         { JSArguments $1 $2 $3			{- 'Arguments2' -} }
+          | LParen ArgumentList Comma RParen   { JSArguments $1 $2 $4			{- 'Arguments3' -} }
 
 -- ArgumentList :                                               See 11.2
 --        AssignmentExpression
@@ -746,16 +792,23 @@ UnaryExpression : PostfixExpression         { $1 {- 'UnaryExpression' -} }
                 | Tilde     UnaryExpression { AST.JSUnaryExpression $1 $2 }
                 | Not       UnaryExpression { AST.JSUnaryExpression $1 $2 }
 
--- MultiplicativeExpression :                                   See 11.5
+-- ExponentiationExpression :                                  See ES2016
 --        UnaryExpression
---        MultiplicativeExpression * UnaryExpression
---        MultiplicativeExpression / UnaryExpression
---        MultiplicativeExpression % UnaryExpression
+--        UnaryExpression ** ExponentiationExpression
+ExponentiationExpression :: { AST.JSExpression }
+ExponentiationExpression : UnaryExpression                                       { $1 {- 'ExponentiationExpression' -} }
+                         | UnaryExpression Exp ExponentiationExpression          { AST.JSExpressionBinary {- '**' -} $1 $2 $3 }
+
+-- MultiplicativeExpression :                                   See 11.5
+--        ExponentiationExpression
+--        MultiplicativeExpression * ExponentiationExpression
+--        MultiplicativeExpression / ExponentiationExpression
+--        MultiplicativeExpression % ExponentiationExpression
 MultiplicativeExpression :: { AST.JSExpression }
-MultiplicativeExpression : UnaryExpression                              { $1 {- 'MultiplicativeExpression' -} }
-                         | MultiplicativeExpression Mul UnaryExpression { AST.JSExpressionBinary {- '*' -} $1 $2 $3 }
-                         | MultiplicativeExpression Div UnaryExpression { AST.JSExpressionBinary {- '/' -} $1 $2 $3 }
-                         | MultiplicativeExpression Mod UnaryExpression { AST.JSExpressionBinary {- '%' -} $1 $2 $3 }
+MultiplicativeExpression : ExponentiationExpression                                    { $1 {- 'MultiplicativeExpression' -} }
+                         | MultiplicativeExpression Mul ExponentiationExpression       { AST.JSExpressionBinary {- '*' -} $1 $2 $3 }
+                         | MultiplicativeExpression Div ExponentiationExpression       { AST.JSExpressionBinary {- '/' -} $1 $2 $3 }
+                         | MultiplicativeExpression Mod ExponentiationExpression       { AST.JSExpressionBinary {- '%' -} $1 $2 $3 }
 
 -- AdditiveExpression :                                        See 11.6
 --        MultiplicativeExpression
@@ -891,19 +944,33 @@ LogicalAndExpressionNoIn :: { AST.JSExpression }
 LogicalAndExpressionNoIn : BitwiseOrExpressionNoIn { $1 {- 'LogicalAndExpression' -} }
                          | LogicalAndExpressionNoIn And BitwiseOrExpressionNoIn { AST.JSExpressionBinary {- '&&' -} $1 $2 $3 }
 
--- LogicalORExpression :                                                                 See 11.11
+-- NullishCoalescingExpression :                                                        See 12.5.4
 --        LogicalANDExpression
---        LogicalORExpression || LogicalANDExpression
+--        NullishCoalescingExpression ?? LogicalANDExpression
+NullishCoalescingExpression :: { AST.JSExpression }
+NullishCoalescingExpression : LogicalAndExpression { $1 {- 'NullishCoalescingExpression' -} }
+                            | NullishCoalescingExpression NullishCoalescing LogicalAndExpression { AST.JSExpressionBinary {- '??' -} $1 $2 $3 }
+
+-- LogicalORExpression :                                                                 See 11.11
+--        NullishCoalescingExpression
+--        LogicalORExpression || NullishCoalescingExpression
 LogicalOrExpression :: { AST.JSExpression }
-LogicalOrExpression : LogicalAndExpression { $1 {- 'LogicalOrExpression' -} }
-                    | LogicalOrExpression Or LogicalAndExpression { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
+LogicalOrExpression : NullishCoalescingExpression { $1 {- 'LogicalOrExpression' -} }
+                    | LogicalOrExpression Or NullishCoalescingExpression { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
+
+-- NullishCoalescingExpressionNoIn :                                                    See 12.5.4
+--        LogicalANDExpressionNoIn
+--        NullishCoalescingExpressionNoIn ?? LogicalANDExpressionNoIn
+NullishCoalescingExpressionNoIn :: { AST.JSExpression }
+NullishCoalescingExpressionNoIn : LogicalAndExpressionNoIn { $1 {- 'NullishCoalescingExpression' -} }
+                                | NullishCoalescingExpressionNoIn NullishCoalescing LogicalAndExpressionNoIn { AST.JSExpressionBinary {- '??' -} $1 $2 $3 }
 
 -- LogicalORExpressionNoIn :                                                             See 11.11
---        LogicalANDExpressionNoIn
---        LogicalORExpressionNoIn || LogicalANDExpressionNoIn
+--        NullishCoalescingExpressionNoIn
+--        LogicalORExpressionNoIn || NullishCoalescingExpressionNoIn
 LogicalOrExpressionNoIn :: { AST.JSExpression }
-LogicalOrExpressionNoIn : LogicalAndExpressionNoIn { $1 {- 'LogicalOrExpression' -} }
-                        | LogicalOrExpressionNoIn Or LogicalAndExpressionNoIn { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
+LogicalOrExpressionNoIn : NullishCoalescingExpressionNoIn { $1 {- 'LogicalOrExpression' -} }
+                        | LogicalOrExpressionNoIn Or NullishCoalescingExpressionNoIn { AST.JSExpressionBinary {- '||' -} $1 $2 $3 }
 
 -- ConditionalExpression :                                                               See 11.12
 --        LogicalORExpression
@@ -1221,7 +1288,7 @@ Finally : FinallyL Block { AST.JSFinally $1 $2 {- 'Finally' -} }
 -- DebuggerStatement :                                                        See 12.15
 --        debugger ;
 DebuggerStatement :: { AST.JSStatement }
-DebuggerStatement : 'debugger' MaybeSemi { AST.JSExpressionStatement (AST.JSLiteral (mkJSAnnot $1) "debugger") $2 {- 'DebuggerStatement' -} }
+DebuggerStatement : 'debugger' MaybeSemi { AST.JSExpressionStatement (AST.JSLiteral (mkJSAnnot $1) ("debugger")) $2 {- 'DebuggerStatement' -} }
 
 -- FunctionDeclaration :                                                      See clause 13
 --        function Identifier ( FormalParameterListopt ) { FunctionBody }
@@ -1237,15 +1304,20 @@ FunctionExpression :: { AST.JSExpression }
 FunctionExpression : ArrowFunctionExpression     { $1 {- 'ArrowFunctionExpression' -} }
                    | LambdaExpression            { $1 {- 'FunctionExpression1' -} }
                    | NamedFunctionExpression     { $1 {- 'FunctionExpression2' -} }
+                   | AsyncFunctionExpression     { $1 {- 'AsyncFunctionExpression' -} }
 
 ArrowFunctionExpression :: { AST.JSExpression }
-ArrowFunctionExpression : ArrowParameterList Arrow StatementOrBlock
+ArrowFunctionExpression : ArrowParameterList Arrow ConciseBody
                            { AST.JSArrowExpression $1 $2 $3 }
 
 ArrowParameterList :: { AST.JSArrowParameterList }
 ArrowParameterList : PrimaryExpression {%^ toArrowParameterList $1 }
                    | LParen RParen
                       { AST.JSParenthesizedArrowParameterList $1 AST.JSLNil $2 }
+
+ConciseBody :: { AST.JSConciseBody }
+ConciseBody : Block                    { AST.JSConciseFunctionBody $1 }
+            | AssignmentExpression     { AST.JSConciseExpressionBody $1 }
 
 StatementOrBlock :: { AST.JSStatement }
 StatementOrBlock : Block MaybeSemi		{ blockToStatement $1 $2 }
@@ -1262,12 +1334,33 @@ NamedFunctionExpression : Function Identifier LParen RParen FunctionBody
                             { AST.JSFunctionExpression $1 (identName $2) $3 AST.JSLNil $4 $5    {- 'NamedFunctionExpression1' -} }
                         | Function Identifier LParen FormalParameterList RParen FunctionBody
                             { AST.JSFunctionExpression $1 (identName $2) $3 $4 $5 $6            {- 'NamedFunctionExpression2' -} }
+                        | Function Identifier LParen FormalParameterList Comma RParen FunctionBody
+                            { AST.JSFunctionExpression $1 (identName $2) $3 $4 $6 $7            {- 'NamedFunctionExpression3' -} }
 
 LambdaExpression :: { AST.JSExpression }
 LambdaExpression : Function LParen RParen FunctionBody
                     { AST.JSFunctionExpression $1 AST.JSIdentNone $2 AST.JSLNil $3 $4	{- 'LambdaExpression1' -} }
                  | Function LParen FormalParameterList RParen FunctionBody
                     { AST.JSFunctionExpression $1 AST.JSIdentNone $2 $3 $4 $5           {- 'LambdaExpression2' -} }
+                 | Function LParen FormalParameterList Comma RParen FunctionBody
+                    { AST.JSFunctionExpression $1 AST.JSIdentNone $2 $3 $5 $6           {- 'LambdaExpression3' -} }
+
+AsyncFunctionExpression :: { AST.JSExpression }
+AsyncFunctionExpression : Async Function LParen RParen FunctionBody
+                           { AST.JSAsyncFunctionExpression $1 $2 AST.JSIdentNone $3 AST.JSLNil $4 $5   {- 'AsyncFunctionExpression1' -} }
+                        | Async Function LParen FormalParameterList RParen FunctionBody
+                           { AST.JSAsyncFunctionExpression $1 $2 AST.JSIdentNone $3 $4 $5 $6           {- 'AsyncFunctionExpression2' -} }
+                        | Async Function LParen FormalParameterList Comma RParen FunctionBody
+                           { AST.JSAsyncFunctionExpression $1 $2 AST.JSIdentNone $3 $4 $6 $7           {- 'AsyncFunctionExpression3' -} }
+                        | AsyncNamedFunctionExpression     { $1 {- 'AsyncFunctionExpression4' -} }
+
+AsyncNamedFunctionExpression :: { AST.JSExpression }
+AsyncNamedFunctionExpression : Async Function Identifier LParen RParen FunctionBody
+                                { AST.JSAsyncFunctionExpression $1 $2 (identName $3) $4 AST.JSLNil $5 $6    {- 'AsyncNamedFunctionExpression1' -} }
+                             | Async Function Identifier LParen FormalParameterList RParen FunctionBody
+                                { AST.JSAsyncFunctionExpression $1 $2 (identName $3) $4 $5 $6 $7            {- 'AsyncNamedFunctionExpression2' -} }
+                             | Async Function Identifier LParen FormalParameterList Comma RParen FunctionBody
+                                { AST.JSAsyncFunctionExpression $1 $2 (identName $3) $4 $5 $7 $8            {- 'AsyncNamedFunctionExpression3' -} }
 
 -- GeneratorDeclaration :
 --         function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1285,12 +1378,16 @@ GeneratorExpression : NamedGeneratorExpression { $1 }
                         { AST.JSGeneratorExpression $1 (mkJSAnnot $2) AST.JSIdentNone $3 AST.JSLNil $4 $5 }
                     | Function '*' LParen FormalParameterList RParen FunctionBody
                         { AST.JSGeneratorExpression $1 (mkJSAnnot $2) AST.JSIdentNone $3 $4 $5 $6 }
+                    | Function '*' LParen FormalParameterList Comma RParen FunctionBody
+                        { AST.JSGeneratorExpression $1 (mkJSAnnot $2) AST.JSIdentNone $3 $4 $6 $7 }
 
 NamedGeneratorExpression :: { AST.JSExpression }
 NamedGeneratorExpression : Function '*' Identifier LParen RParen FunctionBody
                              { AST.JSGeneratorExpression $1 (mkJSAnnot $2) (identName $3) $4 AST.JSLNil $5 $6 }
                          | Function '*' Identifier LParen FormalParameterList RParen FunctionBody
                              { AST.JSGeneratorExpression $1 (mkJSAnnot $2) (identName $3) $4 $5 $6 $7 }
+                         | Function '*' Identifier LParen FormalParameterList Comma RParen FunctionBody
+                             { AST.JSGeneratorExpression $1 (mkJSAnnot $2) (identName $3) $4 $5 $7 $8 }
 
 -- YieldExpression :
 --         yield
@@ -1352,9 +1449,27 @@ ClassBody :                        { [] }
 --         static MethodDefinition
 --         ;
 ClassElement :: { AST.JSClassElement }
-ClassElement : MethodDefinition        { AST.JSClassInstanceMethod $1 }
-             | Static MethodDefinition { AST.JSClassStaticMethod $1 $2 }
-             | Semi                    { AST.JSClassSemi $1 }
+ClassElement : MethodDefinition              { AST.JSClassInstanceMethod $1 }
+             | Static MethodDefinition       { AST.JSClassStaticMethod $1 $2 }
+             | Semi                          { AST.JSClassSemi $1 }
+             | PrivateField                  { $1 }
+             | PrivateMethod                 { $1 }
+             | PrivateAccessor               { $1 }
+
+-- Private field declarations: #field = value; or #field;
+PrivateField :: { AST.JSClassElement }
+PrivateField : 'private' '=' AssignmentExpression AutoSemi { AST.JSPrivateField (mkJSAnnot $1) (extractPrivateName $1) (mkJSAnnot $2) (Just $3) $4 }
+             | 'private' AutoSemi                         { AST.JSPrivateField (mkJSAnnot $1) (extractPrivateName $1) (mkJSAnnot $1) Nothing $2 }
+
+-- Private method definitions: #method() { }
+PrivateMethod :: { AST.JSClassElement }
+PrivateMethod : 'private' LParen RParen FunctionBody                     { AST.JSPrivateMethod (mkJSAnnot $1) (extractPrivateName $1) $2 AST.JSLNil $3 $4 }
+              | 'private' LParen FormalParameterList RParen FunctionBody { AST.JSPrivateMethod (mkJSAnnot $1) (extractPrivateName $1) $2 $3 $4 $5 }
+
+-- Private accessor methods: get #prop() { } or set #prop(value) { }
+PrivateAccessor :: { AST.JSClassElement }
+PrivateAccessor : 'get' 'private' LParen RParen FunctionBody                     { AST.JSPrivateAccessor (AST.JSAccessorGet (mkJSAnnot $1)) (mkJSAnnot $2) (extractPrivateName $2) $3 AST.JSLNil $4 $5 }
+                | 'set' 'private' LParen FormalParameterList RParen FunctionBody { AST.JSPrivateAccessor (AST.JSAccessorSet (mkJSAnnot $1)) (mkJSAnnot $2) (extractPrivateName $2) $3 $4 $5 $6 }
 
 -- Program :                                                                  See clause 14
 --        SourceElementsopt
@@ -1392,10 +1507,10 @@ ModuleItem : Import ImportDeclaration
                     { AST.JSModuleStatementListItem $1      {- 'ModuleItem2' -} }
 
 ImportDeclaration :: { AST.JSImportDeclaration }
-ImportDeclaration : ImportClause FromClause AutoSemi
-                          { AST.JSImportDeclaration $1 $2 $3 }
-                  | 'string' AutoSemi
-                          { AST.JSImportDeclarationBare (mkJSAnnot $1) (tokenLiteral $1) $2 }
+ImportDeclaration : ImportClause FromClause ImportAttributesOpt AutoSemi
+                          { AST.JSImportDeclaration $1 $2 $3 $4 }
+                  | 'string' ImportAttributesOpt AutoSemi
+                          { AST.JSImportDeclarationBare (mkJSAnnot $1) (tokenLiteral $1) $2 $3 }
 
 ImportClause :: { AST.JSImportClause }
 ImportClause : IdentifierName
@@ -1433,6 +1548,18 @@ ImportSpecifier : IdentifierName
                 | IdentifierName As IdentifierName
                     { AST.JSImportSpecifierAs (identName $1) $2 (identName $3) }
 
+ImportAttributesOpt :: { Maybe AST.JSImportAttributes }
+ImportAttributesOpt : {- empty -}                { Nothing }
+                    | 'with' LBrace ImportAttributeList RBrace  { Just (AST.JSImportAttributes $2 $3 $4) }
+
+ImportAttributeList :: { AST.JSCommaList AST.JSImportAttribute }
+ImportAttributeList : ImportAttribute               { AST.JSLOne $1 }
+                    | ImportAttributeList Comma ImportAttribute  { AST.JSLCons $1 $2 $3 }
+
+ImportAttribute :: { AST.JSImportAttribute }
+ImportAttribute : IdentifierName Colon 'string'
+                    { AST.JSImportAttribute (identName $1) $2 (AST.JSStringLiteral (mkJSAnnot $3) (tokenLiteral $3)) }
+
 -- ExportDeclaration :                                                        See 15.2.3
 -- [ ]    export * FromClause ;
 -- [x]    export ExportClause FromClause ;
@@ -1452,7 +1579,11 @@ ImportSpecifier : IdentifierName
 -- [ ]    export default ClassDeclaration[Default]
 -- [ ]    export default [lookahead ∉ { function, class }] AssignmentExpression[In] ;
 ExportDeclaration :: { AST.JSExportDeclaration }
-ExportDeclaration : ExportClause FromClause AutoSemi
+ExportDeclaration : Mul FromClause AutoSemi
+                         { AST.JSExportAllFrom $1 $2 $3  {- 'ExportDeclarationStar' -} }
+                  | Mul As Identifier FromClause AutoSemi
+                         { AST.JSExportAllAsFrom $1 $2 (identName $3) $4 $5  {- 'ExportDeclarationStarAs' -} }
+                  | ExportClause FromClause AutoSemi
                          { AST.JSExportFrom $1 $2 $3  {- 'ExportDeclaration1' -} }
                   | ExportClause AutoSemi
                          { AST.JSExportLocals $1 $2   {- 'ExportDeclaration2' -} }
@@ -1464,6 +1595,14 @@ ExportDeclaration : ExportClause FromClause AutoSemi
                          { AST.JSExport $1 $2         {- 'ExportDeclaration5' -} }
                   | ClassDeclaration AutoSemi
                          { AST.JSExport $1 $2         {- 'ExportDeclaration6' -} }
+                  | Default FunctionDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3 {- 'ExportDeclarationDefault1' -} }
+                  | Default GeneratorDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3 {- 'ExportDeclarationDefault2' -} }
+                  | Default ClassDeclaration AutoSemi
+                         { AST.JSExportDefault $1 $2 $3 {- 'ExportDeclarationDefault3' -} }
+                  | Default AssignmentExpression AutoSemi
+                         { AST.JSExportDefault $1 (AST.JSExpressionStatement $2 (AST.JSSemiAuto)) $3 {- 'ExportDeclarationDefault4' -} }
 
 -- ExportClause :
 --           { }
@@ -1506,7 +1645,7 @@ StatementMain : StatementNoEmpty Eof	{ AST.JSAstStatement $1 $2   	{- 'Statement
 {
 
 -- Need this type while build the AST, but is not actually part of the AST.
-data JSArguments = JSArguments AST.JSAnnot (AST.JSCommaList AST.JSExpression) AST.JSAnnot    -- ^lb, args, rb
+data JSArguments = JSArguments AST.JSAnnot (AST.JSCommaList AST.JSExpression) AST.JSAnnot    -- lb, args, rb
 data JSUntaggedTemplate = JSUntaggedTemplate !AST.JSAnnot !String ![AST.JSTemplatePart] -- lquot, head, parts
 
 blockToStatement :: AST.JSBlock -> AST.JSSemi -> AST.JSStatement
@@ -1514,6 +1653,7 @@ blockToStatement (AST.JSBlock a b c) s = AST.JSStatementBlock a b c s
 
 expressionToStatement :: AST.JSExpression -> AST.JSSemi -> AST.JSStatement
 expressionToStatement (AST.JSFunctionExpression a b@(AST.JSIdentName{}) c d e f) s = AST.JSFunction a b c d e f s
+expressionToStatement (AST.JSAsyncFunctionExpression a fn b@(AST.JSIdentName{}) c d e f) s = AST.JSAsyncFunction a fn b c d e f s
 expressionToStatement (AST.JSGeneratorExpression a b c@(AST.JSIdentName{}) d e f g) s = AST.JSGenerator a b c d e f g s
 expressionToStatement (AST.JSAssignExpression lhs op rhs) s = AST.JSAssignStatement lhs op rhs s
 expressionToStatement (AST.JSMemberExpression e l a r) s = AST.JSMethodCall e l a r s
@@ -1522,6 +1662,7 @@ expressionToStatement exp s = AST.JSExpressionStatement exp s
 
 expressionToAsyncFunction :: AST.JSAnnot -> AST.JSExpression -> AST.JSSemi -> AST.JSStatement
 expressionToAsyncFunction aa (AST.JSFunctionExpression a b@(AST.JSIdentName{}) c d e f) s = AST.JSAsyncFunction aa a b c d e f s
+expressionToAsyncFunction _aa (AST.JSAsyncFunctionExpression a fn b@(AST.JSIdentName{}) c d e f) s = AST.JSAsyncFunction a fn b c d e f s
 expressionToAsyncFunction _aa _exp _s = error "Bad async function."
 
 mkJSCallExpression :: AST.JSExpression -> JSArguments -> AST.JSExpression
@@ -1532,6 +1673,10 @@ mkJSMemberExpression e (JSArguments l arglist r) = AST.JSMemberExpression e l ar
 
 mkJSMemberNew :: AST.JSAnnot -> AST.JSExpression -> JSArguments -> AST.JSExpression
 mkJSMemberNew a e (JSArguments l arglist r) = AST.JSMemberNew a e l arglist r
+
+mkJSOptionalCallExpression :: AST.JSExpression -> AST.JSAnnot -> JSArguments -> AST.JSExpression
+mkJSOptionalCallExpression e annot (JSArguments l arglist r) = AST.JSOptionalCallExpression e annot arglist r
+
 
 parseError :: Token -> Alex a
 parseError = alexError . show
@@ -1556,10 +1701,14 @@ identName :: AST.JSExpression -> AST.JSIdent
 identName (AST.JSIdentifier a s) = AST.JSIdentName a s
 identName x = error $ "Cannot convert '" ++ show x ++ "' to a JSIdentName."
 
+extractPrivateName :: Token -> String
+extractPrivateName token = drop 1 (tokenLiteral token)  -- Remove the '#' prefix
+
 propName :: AST.JSExpression ->  AST.JSPropertyName
 propName (AST.JSIdentifier a s) = AST.JSPropertyIdent a s
 propName (AST.JSDecimal a s) = AST.JSPropertyNumber a s
 propName (AST.JSHexInteger a s) = AST.JSPropertyNumber a s
+propName (AST.JSBinaryInteger a s) = AST.JSPropertyNumber a s
 propName (AST.JSOctal a s) = AST.JSPropertyNumber a s
 propName (AST.JSStringLiteral a s) = AST.JSPropertyString a s
 propName x = error $ "Cannot convert '" ++ show x ++ "' to a JSPropertyName."
@@ -1567,6 +1716,10 @@ propName x = error $ "Cannot convert '" ++ show x ++ "' to a JSPropertyName."
 identifierToProperty :: AST.JSExpression -> AST.JSObjectProperty
 identifierToProperty (AST.JSIdentifier a s) = AST.JSPropertyIdentRef a s
 identifierToProperty x = error $ "Cannot convert '" ++ show x ++ "' to a JSObjectProperty."
+
+spreadExpressionToProperty :: AST.JSExpression -> AST.JSObjectProperty
+spreadExpressionToProperty (AST.JSSpreadExpression a expr) = AST.JSObjectSpread a expr
+spreadExpressionToProperty x = error $ "Cannot convert '" ++ show x ++ "' to a JSObjectSpread."
 
 toArrowParameterList :: AST.JSExpression -> Token -> Alex AST.JSArrowParameterList
 toArrowParameterList (AST.JSIdentifier a s)          = const . return $ AST.JSUnparenthesizedArrowParameter (AST.JSIdentName a s)
@@ -1576,5 +1729,6 @@ toArrowParameterList _                               = parseError
 commasToCommaList :: AST.JSExpression -> AST.JSCommaList AST.JSExpression
 commasToCommaList (AST.JSCommaExpression l c r) = AST.JSLCons (commasToCommaList l) c r
 commasToCommaList x = AST.JSLOne x
+
 
 }

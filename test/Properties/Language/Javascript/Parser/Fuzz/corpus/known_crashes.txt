@@ -1,0 +1,32 @@
+# Known crash cases for regression testing
+# Each line represents a JavaScript input that previously caused crashes
+
+# Unmatched parentheses - deeply nested
+((((((((((((((((((((
+
+# Incomplete constructs
+function f(
+
+# Invalid character sequences
+var x = "
+
+# Deeply nested structures
+{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
+
+# Incomplete expressions
+var x = ,
+
+# Broken token sequences
+0x
+
+# Unicode edge cases
+var \u
+
+# Long identifiers (simplified for storage)
+var aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1;
+
+# Control characters
+var x = " 	 ";
+
+# Invalid escape sequences
+var x = "\x";

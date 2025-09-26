@@ -1,0 +1,11 @@
+-- This won't compile, just for reference
+-- The issue is in shouldPreserveStatement logic:
+-- 
+-- shouldPreserveStatement opts usageMap stmt =
+--   isStatementUsed usageMap stmt ||         -- Function is unused -> False
+--   hasObservableSideEffects stmt ||         -- Function has no side effects -> False  
+--   (opts ^. Types.preserveTopLevel) ||      -- Default option -> False
+--   (opts ^. Types.preserveSideEffects)      -- Default option -> ?
+--
+-- So the function should be eliminated IF all conditions are False
+-- Let me check what defaultOptions sets for these flags

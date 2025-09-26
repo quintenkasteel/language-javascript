@@ -15,6 +15,7 @@ module Language.JavaScript.Parser.Lexer
     , alexError
     , runAlex
     , alexTestTokeniser
+    , alexTestTokeniserASI
     , setInTemplate
     ) where
 
@@ -23,6 +24,7 @@ import Language.JavaScript.Parser.ParserMonad
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
 import qualified Data.Map as Map
+import qualified Data.List as List
 
 }
 
@@ -40,6 +42,7 @@ $dq = \"  -- double quote
 $digit = 0-9     	   	-- digits
 $oct_digit = [0-7]
 $hex_digit = [0-9a-fA-F]
+$bin_digit = [01]
 $alpha = [a-zA-Z]       -- alphabetic characters
 $non_zero_digit = 1-9
 $ident_letter = [a-zA-Z_]
@@ -74,17 +77,18 @@ $not_eol_char = ~$eol_char -- anything but an end of line character
 $string_chars = [^ \n \r ' \" \\]
 
 -- See e.g. http://es5.github.io/x7.html#x7.8.4 (Table 4)
-@sq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | x )
-@dq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | x )
+@sq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | \/ )
+@dq_escapes = \\ ( \\ | ' | \" | \s | \- | b | f | n | r | t | v | 0 | \/ )
 
+-- Valid escape sequences
+@hex_escape = \\ x $hex_digit{2}
 @unicode_escape = \\ u $hex_digit{4}
+@octal_escape = \\ $oct_digit{1,3}
 
-@string_parts = $string_chars | \\ $digit | $ls | $ps
+@string_parts = $string_chars | $ls | $ps
 
-@non_escape_char = \\ [^ \n \\ ]
-
-@stringCharsSingleQuote = @string_parts | @sq_escapes | @unicode_escape | $dq | @non_escape_char
-@stringCharsDoubleQuote = @string_parts | @dq_escapes | @unicode_escape | $sq | @non_escape_char
+@stringCharsSingleQuote = @string_parts | @sq_escapes | @hex_escape | @unicode_escape | @octal_escape | $dq
+@stringCharsDoubleQuote = @string_parts | @dq_escapes | @hex_escape | @unicode_escape | @octal_escape | $sq
 
 -- Character values < 0x20.
 $low_unprintable = [\x00-\x1f]
@@ -236,16 +240,31 @@ tokens :-
 -- <reg,divide> @IDHead(@IDTail)*  { \loc len str -> keywordOrIdent (take len str) loc }
 <reg,divide> @IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> keywordOrIdent (take len str) (toTokenPosn loc) }
 
+-- Private identifier (#identifier)
+<reg,divide> "#"@IdentifierStart(@IdentifierPart)*  { \ap@(loc,_,_,str) len -> return $ PrivateNameToken (toTokenPosn loc) (take len str) [] }
+
 -- ECMA-262 : Section 7.8.4 String Literals
 -- StringLiteral = '"' ( {String Chars1} | '\' {Printable} )* '"'
 --                | '' ( {String Chars2} | '\' {Printable} )* ''
 <reg,divide>  $dq (@stringCharsDoubleQuote *) $dq
             | $sq (@stringCharsSingleQuote *) $sq		{ adapt (mkString stringToken) }
 
--- HexIntegerLiteral = '0x' {Hex Digit}+
-<reg,divide> ("0x"|"0X") $hex_digit+ { adapt (mkString hexIntegerToken) }
+-- HexIntegerLiteral = '0x' {Hex Digit}+ with optional separators and BigInt suffix
+<reg,divide> ("0x"|"0X") ($hex_digit ("_"? $hex_digit)*) "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0x"|"0X") ($hex_digit ("_"? $hex_digit)*) { adapt (mkString hexIntegerToken) }
 
--- OctalLiteral = '0' {Octal Digit}+
+
+-- BinaryIntegerLiteral = '0b' {Binary Digit}+ with optional separators and BigInt suffix
+<reg,divide> ("0b"|"0B") ($bin_digit ("_"? $bin_digit)*) "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0b"|"0B") ($bin_digit ("_"? $bin_digit)*) { adapt (mkString binaryIntegerToken) }
+
+
+-- Modern OctalLiteral = '0o' {Octal Digit}+ with optional separators and BigInt suffix
+<reg,divide> ("0o"|"0O") ($oct_digit ("_"? $oct_digit)*) "n" { adapt (mkString bigIntToken) }
+<reg,divide> ("0o"|"0O") ($oct_digit ("_"? $oct_digit)*) { adapt (mkString octalToken) }
+
+
+-- Legacy OctalLiteral = '0' {Octal Digit}+
 <reg,divide> ("0") $oct_digit+ { adapt (mkString octalToken) }
 
 -- RegExp         = '/' ({RegExp Chars} | '\' {Non Terminator})+ '/' ( 'g' | 'i' | 'm' )*
@@ -279,17 +298,32 @@ tokens :-
 --     | "0"
 --     | "0." $digit+                    { mkString decimalToken }
 
-<reg,divide> "0"              "." $digit* ("e"|"E") ("+"|"-")? $digit+
-    | $non_zero_digit $digit* "." $digit* ("e"|"E") ("+"|"-")? $digit+
-    |                "." $digit+          ("e"|"E") ("+"|"-")? $digit+
-    |        "0"                          ("e"|"E") ("+"|"-")? $digit+
-    | $non_zero_digit $digit*             ("e"|"E") ("+"|"-")? $digit+
--- ++FOO++
-    |        "0"              "." $digit*
-    | $non_zero_digit $digit* "." $digit*
-    |                "." $digit+
+-- Decimal literals with optional numeric separators (ES2021)
+<reg,divide> "0"              "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    |                "." ($digit ("_"? $digit)*)          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    |        "0"                          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    | ($non_zero_digit ("_"? $digit)*)             ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*)
+    |        "0"              "." ($digit ("_"? $digit)*)
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*)
+    |                "." ($digit ("_"? $digit)*)
     |        "0"
-    | $non_zero_digit $digit*         { adapt (mkString decimalToken) }
+    | ($non_zero_digit ("_"? $digit)*)         { adapt (mkString decimalToken) }
+
+-- Legacy octal BigInt literals: '0' followed by octal digits and 'n'
+<reg,divide> ("0") $oct_digit+ "n" { adapt (mkString bigIntToken) }
+
+-- Decimal BigInt literals with optional numeric separators (ES2021)  
+<reg,divide> "0"              "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*) ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    |                "." ($digit ("_"? $digit)*)          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    |        "0"                          ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    | ($non_zero_digit ("_"? $digit)*)             ("e"|"E") ("+"|"-")? ($digit ("_"? $digit)*) "n"
+    |        "0"              "." ($digit ("_"? $digit)*) "n"
+    | ($non_zero_digit ("_"? $digit)*) "." ($digit ("_"? $digit)*) "n"
+    |                "." ($digit ("_"? $digit)*) "n"
+    |        "0" "n"
+    | ($non_zero_digit ("_"? $digit)*) "n"         { adapt (mkString bigIntToken) }
 
 
 -- beginning of file
@@ -308,6 +342,8 @@ tokens :-
 <reg,divide> {
     ";"     { adapt (symbolToken  SemiColonToken) }
     ","     { adapt (symbolToken  CommaToken) }
+    "??"    { adapt (symbolToken  NullishCoalescingToken) }
+    "?."    { adapt (symbolToken  OptionalChainingToken) }
     "?"     { adapt (symbolToken  HookToken) }
     ":"     { adapt (symbolToken  ColonToken) }
     "||"    { adapt (symbolToken  OrToken) }
@@ -328,6 +364,9 @@ tokens :-
     "&="    { adapt (symbolToken  AndAssignToken) }
     "^="    { adapt (symbolToken  XorAssignToken) }
     "|="    { adapt (symbolToken  OrAssignToken) }
+    "&&="   { adapt (symbolToken  LogicalAndAssignToken) }
+    "||="   { adapt (symbolToken  LogicalOrAssignToken) }
+    "??="   { adapt (symbolToken  NullishAssignToken) }
     "="     { adapt (symbolToken  SimpleAssignToken) }
     "!=="   { adapt (symbolToken  StrictNeToken) }
     "!="    { adapt (symbolToken  NeToken) }
@@ -342,6 +381,7 @@ tokens :-
     "--"    { adapt (symbolToken  DecrementToken) }
     "+"     { adapt (symbolToken  PlusToken) }
     "-"     { adapt (symbolToken  MinusToken) }
+    "**"    { adapt (symbolToken  ExponentiationToken) }
     "*"     { adapt (symbolToken  MulToken) }
     "%"     { adapt (symbolToken  ModToken) }
     "!"     { adapt (symbolToken  NotToken) }
@@ -425,6 +465,61 @@ alexTestTokeniser input =
                             xs -> reverse xs
             _ -> loop (tok:acc)
 
+-- For testing with ASI (Automatic Semicolon Insertion) support
+-- This version includes comment tokens in the output for testing
+alexTestTokeniserASI :: String -> Either String [Token]
+alexTestTokeniserASI input =
+    runAlex input $ loop []
+  where
+    loop acc = do
+        tok <- lexToken
+        case tok of
+            EOFToken {} ->
+                return $ case acc of
+                            [] -> []
+                            (TailToken{}:xs) -> reverse xs
+                            xs -> reverse xs
+            CommentToken {} -> do
+                if shouldTriggerASI acc
+                    then maybeAutoSemiTest tok acc
+                    else loop (tok:acc)
+            WsToken {} -> do
+                if shouldTriggerASI acc
+                    then maybeAutoSemiTest tok acc  
+                    else loop (tok:acc)
+            _ -> do
+                setLastToken tok
+                loop (tok:acc)
+    
+    -- Test version that includes tokens in output stream
+    maybeAutoSemiTest (WsToken sp tl cmt) acc =
+        if hasNewlineTest tl
+            then loop (AutoSemiToken sp tl cmt : WsToken sp tl cmt : acc)
+            else loop (WsToken sp tl cmt : acc)
+    maybeAutoSemiTest (CommentToken sp tl cmt) acc =
+        if hasNewlineTest tl  
+            then loop (AutoSemiToken sp tl cmt : CommentToken sp tl cmt : acc)
+            else loop (CommentToken sp tl cmt : acc)
+    maybeAutoSemiTest tok acc = loop (tok:acc)
+    
+    -- Check for newlines including all JavaScript line terminators
+    hasNewlineTest :: String -> Bool
+    hasNewlineTest s = any (`elem` ['\n', '\r']) s || 
+                       u2028 `isInfixOf` s || u2029 `isInfixOf` s
+      where
+        u2028 = "\x2028"  -- U+2028 (Line Separator)
+        u2029 = "\x2029"  -- U+2029 (Paragraph Separator)
+        isInfixOf = List.isInfixOf
+    
+    -- Check if we should trigger ASI by looking for recent return/break/continue tokens
+    shouldTriggerASI :: [Token] -> Bool
+    shouldTriggerASI = any isASITrigger . take 5  -- Look at last 5 tokens
+      where
+        isASITrigger (ReturnToken {}) = True
+        isASITrigger (BreakToken {}) = True  
+        isASITrigger (ContinueToken {}) = True
+        isASITrigger _ = False
+
 -- This is called by the Happy parser.
 lexCont :: (Token -> Alex a) -> Alex a
 lexCont cont =
@@ -435,7 +530,12 @@ lexCont cont =
         case tok of
             CommentToken {} -> do
                 addComment tok
-                lexLoop
+                ltok <- getLastToken
+                case ltok of
+                    BreakToken {} -> maybeAutoSemi tok
+                    ContinueToken {} -> maybeAutoSemi tok
+                    ReturnToken {} -> maybeAutoSemi tok
+                    _otherwise -> lexLoop
             WsToken {} -> do
                 addComment tok
                 ltok <- getLastToken
@@ -450,13 +550,26 @@ lexCont cont =
                 setComment []
                 cont tok'
 
-    -- If the token is a WsToken and it contains a newline, convert it to an
-    -- AutoSemiToken and call the continuation, otherwise, just lexLoop.
+    -- If the token contains a newline, convert it to an AutoSemiToken and call 
+    -- the continuation, otherwise, just lexLoop. Now handles both WsToken and CommentToken.
     maybeAutoSemi (WsToken sp tl cmt) =
-        if any (== '\n') tl
+        if hasNewline tl
+            then cont $ AutoSemiToken sp tl cmt
+            else lexLoop
+    maybeAutoSemi (CommentToken sp tl cmt) =
+        if hasNewline tl
             then cont $ AutoSemiToken sp tl cmt
             else lexLoop
     maybeAutoSemi _ = lexLoop
+
+    -- Check for newlines including all JavaScript line terminators
+    hasNewline :: String -> Bool
+    hasNewline s = any (`elem` ['\n', '\r']) s || 
+                   u2028 `isInfixOf` s || u2029 `isInfixOf` s
+      where
+        u2028 = "\x2028"  -- U+2028 (Line Separator)
+        u2029 = "\x2029"  -- U+2029 (Paragraph Separator)
+        isInfixOf = List.isInfixOf
 
 
 toCommentAnnotation :: [Token] -> [CommentAnnotation]

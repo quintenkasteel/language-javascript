@@ -1,0 +1,3 @@
+/**
+ * User management class @class @extends EventEmitter @param {Object} options Configuration @param {string} options.baseUrl API base URL
+ */

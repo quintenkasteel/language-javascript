@@ -1,0 +1,16 @@
+# Act configuration for local GitHub Actions testing
+# This file contains settings for running GitHub Actions locally with act
+
+# Use a smaller, faster container for basic tests
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Set environment variables for local testing
+--env CABAL_NO_SANDBOX=1
+--env CI=true
+--env GITHUB_ACTIONS=true
+
+# Increase verbosity for debugging
+--verbose
+
+# Don't pull Docker images automatically to speed up testing
+--pull=false

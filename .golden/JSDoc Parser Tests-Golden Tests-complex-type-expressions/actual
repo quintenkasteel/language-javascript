@@ -1,0 +1,3 @@
+/**
+ * Process user data @param {Array<{name: string, age?: number}>} users @returns {Promise<Map<string, boolean>>}
+ */

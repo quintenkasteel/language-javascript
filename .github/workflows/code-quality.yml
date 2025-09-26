@@ -1,0 +1,270 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, new-ast, release/* ]
+  pull_request:
+    branches: [ main, new-ast ]
+
+jobs:
+  hlint:
+    name: HLint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Haskell
+      uses: haskell-actions/setup@v2
+      with:
+        ghc-version: '9.8.4'
+        cabal-version: 'latest'
+
+    - name: Cache HLint
+      uses: actions/cache@v4
+      with:
+        path: ~/.cabal/bin
+        key: hlint-${{ runner.os }}
+
+    - name: Install HLint
+      run: |
+        cabal update
+        cabal install hlint --constraint="hlint >=3.5"
+
+    - name: Run HLint on source
+      run: |
+        echo "Running HLint on src/ directory..."
+        ~/.cabal/bin/hlint src/ --report=hlint-src.html || {
+          echo "HLint found issues in src/"
+          ~/.cabal/bin/hlint src/
+          exit 1
+        }
+
+    - name: Run HLint on tests
+      run: |
+        echo "Running HLint on test/ directory..."
+        ~/.cabal/bin/hlint test/ --report=hlint-test.html || {
+          echo "HLint found issues in test/"
+          ~/.cabal/bin/hlint test/
+          exit 1
+        }
+
+    - name: Upload HLint reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: hlint-reports
+        path: hlint-*.html
+
+  ormolu:
+    name: Ormolu Formatting
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Haskell
+      uses: haskell-actions/setup@v2
+      with:
+        ghc-version: '9.8.4'
+        cabal-version: 'latest'
+
+    - name: Cache Ormolu
+      uses: actions/cache@v4
+      with:
+        path: ~/.cabal/bin
+        key: ormolu-${{ runner.os }}
+
+    - name: Install Ormolu
+      run: |
+        cabal update
+        cabal install ormolu
+
+    - name: Check Ormolu formatting
+      run: |
+        echo "Checking code formatting with Ormolu..."
+        
+        # Check source files
+        echo "Checking src/ formatting..."
+        find src -name "*.hs" -exec ~/.cabal/bin/ormolu --mode check {} \; || {
+          echo "Source files are not formatted correctly"
+          echo "Run 'ormolu --mode inplace \$(find src -name \"*.hs\")' to fix"
+          exit 1
+        }
+        
+        # Check test files
+        echo "Checking test/ formatting..."
+        find test -name "*.hs" -exec ~/.cabal/bin/ormolu --mode check {} \; || {
+          echo "Test files are not formatted correctly"
+          echo "Run 'ormolu --mode inplace \$(find test -name \"*.hs\")' to fix"
+          exit 1
+        }
+        
+        echo "All files are properly formatted!"
+
+  complexity-check:
+    name: Function Complexity Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check function complexity
+      run: |
+        echo "Checking function complexity and size limits..."
+        
+        # Check for functions longer than 15 lines
+        echo "=== Checking function line counts ==="
+        LONG_FUNCTIONS=0
+        
+        for file in $(find src test -name "*.hs"); do
+          echo "Checking $file..."
+          
+          # This is a basic check - could be improved with proper Haskell parsing
+          awk '
+            /^[a-zA-Z][a-zA-Z0-9_]*.*::/ { 
+              in_sig = 1; next 
+            }
+            in_sig && /^[a-zA-Z][a-zA-Z0-9_]*/ && !/^  / { 
+              if (func_name != "") {
+                if (line_count > 15) {
+                  print "⚠️  Function " func_name " has " line_count " lines (limit: 15)"
+                  long_funcs++
+                }
+              }
+              func_name = $1; line_count = 0; in_sig = 0 
+            }
+            in_sig { next }
+            func_name != "" && /^  / && !/^  --/ && !/^[ \t]*$/ { 
+              line_count++ 
+            }
+            func_name != "" && /^[a-zA-Z]/ && !/^  / { 
+              if (line_count > 15) {
+                print "⚠️  Function " func_name " has " line_count " lines (limit: 15)"
+                long_funcs++
+              }
+              func_name = ""; line_count = 0 
+            }
+            END { 
+              if (func_name != "" && line_count > 15) {
+                print "⚠️  Function " func_name " has " line_count " lines (limit: 15)"
+                long_funcs++
+              }
+              if (long_funcs > 0) {
+                print "\n❌ Found " long_funcs " functions exceeding 15-line limit"
+                exit(1)
+              } else {
+                print "✅ All functions within 15-line limit"
+              }
+            }
+          ' "$file" || LONG_FUNCTIONS=1
+        done
+        
+        if [ $LONG_FUNCTIONS -eq 1 ]; then
+          echo "❌ Some functions exceed the 15-line limit"
+          exit 1
+        fi
+        
+        echo "✅ All function complexity checks passed!"
+
+  import-style-check:
+    name: Import Style Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check import patterns
+      run: |
+        echo "Checking import style compliance..."
+        
+        # Check for unqualified function imports (should be qualified)
+        echo "=== Checking for unqualified function imports ==="
+        BAD_IMPORTS=0
+        
+        # Look for imports that might be unqualified functions
+        for file in $(find src test -name "*.hs"); do
+          echo "Checking imports in $file..."
+          
+          # Check for imports without 'qualified' that aren't type imports
+          if grep -n "^import [A-Z][^(]*$" "$file" | grep -v "qualified"; then
+            echo "⚠️  Potentially unqualified imports found in $file"
+            BAD_IMPORTS=1
+          fi
+        done
+        
+        # Check for proper qualified usage
+        echo "=== Checking qualified usage patterns ==="
+        for file in $(find src test -name "*.hs"); do
+          # Look for potential violations of qualified naming
+          if grep -n "qualified.*as [a-z]" "$file"; then
+            echo "⚠️  Short qualified aliases found in $file (prefer full names)"
+            BAD_IMPORTS=1
+          fi
+        done
+        
+        if [ $BAD_IMPORTS -eq 1 ]; then
+          echo "❌ Import style violations found"
+          echo "Remember: Import types unqualified, functions qualified"
+          exit 1
+        fi
+        
+        echo "✅ Import style checks passed!"
+
+  lens-usage-check:
+    name: Lens Usage Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check lens usage patterns
+      run: |
+        echo "Checking lens usage compliance..."
+        
+        BAD_PATTERNS=0
+        
+        # Check for record syntax usage (should use lenses)
+        echo "=== Checking for record syntax violations ==="
+        for file in $(find src test -name "*.hs"); do
+          echo "Checking record patterns in $file..."
+          
+          # Look for record updates using { } syntax
+          if grep -n ".*{.*=.*}" "$file" | grep -v "^--"; then
+            echo "⚠️  Record update syntax found in $file (use lenses instead)"
+            BAD_PATTERNS=1
+          fi
+          
+          # Look for record access with dot notation patterns
+          if grep -n "\\..*=" "$file" | grep -v "^--" | grep -v "qualified"; then
+            echo "⚠️  Potential record access patterns found in $file"
+          fi
+        done
+        
+        # Check for makeLenses usage
+        echo "=== Checking for makeLenses declarations ==="
+        LENS_FILES=0
+        for file in $(find src -name "*.hs"); do
+          if grep -q "data.*=" "$file" && grep -q "_.*::" "$file"; then
+            if ! grep -q "makeLenses" "$file"; then
+              echo "⚠️  $file has record types but no makeLenses"
+              BAD_PATTERNS=1
+            else
+              LENS_FILES=$((LENS_FILES + 1))
+            fi
+          fi
+        done
+        
+        echo "Found $LENS_FILES files using lens patterns"
+        
+        if [ $BAD_PATTERNS -eq 1 ]; then
+          echo "❌ Lens usage violations found"
+          exit 1
+        fi
+        
+        echo "✅ Lens usage checks passed!"

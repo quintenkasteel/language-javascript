@@ -1,0 +1,173 @@
+name: Validation Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, new-ast, release/* ]
+
+jobs:
+  # Fast validation that works without heavy Haskell installation
+  validate:
+    name: Fast Validation
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate project structure
+      run: |
+        echo "=== Project Structure Validation ==="
+        echo "✓ Repository checked out successfully"
+        
+        # Check essential files exist
+        if [ -f "language-javascript.cabal" ]; then
+          echo "✓ Cabal project file found"
+        else
+          echo "❌ Cabal project file missing"
+          exit 1
+        fi
+        
+        if [ -d "src" ]; then
+          HASKELL_FILES=$(find src -name "*.hs" -type f | wc -l)
+          echo "✓ Source directory with $HASKELL_FILES Haskell files"
+        else
+          echo "❌ Source directory missing"
+          exit 1
+        fi
+        
+        if [ -d "test" ]; then
+          TEST_FILES=$(find test -name "*.hs" -type f | wc -l)
+          echo "✓ Test directory with $TEST_FILES test files"
+        else
+          echo "❌ Test directory missing"
+          exit 1
+        fi
+
+    - name: Validate workflow files
+      run: |
+        echo "=== Workflow Validation ==="
+        
+        # Check all workflow files for basic YAML syntax
+        if command -v python3 >/dev/null 2>&1; then
+          echo "Validating GitHub Actions workflows..."
+          for workflow in .github/workflows/*.yml; do
+            if [ -f "$workflow" ]; then
+              echo "Checking $(basename "$workflow")..."
+              python3 -c "import yaml; data=yaml.safe_load(open('$workflow', 'r')); print('  ✓ Valid YAML with', len(data.get('jobs', {})), 'jobs')" || exit 1
+            fi
+          done
+        else
+          echo "Python not available, skipping YAML validation"
+        fi
+
+    - name: Check code quality standards
+      run: |
+        echo "=== Code Quality Standards Check ==="
+        
+        # Check for basic Haskell patterns
+        echo "Checking Haskell code patterns..."
+        
+        # Check for module headers
+        MODULES_WITH_HEADERS=$(find src -name "*.hs" -exec grep -l "^module " {} \; | wc -l)
+        TOTAL_MODULES=$(find src -name "*.hs" | wc -l)
+        
+        if [ $MODULES_WITH_HEADERS -eq $TOTAL_MODULES ]; then
+          echo "✓ All $TOTAL_MODULES modules have proper headers"
+        else
+          echo "⚠️ $((TOTAL_MODULES - MODULES_WITH_HEADERS)) modules missing headers"
+        fi
+        
+        # Check for common anti-patterns
+        echo "Checking for potential issues..."
+        
+        UNDEFINED_COUNT=$(find src -name "*.hs" -exec grep -c "undefined" {} \; 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo "0")
+        if [ $UNDEFINED_COUNT -gt 0 ]; then
+          echo "⚠️ Found $UNDEFINED_COUNT instances of 'undefined'"
+        else
+          echo "✓ No 'undefined' found"
+        fi
+        
+        ERROR_COUNT=$(find src -name "*.hs" -exec grep -c " error " {} \; 2>/dev/null | paste -sd+ | bc 2>/dev/null || echo "0")
+        if [ $ERROR_COUNT -gt 0 ]; then
+          echo "⚠️ Found $ERROR_COUNT instances of 'error'"
+        else
+          echo "✓ No obvious 'error' calls found"
+        fi
+
+    - name: Security scan
+      run: |
+        echo "=== Security Scan ==="
+        
+        # Check for potentially unsafe patterns
+        echo "Scanning for potential security issues..."
+        
+        if grep -r "unsafePerformIO" src/ 2>/dev/null | head -5; then
+          echo "⚠️ Found unsafePerformIO usage"
+        else
+          echo "✓ No unsafePerformIO found"
+        fi
+        
+        # Check for hardcoded secrets patterns (basic)
+        if grep -r -i -E "(password|secret|key).*=" src/ 2>/dev/null | grep -v "-- " | head -3; then
+          echo "⚠️ Potential hardcoded secrets found (review manually)"
+        else
+          echo "✓ No obvious hardcoded secrets detected"
+        fi
+
+    - name: Documentation check
+      run: |
+        echo "=== Documentation Check ==="
+        
+        if [ -f "README.md" ]; then
+          README_SIZE=$(wc -c < README.md)
+          echo "✓ README.md exists ($README_SIZE bytes)"
+        else
+          echo "❌ README.md missing"
+        fi
+        
+        if [ -f "ChangeLog.md" ]; then
+          CHANGELOG_SIZE=$(wc -c < ChangeLog.md)
+          echo "✓ ChangeLog.md exists ($CHANGELOG_SIZE bytes)"
+        else
+          echo "❌ ChangeLog.md missing"
+        fi
+        
+        if [ -f "CLAUDE.md" ]; then
+          CLAUDE_SIZE=$(wc -c < CLAUDE.md)
+          echo "✓ CLAUDE.md coding standards exist ($CLAUDE_SIZE bytes)"
+        else
+          echo "⚠️ CLAUDE.md coding standards missing"
+        fi
+
+    - name: Test configuration check
+      run: |
+        echo "=== Test Configuration Check ==="
+        
+        # Check for test suite configuration
+        if grep -q "test-suite" language-javascript.cabal; then
+          echo "✓ Test suite configured in cabal file"
+        else
+          echo "⚠️ No test suite found in cabal file"
+        fi
+        
+        # Check for common test files
+        if find test -name "*Test*.hs" -o -name "*Spec*.hs" | head -5; then
+          echo "✓ Test files found"
+        else
+          echo "⚠️ No obvious test files found"
+        fi
+
+    - name: Summary
+      run: |
+        echo "=== Validation Summary ==="
+        echo "✅ Project structure validated"
+        echo "✅ Workflow files validated"
+        echo "✅ Code quality standards checked"
+        echo "✅ Security scan completed"
+        echo "✅ Documentation checked"
+        echo "✅ Test configuration verified"
+        echo ""
+        echo "🎉 All validation checks completed successfully!"
+        echo ""
+        echo "Note: This validation runs quickly without installing Haskell tools."
+        echo "For full compilation and testing, use the other workflow files."

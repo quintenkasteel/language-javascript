@@ -1,13 +1,59 @@
+# Compiled Haskell files
 *.exe
 *.hi
 *.o
+*.dyn_hi
+*.dyn_o
+*.p_hi
+*.p_o
 *~
+
+# Build directories
 dist/
 dist-newstyle/
-parse.txt
+
+# Generated parser/lexer files
 src/Language/JavaScript/Parser/Grammar5.hs
+src/Language/JavaScript/Parser/Grammar7.hs
+src/Language/JavaScript/Parser/Lexer.hs
 src/Language/JavaScript/Parser/Lexer.info
+
+# Temporary files
+parse.txt
+testsuite.exe
+
+# Unicode generation files
 unicode/*.htm
 
-# stack
+# Stack
 .stack-work/
+
+# Cabal
+cabal.project.local
+.ghc.environment.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+*.tix
+hpc_index.html
+hpc_index_alt.html
+.hpc/
+
+# Profiling
+*.prof
+*.aux
+*.hp
+*.ps
+
+# Documentation
+*.haddock
