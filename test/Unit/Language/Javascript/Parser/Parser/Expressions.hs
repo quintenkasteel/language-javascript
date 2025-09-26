@@ -865,15 +865,14 @@ testExpressionParser = describe "Parse expressions:" $ do
       Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "console") dot (JSIdentifier memAnnot "log")) leftParen (JSLOne (JSStringLiteral strAnnot "'hello'")) rightParen) astAnnot) -> pure ()
       result -> expectationFailure ("Expected console.log call with trailing comma, got: " ++ show result)
 
-  it "dynamic imports (ES2020) - current parser limitations" $ do
-    -- Note: Current parser does not support dynamic import() expressions
-    -- import() is currently parsed as import statements, not expressions
-    -- These tests document the existing behavior for future implementation
-    parse "import('./module.js')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-    parse "const mod = import('module')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-    parse "import(moduleSpecifier)" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-    parse "import('./utils.js').then(m => m.helper())" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
-    parse "await import('./async-module.js')" "test" `shouldSatisfy` (\result -> case result of Left _ -> True; Right _ -> False)
+  it "dynamic imports (ES2020) - current parser support" $ do
+    -- Note: Parser now supports dynamic import() expressions
+    -- These tests verify current parsing capabilities
+    parse "import('./module.js')" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+    parse "const mod = import('module')" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)  -- Assignment now works
+    parse "import(moduleSpecifier)" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)
+    parse "import('./utils.js').then(m => m.helper())" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)  -- Complex chaining now works
+    parse "await import('./async-module.js')" "test" `shouldSatisfy` (\result -> case result of Right _ -> True; Left _ -> False)  -- Await import now works
 
   it "spread expression" $ do
     case testExpr "... x" of

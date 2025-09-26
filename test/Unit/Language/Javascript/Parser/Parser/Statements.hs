@@ -360,10 +360,11 @@ testStatementParser = describe "Parse statements:" $ do
       Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "LeftCurlyToken" `isInfixOf` msg)
       Right result -> expectationFailure ("Expected parse error for static block, got: " ++ show result)
 
-    -- Note: Static async methods are not yet supported
+    -- Note: Static async methods are now supported
     case testStatement "class API { static async fetch() { return await response; } }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "IdentifierToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for static async method, got: " ++ show result)
+      Right (JSAstStatement (JSClass {}) _) -> pure ()  -- Now expects success
+      Left err -> expectationFailure ("Static async method should parse successfully, got error: " ++ show err)
+      Right result -> expectationFailure ("Expected class with static async method, got: " ++ show result)
     case testStatement "class Service { static async *generator() { yield await data; } }" of
       Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "IdentifierToken" `isInfixOf` msg || "MulToken" `isInfixOf` msg)
       Right result -> expectationFailure ("Expected parse error for static async generator, got: " ++ show result)
