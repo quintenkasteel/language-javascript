@@ -350,7 +350,8 @@ analyzeExpression expr = case expr of
     
   JSMemberDot target _ prop -> do
     analyzeExpression target
-    -- Don't analyze prop - it's a property name, not a variable reference
+    -- Track property access for tree shaking (mark property as used)
+    markPropertyUsed target prop
     
   JSMemberSquare target _ prop _ -> do
     analyzeExpression target
@@ -669,6 +670,14 @@ markIdentifierUsed identifier = do
         & directReferences %~ (+1)
 
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
+
+-- | Mark property as used via member access (obj.prop).
+markPropertyUsed :: JSExpression -> JSExpression -> AnalysisM ()
+markPropertyUsed _target prop = do
+  -- Extract property name and mark it as used
+  case extractIdentifierName prop of
+    Just propName -> markIdentifierUsed propName
+    Nothing -> pure ()  -- Complex property expressions are not tracked yet
 
 -- | Mark object as having dynamic property access and mark all its properties as used.
 markObjectWithDynamicAccess :: JSExpression -> AnalysisM ()

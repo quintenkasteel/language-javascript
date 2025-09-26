@@ -158,6 +158,7 @@ instance RenderJS JSExpression where
   (|>) pacc (JSTemplateLiteral t a h ps) = pacc |> t |> a |> h |> ps
   (|>) pacc (JSUnaryExpression op x) = pacc |> op |> x
   (|>) pacc (JSVarInitExpression x1 x2) = pacc |> x1 |> x2
+  (|>) pacc (JSParameterExpression x1 x2) = pacc |> x1 |> x2
   (|>) pacc (JSYieldExpression y x) = pacc |> y |> "yield" |> x
   (|>) pacc (JSYieldFromExpression y s x) = pacc |> y |> "yield" |> s |> "*" |> x
   (|>) pacc (JSImportMeta i d) = pacc |> i |> "import" |> d |> ".meta"
@@ -353,6 +354,7 @@ instance RenderJS JSObjectProperty where
 
 instance RenderJS JSMethodDefinition where
   (|>) pacc (JSMethodDefinition n alp ps arp b) = pacc |> n |> alp |> "(" |> ps |> arp |> ")" |> b
+  (|>) pacc (JSAsyncMethodDefinition s n alp ps arp b) = pacc |> s |> "async " |> n |> alp |> "(" |> ps |> arp |> ")" |> b
   (|>) pacc (JSGeneratorMethodDefinition s n alp ps arp b) = pacc |> s |> "*" |> n |> alp |> "(" |> ps |> arp |> ")" |> b
   (|>) pacc (JSPropertyAccessor s n alp ps arp b) = pacc |> s |> n |> alp |> "(" |> ps |> arp |> ")" |> b
 

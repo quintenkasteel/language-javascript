@@ -354,6 +354,8 @@ data JSExpression
   | JSUnaryExpression !JSUnaryOp !JSExpression
   | -- | identifier, initializer
     JSVarInitExpression !JSExpression !JSVarInitializer
+  | -- | parameter with optional default value
+    JSParameterExpression !JSExpression !JSVarInitializer
   | -- | yield, optional expr
     JSYieldExpression !JSAnnot !(Maybe JSExpression)
   | -- | yield, *, expr
@@ -481,6 +483,8 @@ data JSMethodDefinition
   = JSMethodDefinition !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- name, lb, params, rb, block
   | -- | *, name, lb, params, rb, block
     JSGeneratorMethodDefinition !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
+  | -- | async, name, lb, params, rb, block
+    JSAsyncMethodDefinition !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   | -- | get/set, name, lb, params, rb, block
     JSPropertyAccessor !JSAccessor !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
@@ -655,6 +659,7 @@ instance ShowStripped JSExpression where
   ss (JSStringLiteral _ s) = "JSStringLiteral " <> s
   ss (JSUnaryExpression op x) = "JSUnaryExpression (" <> (ss op <> ("," <> (ss x <> ")")))
   ss (JSVarInitExpression x1 x2) = "JSVarInitExpression (" <> (ss x1 <> (") " <> ss x2))
+  ss (JSParameterExpression x1 x2) = "JSParameterExpression (" <> (ss x1 <> (") " <> ss x2))
   ss (JSYieldExpression _ Nothing) = "JSYieldExpression ()"
   ss (JSYieldExpression _ (Just x)) = "JSYieldExpression (" <> (ss x <> ")")
   ss (JSYieldFromExpression _ _ x) = "JSYieldFromExpression (" <> (ss x <> ")")
@@ -741,6 +746,7 @@ instance ShowStripped JSObjectProperty where
 
 instance ShowStripped JSMethodDefinition where
   ss (JSMethodDefinition x1 _lb1 x2s _rb1 x3) = "JSMethodDefinition (" <> (ss x1 <> (") " <> (ss x2s <> (" (" <> (ss x3 <> ")")))))
+  ss (JSAsyncMethodDefinition _ x1 _lb1 x2s _rb1 x3) = "JSAsyncMethodDefinition (" <> (ss x1 <> (") " <> (ss x2s <> (" (" <> (ss x3 <> ")")))))
   ss (JSPropertyAccessor s x1 _lb1 x2s _rb1 x3) = "JSPropertyAccessor " <> (ss s <> (" (" <> (ss x1 <> (") " <> (ss x2s <> (" (" ++ ss x3 ++ ")"))))))
   ss (JSGeneratorMethodDefinition _ x1 _lb1 x2s _rb1 x3) = "JSGeneratorMethodDefinition (" <> (ss x1 <> (") " <> (ss x2s <> (" (" <> (ss x3 <> ")")))))
 

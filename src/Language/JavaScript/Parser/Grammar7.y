@@ -650,6 +650,12 @@ MethodDefinition : PropertyName LParen RParen FunctionBody
                      { AST.JSMethodDefinition $1 $2 $3 $4 $5 }
                  | PropertyName LParen FormalParameterList Comma RParen FunctionBody
                      { AST.JSMethodDefinition $1 $2 $3 $5 $6 }
+                 | Async PropertyName LParen RParen FunctionBody
+                     { AST.JSAsyncMethodDefinition $1 $2 $3 AST.JSLNil $4 $5 }
+                 | Async PropertyName LParen FormalParameterList RParen FunctionBody
+                     { AST.JSAsyncMethodDefinition $1 $2 $3 $4 $5 $6 }
+                 | Async PropertyName LParen FormalParameterList Comma RParen FunctionBody
+                     { AST.JSAsyncMethodDefinition $1 $2 $3 $4 $6 $7 }
                  | '*' PropertyName LParen RParen FunctionBody
                      { AST.JSGeneratorMethodDefinition (mkJSAnnot $1) $2 $3 AST.JSLNil $4 $5 }
                  | '*' PropertyName LParen FormalParameterList RParen FunctionBody
@@ -1409,6 +1415,8 @@ IdentifierOpt : Identifier { identName $1     {- 'IdentifierOpt1' -} }
 FormalParameterList :: { AST.JSCommaList AST.JSExpression }
 FormalParameterList : AssignmentExpression                           { AST.JSLOne $1         {- 'FormalParameterList1' -} }
                     | FormalParameterList Comma AssignmentExpression { AST.JSLCons $1 $2 $3  {- 'FormalParameterList2' -} }
+                    | Identifier '=' AssignmentExpression         { AST.JSLOne (AST.JSParameterExpression $1 (AST.JSVarInit (mkJSAnnot $2) $3)) {- 'FormalParameterList3' -} }
+                    | FormalParameterList Comma Identifier '=' AssignmentExpression { AST.JSLCons $1 $2 (AST.JSParameterExpression $3 (AST.JSVarInit (mkJSAnnot $4) $5)) {- 'FormalParameterList4' -} }
 
 -- FunctionBody :                                                             See clause 13
 --        SourceElementsopt
