@@ -903,13 +903,14 @@ parseJSDocContent pos content =
           | Text.null remaining =
               if Text.null current then acc else acc ++ [Text.strip current]
           | otherwise =
-              let (char, rest') = (Text.head remaining, Text.tail remaining)
-              in case char of
-                '<' -> splitCommaBalanced rest' (depth + 1) acc (current <> Text.singleton char)
-                '>' -> splitCommaBalanced rest' (depth - 1) acc (current <> Text.singleton char)
-                ',' | depth == 0 ->
-                  splitCommaBalanced rest' depth (acc ++ [Text.strip current]) ""
-                _ -> splitCommaBalanced rest' depth acc (current <> Text.singleton char)
+              case Text.uncons remaining of
+                Nothing -> if Text.null current then acc else acc ++ [Text.strip current]
+                Just (char, rest') -> case char of
+                  '<' -> splitCommaBalanced rest' (depth + 1) acc (current <> Text.singleton char)
+                  '>' -> splitCommaBalanced rest' (depth - 1) acc (current <> Text.singleton char)
+                  ',' | depth == 0 ->
+                    splitCommaBalanced rest' depth (acc ++ [Text.strip current]) ""
+                  _ -> splitCommaBalanced rest' depth acc (current <> Text.singleton char)
 
     parseFunctionType :: Text -> Maybe JSDocType
     parseFunctionType text =
@@ -950,13 +951,14 @@ parseJSDocContent pos content =
           | Text.null remaining =
               if Text.null current then acc else acc ++ [Text.strip current]
           | otherwise =
-              let (char, rest') = (Text.head remaining, Text.tail remaining)
-              in case char of
-                '{' -> splitCommaBalanced rest' (depth + 1) acc (current <> Text.singleton char)
-                '}' -> splitCommaBalanced rest' (depth - 1) acc (current <> Text.singleton char)
-                ',' | depth == 0 ->
-                  splitCommaBalanced rest' depth (acc ++ [Text.strip current]) ""
-                _ -> splitCommaBalanced rest' depth acc (current <> Text.singleton char)
+              case Text.uncons remaining of
+                Nothing -> if Text.null current then acc else acc ++ [Text.strip current]
+                Just (char, rest') -> case char of
+                  '{' -> splitCommaBalanced rest' (depth + 1) acc (current <> Text.singleton char)
+                  '}' -> splitCommaBalanced rest' (depth - 1) acc (current <> Text.singleton char)
+                  ',' | depth == 0 ->
+                    splitCommaBalanced rest' depth (acc ++ [Text.strip current]) ""
+                  _ -> splitCommaBalanced rest' depth acc (current <> Text.singleton char)
 
     parseObjectField :: Text -> Maybe JSDocObjectField
     parseObjectField text =

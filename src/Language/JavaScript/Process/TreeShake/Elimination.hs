@@ -341,11 +341,16 @@ isControlFlowStatement stmt = case stmt of
   JSForConst {} -> True
   JSForConstIn {} -> True
   JSForConstOf {} -> True
+  JSForAwaitOf {} -> True
+  JSForAwaitVarOf {} -> True
+  JSForAwaitLetOf {} -> True
+  JSForAwaitConstOf {} -> True
   JSWhile {} -> True
   JSDoWhile {} -> True
   JSTry {} -> True
   JSSwitch {} -> True
   JSWith {} -> True
+  JSDebugger {} -> True
   JSReturn {} -> True
   JSThrow {} -> True
   JSBreak {} -> True

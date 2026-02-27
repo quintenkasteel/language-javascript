@@ -357,8 +357,8 @@ testInvalidClasses = describe "Invalid classes" $ do
     "class 123" `shouldFailToParse` "Should reject numeric class name"
 
   it "rejects invalid class methods" $ do
-    "class C { constructor }" `shouldFailToParse` "Should reject constructor without parens"
-    "class C { method }" `shouldFailToParse` "Should reject method without parens/body"
+    "class C { constructor() }" `shouldFailToParse` "Should reject constructor without body"
+    "class C { method( }" `shouldFailToParse` "Should reject method with unclosed parens"
 
 -- Note: "class C { 123() {} }" is valid ES6+ syntax (computed property names)
 

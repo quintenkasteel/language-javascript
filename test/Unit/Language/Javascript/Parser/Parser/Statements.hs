@@ -338,35 +338,22 @@ testStatementParser = describe "Parse statements:" $ do
     -- Static computed property setter
     testStmt "class Bar { static set [key](value) {} }" `shouldBe` "Right (JSAstStatement (JSClass 'Bar' () [JSClassStaticMethod (JSPropertyAccessor JSAccessorSet (JSPropertyComputed (JSIdentifier 'key')) (JSIdentifier 'value') (JSBlock []))]))"
 
-  it "static class features - current limitations" $ do
-    -- Note: Static field declarations are not yet supported by the parser
-    -- These tests document the existing limitations for future implementation
+  it "static class fields and blocks (ES2022)" $ do
     case testStatement "class Test { static field = 42; }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "SimpleAssignToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for static field, got: " ++ show result)
-    case testStatement "class Demo { static x = 1, y = 2; }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "SimpleAssignToken" `isInfixOf` msg || "CommaToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for static field, got: " ++ show result)
-    case testStatement "class Example { static #privateField = 'secret'; }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "PrivateNameToken" `isInfixOf` msg || "SimpleAssignToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for private field, got: " ++ show result)
-
-    -- Note: Static initialization blocks are not yet supported
+      Right (JSAstStatement (JSClass {}) _) -> pure ()
+      result -> expectationFailure ("Expected static field to parse, got: " ++ show result)
     case testStatement "class Init { static { console.log('initialization'); } }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "LeftCurlyToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for static block, got: " ++ show result)
+      Right (JSAstStatement (JSClass {}) _) -> pure ()
+      result -> expectationFailure ("Expected static block to parse, got: " ++ show result)
     case testStatement "class Complex { static { this.computed = this.a + this.b; } }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "LeftCurlyToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for static block, got: " ++ show result)
-
-    -- Note: Static async methods are now supported
+      Right (JSAstStatement (JSClass {}) _) -> pure ()
+      result -> expectationFailure ("Expected static block to parse, got: " ++ show result)
     case testStatement "class API { static async fetch() { return await response; } }" of
-      Right (JSAstStatement (JSClass {}) _) -> pure ()  -- Now expects success
-      Left err -> expectationFailure ("Static async method should parse successfully, got error: " ++ show err)
-      Right result -> expectationFailure ("Expected class with static async method, got: " ++ show result)
+      Right (JSAstStatement (JSClass {}) _) -> pure ()
+      result -> expectationFailure ("Expected static async method to parse, got: " ++ show result)
     case testStatement "class Service { static async *generator() { yield await data; } }" of
-      Left err -> err `shouldSatisfy` (\msg -> "lexical error" `isInfixOf` msg || "IdentifierToken" `isInfixOf` msg || "MulToken" `isInfixOf` msg)
-      Right result -> expectationFailure ("Expected parse error for static async generator, got: " ++ show result)
+      Right (JSAstStatement (JSClass {}) _) -> pure ()
+      result -> expectationFailure ("Expected static async generator to parse, got: " ++ show result)
 
 -- | Original function for existing string-based tests
 testStmt :: String -> String

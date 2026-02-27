@@ -3,6 +3,8 @@ module Language.JavaScript.Parser
     PA.parseModule,
     PA.readJs,
     PA.readJsModule,
+    PA.readJsSafe,
+    PA.readJsModuleSafe,
     PA.parseFile,
     PA.parseFileUtf8,
     PA.showStripped,

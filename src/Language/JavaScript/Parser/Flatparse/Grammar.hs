@@ -128,8 +128,9 @@ fpPosToAnnot :: FP.Pos -> JSAnnot
 fpPosToAnnot fpPos = JSAnnot (TokenPn (FP.unPos fpPos) 0 0) []
 
 -- | Default annotation for generated nodes (no position information).
+-- Uses -1 as sentinel to distinguish from real positions at offset 0.
 defaultAnnot :: JSAnnot
-defaultAnnot = JSAnnot (TokenPn 0 0 0) []
+defaultAnnot = JSAnnot (TokenPn (-1) 0 0) []
 
 -- | Default semicolon.
 defaultSemi :: JSSemi
@@ -224,7 +225,7 @@ parseAnnotCommaList item = do
         Just commaA -> do
           whitespace
           next <- item
-          commaLoop firstItem (acc <> [(commaA, next)])
+          commaLoop firstItem ((commaA, next) : acc)
 
 -- | Parse comma-separated list with optional trailing comma, returning
 -- the list and trailing comma annotation if present.
@@ -245,7 +246,13 @@ parseAnnotCommaListTrailing item = do
           mNext <- FP.optional item
           case mNext of
             Nothing -> pure (listToAnnotCommaList firstItem (reverse acc), Just commaA)
-            Just next -> commaLoop firstItem (acc <> [(commaA, next)])
+            Just next -> commaLoop firstItem ((commaA, next) : acc)
+
+-- | Parse comma-separated list with optional trailing comma, discarding
+-- the trailing comma annotation. Useful for parameter lists where the AST
+-- does not store a trailing comma.
+parseAnnotCommaListDropTrailing :: JSParser a -> JSParser (JSCommaList a)
+parseAnnotCommaListDropTrailing item = fst <$> parseAnnotCommaListTrailing item
 
 -- | Convert list to JSCommaTrailingList.
 listToCommaTrailingList :: [a] -> JSCommaTrailingList a
@@ -431,7 +438,7 @@ commaExpression = do
 -- | Parse assignment expression or arrow function.
 assignmentExpression :: JSParser JSExpression
 assignmentExpression =
-  arrowFunction FP.<|> yieldExpr FP.<|> normalAssignment
+  asyncArrowFunction FP.<|> arrowFunction FP.<|> yieldExpr FP.<|> normalAssignment
   where
     normalAssignment = do
       left <- conditionalExpression
@@ -444,6 +451,46 @@ assignmentExpression =
           right <- assignmentExpression
           pure (JSAssignExpression left op right)
 
+-- | Parse async arrow function: @async (params) => body@ or @async x => body@
+asyncArrowFunction :: JSParser JSExpression
+asyncArrowFunction = asyncParenArrow FP.<|> asyncSingleParamArrow
+
+-- | Async arrow with parenthesized params: @async (a, b) => body@
+asyncParenArrow :: JSParser JSExpression
+asyncParenArrow = do
+  asyncPos <- FP.getPos
+  keyword "async"
+  whitespace
+  pos <- FP.getPos
+  parseChar '('
+  whitespace
+  paramList <- parseAnnotCommaListDropTrailing arrowParam
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  arrowA <- parseStringAnnot "=>"
+  whitespace
+  body <- arrowBody
+  pure (JSAsyncArrowExpression (fpPosToAnnot asyncPos)
+    (JSParenthesizedArrowParameterList (fpPosToAnnot pos) paramList rp)
+    arrowA body)
+
+-- | Async arrow with single param: @async x => body@
+asyncSingleParamArrow :: JSParser JSExpression
+asyncSingleParamArrow = do
+  asyncPos <- FP.getPos
+  keyword "async"
+  whitespace
+  pos <- FP.getPos
+  name <- identifier
+  whitespace
+  arrowA <- parseStringAnnot "=>"
+  whitespace
+  body <- arrowBody
+  pure (JSAsyncArrowExpression (fpPosToAnnot asyncPos)
+    (JSUnparenthesizedArrowParameter (JSIdentName (fpPosToAnnot pos) (Text.unpack name)))
+    arrowA body)
+
 -- | Parse arrow function: @(params) => body@ or @x => body@
 arrowFunction :: JSParser JSExpression
 arrowFunction = parenArrow FP.<|> singleParamArrow
@@ -454,7 +501,7 @@ parenArrow = do
   pos <- FP.getPos
   parseChar '('
   whitespace
-  paramList <- parseAnnotCommaList arrowParam
+  paramList <- parseAnnotCommaListDropTrailing arrowParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -899,7 +946,7 @@ optionalChainAccess expr = do
     optCall e p = do
       parseChar '('
       whitespace
-      argList <- parseAnnotCommaList assignmentExpression
+      argList <- parseAnnotCommaListDropTrailing assignmentExpression
       whitespace
       rp <- parseCharAnnot ')'
       pure (JSOptionalCallExpression e (fpPosToAnnot p) argList rp)
@@ -961,7 +1008,7 @@ argumentListAnnot :: JSParser (JSCommaList JSExpression, JSAnnot)
 argumentListAnnot = do
   parseChar '('
   whitespace
-  argList <- parseAnnotCommaList assignmentExpression
+  argList <- parseAnnotCommaListDropTrailing assignmentExpression
   whitespace
   rp <- parseCharAnnot ')'
   pure (argList, rp)
@@ -971,7 +1018,7 @@ argumentListAnnotFull :: JSParser (JSAnnot, JSCommaList JSExpression, JSAnnot)
 argumentListAnnotFull = do
   lp <- parseCharAnnot '('
   whitespace
-  argList <- parseAnnotCommaList assignmentExpression
+  argList <- parseAnnotCommaListDropTrailing assignmentExpression
   whitespace
   rp <- parseCharAnnot ')'
   pure (lp, argList, rp)
@@ -996,6 +1043,7 @@ primaryExpression =
   templateLiteral FP.<|>
   spreadExpression FP.<|>
   importExpression FP.<|>
+  asyncGeneratorExpr FP.<|>
   asyncFunctionExpr FP.<|>
   generatorExpression FP.<|>
   functionExpression FP.<|>
@@ -1201,7 +1249,7 @@ functionExpression = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1210,6 +1258,28 @@ functionExpression = do
   pure (JSFunctionExpression (fpPosToAnnot pos) ident lp paramList rp body)
 
 -- | Parse async function expression: @async function name(params) { body }@
+-- | Parse async generator expression: @async function* name(params) { body }@
+asyncGeneratorExpr :: JSParser JSExpression
+asyncGeneratorExpr = do
+  pos <- FP.getPos
+  keyword "async"
+  whitespace
+  funcAnnot <- keywordAnnot "function"
+  whitespace
+  star <- parseCharAnnot '*'
+  whitespace
+  name <- FP.optional identName
+  whitespace
+  lp <- parseCharAnnot '('
+  whitespace
+  paramList <- parseAnnotCommaListDropTrailing functionParam
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  body <- blockBody
+  let ident = maybe JSIdentNone id name
+  pure (JSAsyncGeneratorExpression (fpPosToAnnot pos) funcAnnot star ident lp paramList rp body)
+
 asyncFunctionExpr :: JSParser JSExpression
 asyncFunctionExpr = do
   pos <- FP.getPos
@@ -1221,7 +1291,7 @@ asyncFunctionExpr = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1241,7 +1311,7 @@ generatorExpression = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1377,7 +1447,7 @@ methodProp = generatorMethod FP.<|> asyncMethod FP.<|> regularMethod
       whitespace
       lp <- parseCharAnnot '('
       whitespace
-      paramList <- parseAnnotCommaList functionParam
+      paramList <- parseAnnotCommaListDropTrailing functionParam
       whitespace
       rp <- parseCharAnnot ')'
       whitespace
@@ -1391,7 +1461,7 @@ methodProp = generatorMethod FP.<|> asyncMethod FP.<|> regularMethod
       whitespace
       lp <- parseCharAnnot '('
       whitespace
-      paramList <- parseAnnotCommaList functionParam
+      paramList <- parseAnnotCommaListDropTrailing functionParam
       whitespace
       rp <- parseCharAnnot ')'
       whitespace
@@ -1402,7 +1472,7 @@ methodProp = generatorMethod FP.<|> asyncMethod FP.<|> regularMethod
       whitespace
       lp <- parseCharAnnot '('
       whitespace
-      paramList <- parseAnnotCommaList functionParam
+      paramList <- parseAnnotCommaListDropTrailing functionParam
       whitespace
       rp <- parseCharAnnot ')'
       whitespace
@@ -1420,7 +1490,7 @@ accessorProp = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1481,9 +1551,19 @@ classElement = do
       pos <- FP.getPos
       keyword "static"
       whitespace
+      staticBlock pos FP.<|> FP.try (staticMethod pos) FP.<|> staticField pos
+    staticBlock pos = do
+      body <- blockBody
+      pure (JSClassStaticBlock (fpPosToAnnot pos) body)
+    staticField pos = do
+      name <- propertyName
+      whitespace
+      (eq, initExpr, semi) <- fieldInitializer
+      pure (JSClassStaticField (fpPosToAnnot pos) name eq initExpr semi)
+    staticMethod pos = do
       method <- classMethodDef
       pure (JSClassStaticMethod (fpPosToAnnot pos) method)
-    privateElement = privateMethod FP.<|> privateAccessor FP.<|> privateField
+    privateElement = FP.try privateMethod FP.<|> privateAccessor FP.<|> privateField
     privateField = do
       pos <- FP.getPos
       parseChar '#'
@@ -1499,7 +1579,7 @@ classElement = do
       whitespace
       lp <- parseCharAnnot '('
       whitespace
-      paramList <- parseAnnotCommaList functionParam
+      paramList <- parseAnnotCommaListDropTrailing functionParam
       whitespace
       rp <- parseCharAnnot ')'
       whitespace
@@ -1528,15 +1608,48 @@ classElement = do
       whitespace
       lp <- parseCharAnnot '('
       whitespace
-      paramList <- parseAnnotCommaList functionParam
+      paramList <- parseAnnotCommaListDropTrailing functionParam
       whitespace
       rp <- parseCharAnnot ')'
       whitespace
       body <- blockBody
       pure (JSPrivateAccessor (JSAccessorSet (fpPosToAnnot pos)) (fpPosToAnnot pos) (Text.unpack name) lp paramList rp body)
-    instanceElement = do
+    instanceElement = asyncGeneratorMethod FP.<|> FP.try instanceMethod FP.<|> publicField
+    asyncGeneratorMethod = do
+      pos <- FP.getPos
+      keyword "async"
+      whitespace
+      star <- parseCharAnnot '*'
+      whitespace
+      name <- propertyName
+      whitespace
+      lp <- parseCharAnnot '('
+      whitespace
+      paramList <- parseAnnotCommaListDropTrailing functionParam
+      whitespace
+      rp <- parseCharAnnot ')'
+      whitespace
+      body <- blockBody
+      pure (JSAsyncGeneratorMethodDefinition (fpPosToAnnot pos) star name lp paramList rp body)
+    publicField = do
+      name <- propertyName
+      whitespace
+      (eq, initExpr, semi) <- fieldInitializer
+      pure (JSClassField name eq initExpr semi)
+    instanceMethod = do
       method <- classMethodDef
       pure (JSClassInstanceMethod method)
+    fieldInitializer =
+      fieldWithInit FP.<|> fieldWithoutInit
+    fieldWithInit = do
+      eq <- parseCharAnnot '='
+      whitespace
+      val <- assignmentExpression
+      semi <- expectStatementEnd
+      pure (eq, Just val, semi)
+    fieldWithoutInit = do
+      semi <- expectStatementEnd
+      pure (defaultAnnot, Nothing, semi)
 
 -- | Parse class method definition.
 classMethodDef :: JSParser JSMethodDefinition
@@ -1553,7 +1666,7 @@ regularMethodDef = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1574,7 +1687,7 @@ generatorMethodDef = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1591,7 +1704,7 @@ asyncMethodDef = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1609,7 +1722,7 @@ accessorMethodDef = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -1627,6 +1740,7 @@ statement = do
   blockStatement FP.<|>
     emptyStatement FP.<|>
     variableDeclaration FP.<|>
+    asyncGeneratorDecl FP.<|>
     asyncFunctionDecl FP.<|>
     generatorDecl FP.<|>
     functionDeclaration FP.<|>
@@ -1642,6 +1756,7 @@ statement = do
     breakStatement FP.<|>
     continueStatement FP.<|>
     throwStatement FP.<|>
+    debuggerStatement FP.<|>
     labeledStatement FP.<|>
     expressionStatement
 
@@ -1817,12 +1932,41 @@ doWhileStatement = do
 -- | Parse for statement (all variants).
 -- Handles: for, for-in, for-of, for-var, for-let, for-const variants.
 forStatement :: JSParser JSStatement
-forStatement = do
+forStatement = forAwaitStatement FP.<|> forRegularStatement
+
+-- | Parse for-await statement: @for await (... of ...) body@
+forAwaitStatement :: JSParser JSStatement
+forAwaitStatement = do
+  pos <- FP.getPos
+  keyword "for"
+  whitespace
+  awaitA <- keywordAnnot "await"
+  whitespace
+  lp <- parseCharAnnot '('
+  whitespace
+  forAwaitBody pos awaitA lp
+
+-- | Parse regular for statement (no await).
+forRegularStatement :: JSParser JSStatement
+forRegularStatement = do
   pos <- FP.getPos
   keyword "for"
   whitespace
   lp <- parseCharAnnot '('
   whitespace
+  forNormalBody pos lp
+
+-- | Parse for-await-of variants: @for await (const x of iter) body@
+forAwaitBody :: FP.Pos -> JSAnnot -> JSAnnot -> JSParser JSStatement
+forAwaitBody pos awaitA lp =
+  forAwaitVarOf pos awaitA lp FP.<|>
+  forAwaitLetOf pos awaitA lp FP.<|>
+  forAwaitConstOf pos awaitA lp FP.<|>
+  forAwaitOf pos awaitA lp
+
+-- | Parse regular for loop variants (no await).
+forNormalBody :: FP.Pos -> JSAnnot -> JSParser JSStatement
+forNormalBody pos lp =
   forVarIn pos lp FP.<|>
     forVarOf pos lp FP.<|>
     forVar pos lp FP.<|>
@@ -1883,6 +2027,68 @@ forOf pos lp = do
   whitespace
   body <- statement
   pure (JSForOf (fpPosToAnnot pos) lp expr (JSBinOpOf ofA) iter rp body)
+
+-- | For-await-of: @for await (expr of iter) body@
+forAwaitOf :: FP.Pos -> JSAnnot -> JSAnnot -> JSParser JSStatement
+forAwaitOf pos awaitA lp = do
+  expr <- callMemberExpression
+  whitespace
+  ofA <- contextualKeywordAnnot "of"
+  whitespace
+  iter <- assignmentExpression
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  body <- statement
+  pure (JSForAwaitOf (fpPosToAnnot pos) awaitA lp expr (JSBinOpOf ofA) iter rp body)
+
+-- | For-await-var-of: @for await (var x of iter) body@
+forAwaitVarOf :: FP.Pos -> JSAnnot -> JSAnnot -> JSParser JSStatement
+forAwaitVarOf pos awaitA lp = do
+  varA <- keywordAnnot "var"
+  whitespace
+  expr <- callMemberExpression
+  whitespace
+  ofA <- contextualKeywordAnnot "of"
+  whitespace
+  iter <- assignmentExpression
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  body <- statement
+  pure (JSForAwaitVarOf (fpPosToAnnot pos) awaitA lp varA expr (JSBinOpOf ofA) iter rp body)
+
+-- | For-await-let-of: @for await (let x of iter) body@
+forAwaitLetOf :: FP.Pos -> JSAnnot -> JSAnnot -> JSParser JSStatement
+forAwaitLetOf pos awaitA lp = do
+  letA <- keywordAnnot "let"
+  whitespace
+  expr <- callMemberExpression
+  whitespace
+  ofA <- contextualKeywordAnnot "of"
+  whitespace
+  iter <- assignmentExpression
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  body <- statement
+  pure (JSForAwaitLetOf (fpPosToAnnot pos) awaitA lp letA expr (JSBinOpOf ofA) iter rp body)
+
+-- | For-await-const-of: @for await (const x of iter) body@
+forAwaitConstOf :: FP.Pos -> JSAnnot -> JSAnnot -> JSParser JSStatement
+forAwaitConstOf pos awaitA lp = do
+  constA <- keywordAnnot "const"
+  whitespace
+  expr <- callMemberExpression
+  whitespace
+  ofA <- contextualKeywordAnnot "of"
+  whitespace
+  iter <- assignmentExpression
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  body <- statement
+  pure (JSForAwaitConstOf (fpPosToAnnot pos) awaitA lp constA expr (JSBinOpOf ofA) iter rp body)
 
 -- | For-var standard: @for (var decls; test; update) body@
 forVar :: FP.Pos -> JSAnnot -> JSParser JSStatement
@@ -2180,6 +2386,14 @@ throwStatement = do
   semi <- expectStatementEnd
   pure (JSThrow (fpPosToAnnot pos) expr semi)
 
+-- | Parse debugger statement: @debugger;@
+debuggerStatement :: JSParser JSStatement
+debuggerStatement = do
+  pos <- FP.getPos
+  keyword "debugger"
+  semi <- expectStatementEnd
+  pure (JSDebugger (fpPosToAnnot pos) semi)
+
 -- ---------------------------------------------------------------------
 -- Function and Class Declarations
 -- ---------------------------------------------------------------------
@@ -2194,13 +2408,34 @@ functionDeclaration = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
   body <- blockBody
   semi <- expectStatementEnd
   pure (JSFunction (fpPosToAnnot pos) name lp (paramList) rp body semi)
+
+-- | Parse async generator declaration: @async function* name(params) { body }@
+asyncGeneratorDecl :: JSParser JSStatement
+asyncGeneratorDecl = do
+  pos <- FP.getPos
+  keyword "async"
+  whitespace
+  funcAnnot <- keywordAnnot "function"
+  whitespace
+  star <- parseCharAnnot '*'
+  whitespace
+  name <- identName
+  whitespace
+  lp <- parseCharAnnot '('
+  whitespace
+  paramList <- parseAnnotCommaListDropTrailing functionParam
+  whitespace
+  rp <- parseCharAnnot ')'
+  whitespace
+  body <- blockBody
+  pure (JSAsyncGenerator (fpPosToAnnot pos) funcAnnot star name lp paramList rp body defaultSemi)
 
 -- | Parse async function declaration: @async function name(params) { body }@
 asyncFunctionDecl :: JSParser JSStatement
@@ -2214,7 +2449,7 @@ asyncFunctionDecl = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -2233,7 +2468,7 @@ generatorDecl = do
   whitespace
   lp <- parseCharAnnot '('
   whitespace
-  paramList <- parseAnnotCommaList functionParam
+  paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
   rp <- parseCharAnnot ')'
   whitespace
@@ -2308,13 +2543,18 @@ catchClause = do
     catchSimple ca = do
       lp <- parseCharAnnot '('
       whitespace
-      pPos <- FP.getPos
-      p <- identifier
+      param <- catchParam
       whitespace
       rp <- parseCharAnnot ')'
       whitespace
       body <- blockBody
-      pure (JSCatch ca lp (JSIdentifier (fpPosToAnnot pPos) (Text.unpack p)) rp body)
+      pure (JSCatch ca lp param rp body)
+    catchParam =
+      arrayLiteral FP.<|> objectLiteral FP.<|> catchIdentifier
+    catchIdentifier = do
+      pPos <- FP.getPos
+      p <- identifier
+      pure (JSIdentifier (fpPosToAnnot pPos) (Text.unpack p))
     catchNoParam ca = do
       body <- blockBody
       pure (JSCatch ca defaultAnnot (JSIdentifier defaultAnnot "e") defaultAnnot body)

@@ -91,6 +91,8 @@ instance RenderJS JSExpression where
   (|>) pacc (JSExpressionTernary cond h v1 c v2) = pacc |> cond |> h |> "?" |> v1 |> c |> ":" |> v2
   (|>) pacc (JSFunctionExpression annot n lb x2s rb x3) = pacc |> annot |> "function" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
   (|>) pacc (JSAsyncFunctionExpression async function n lb x2s rb x3) = pacc |> async |> "async" |> function |> "function" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
+  (|>) pacc (JSAsyncArrowExpression async ps arrow body) = pacc |> async |> "async" |> ps |> arrow |> "=>" |> body
+  (|>) pacc (JSAsyncGeneratorExpression async function star n lb x2s rb x3) = pacc |> async |> "async" |> function |> "function" |> star |> "*" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
   (|>) pacc (JSGeneratorExpression annot s n lb x2s rb x3) = pacc |> annot |> "function" |> s |> "*" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
   (|>) pacc (JSMemberDot xs dot n) = pacc |> xs |> "." |> dot |> n
   (|>) pacc (JSMemberExpression e lb a rb) = pacc |> e |> lb |> "(" |> a |> rb |> ")"
@@ -273,6 +275,12 @@ instance RenderJS JSStatement where
   (|>) pacc (JSVariable annot xs s) = pacc |> annot |> "var" |> xs |> s
   (|>) pacc (JSWhile annot alp x1 arp x2) = pacc |> annot |> "while" |> alp |> "(" |> x1 |> arp |> ")" |> x2
   (|>) pacc (JSWith annot alp x1 arp x s) = pacc |> annot |> "with" |> alp |> "(" |> x1 |> arp |> ")" |> x |> s
+  (|>) pacc (JSDebugger annot s) = pacc |> annot |> "debugger" |> s
+  (|>) pacc (JSAsyncGenerator aa af as n alb x2s arb x3 s) = pacc |> aa |> "async" |> af |> "function" |> as |> "*" |> n |> alb |> "(" |> x2s |> arb |> ")" |> x3 |> s
+  (|>) pacc (JSForAwaitOf af aw alb x1 i x2 arb x3) = pacc |> af |> "for" |> aw |> "await" |> alb |> "(" |> x1 |> i |> x2 |> arb |> ")" |> x3
+  (|>) pacc (JSForAwaitVarOf af aw alb v x1 i x2 arb x3) = pacc |> af |> "for" |> aw |> "await" |> alb |> "(" |> "var" |> v |> x1 |> i |> x2 |> arb |> ")" |> x3
+  (|>) pacc (JSForAwaitLetOf af aw alb v x1 i x2 arb x3) = pacc |> af |> "for" |> aw |> "await" |> alb |> "(" |> "let" |> v |> x1 |> i |> x2 |> arb |> ")" |> x3
+  (|>) pacc (JSForAwaitConstOf af aw alb v x1 i x2 arb x3) = pacc |> af |> "for" |> aw |> "await" |> alb |> "(" |> "const" |> v |> x1 |> i |> x2 |> arb |> ")" |> x3
 
 instance RenderJS [JSStatement] where
   (|>) = foldl' (|>)
@@ -409,5 +417,11 @@ instance RenderJS JSClassElement where
   (|>) pacc (JSPrivateField a name eq (Just initializer) s) = pacc |> a |> "#" |> name |> eq |> "=" |> initializer |> s
   (|>) pacc (JSPrivateMethod a name lp params rp block) = pacc |> a |> "#" |> name |> lp |> params |> rp |> block
   (|>) pacc (JSPrivateAccessor accessor a name lp params rp block) = pacc |> accessor |> a |> "#" |> name |> lp |> params |> rp |> block
+  (|>) pacc (JSClassField name eq Nothing s) = pacc |> name |> s
+  (|>) pacc (JSClassField name eq (Just initializer) s) = pacc |> name |> eq |> "=" |> initializer |> s
+  (|>) pacc (JSClassStaticField sa name eq Nothing s) = pacc |> sa |> "static" |> name |> s
+  (|>) pacc (JSClassStaticField sa name eq (Just initializer) s) = pacc |> sa |> "static" |> name |> eq |> "=" |> initializer |> s
+  (|>) pacc (JSClassStaticBlock sa block) = pacc |> sa |> "static" |> block
+  (|>) pacc (JSAsyncGeneratorMethodDefinition async star name lp params rp block) = pacc |> async |> "async" |> star |> "*" |> name |> lp |> "(" |> params |> rp |> ")" |> block
 
 -- EOF

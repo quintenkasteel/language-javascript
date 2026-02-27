@@ -27,7 +27,8 @@ module Language.JavaScript.Parser.Parser
     parseModule,
     readJs,
     readJsModule,
-    -- , readJsKeepComments
+    readJsSafe,
+    readJsModuleSafe,
     parseFile,
     parseFileUtf8,
 
@@ -112,39 +113,53 @@ parseFlatparse input =
     FlatParser.ParseError failure ->
       Left (show (FlatParser.parseError failure))
 
-readJsWith ::
-  (String -> String -> Either String AST.JSAST) ->
-  String ->
-  AST.JSAST
-readJsWith f input =
-  case f input "src" of
-    Left msg -> error (show msg)
-    Right p -> p
+-- | Parse JavaScript source, returning the raw AST or an error string.
+--
+-- This is the safe variant of 'readJs' that returns structured errors
+-- instead of throwing exceptions on parse failure.
+readJsSafe :: String -> Either String AST.JSAST
+readJsSafe input = parse input "src"
 
+-- | Parse a JavaScript module, returning the raw AST or an error string.
+--
+-- This is the safe variant of 'readJsModule' that returns structured errors
+-- instead of throwing exceptions on parse failure.
+readJsModuleSafe :: String -> Either String AST.JSAST
+readJsModuleSafe input = parseModule input "src"
+
+-- | Parse JavaScript and return the AST directly.
+--
+-- __Warning:__ This function throws an exception on parse failure.
+-- Prefer 'readJsSafe' for production use.
+{-# WARNING readJs "Partial function: crashes on parse failure. Use readJsSafe instead." #-}
 readJs :: String -> AST.JSAST
-readJs = readJsWith parse
+readJs input = either (error . show) id (readJsSafe input)
 
+-- | Parse a JavaScript module and return the AST directly.
+--
+-- __Warning:__ This function throws an exception on parse failure.
+-- Prefer 'readJsModuleSafe' for production use.
+{-# WARNING readJsModule "Partial function: crashes on parse failure. Use readJsModuleSafe instead." #-}
 readJsModule :: String -> AST.JSAST
-readJsModule = readJsWith parseModule
+readJsModule input = either (error . show) id (readJsModuleSafe input)
 
 -- | Parse the given file.
+--
 -- For UTF-8 support, make sure your locale is set such that
--- "System.IO.localeEncoding" returns "utf8"
+-- "System.IO.localeEncoding" returns "utf8".
 parseFile :: FilePath -> IO AST.JSAST
-parseFile filename =
-  do
-    x <- readFile filename
-    return $ readJs x
+parseFile filename = do
+  x <- readFile filename
+  either fail pure (readJsSafe x)
 
 -- | Parse the given file, explicitly setting the encoding to UTF8
--- when reading it
+-- when reading it.
 parseFileUtf8 :: FilePath -> IO AST.JSAST
-parseFileUtf8 filename =
-  do
-    h <- openFile filename ReadMode
-    hSetEncoding h utf8
-    x <- hGetContents h
-    return $ readJs x
+parseFileUtf8 filename = do
+  h <- openFile filename ReadMode
+  hSetEncoding h utf8
+  x <- hGetContents h
+  either fail pure (readJsSafe x)
 
 showStripped :: AST.JSAST -> String
 showStripped = AST.showStripped

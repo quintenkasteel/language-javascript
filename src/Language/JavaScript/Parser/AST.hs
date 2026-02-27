@@ -289,6 +289,18 @@ data JSStatement
     JSWhile !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSStatement
   | -- | with,lb,expr,rb,stmt list
     JSWith !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSStatement !JSSemi
+  | -- | debugger, autosemi
+    JSDebugger !JSAnnot !JSSemi
+  | -- | async, function, *, name, lb, params, rb, block, autosemi
+    JSAsyncGenerator !JSAnnot !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock !JSSemi
+  | -- | for, await, lb, expr, of, iter, rb, stmt
+    JSForAwaitOf !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
+  | -- | for, await, lb, var, expr, of, iter, rb, stmt
+    JSForAwaitVarOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
+  | -- | for, await, lb, let, expr, of, iter, rb, stmt
+    JSForAwaitLetOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
+  | -- | for, await, lb, const, expr, of, iter, rb, stmt
+    JSForAwaitConstOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
   deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
 
 data JSExpression
@@ -334,6 +346,10 @@ data JSExpression
     JSGeneratorExpression !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   | -- | async,fn,name,lb, parameter list,rb,block`
     JSAsyncFunctionExpression !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
+  | -- | async, parameter list, arrow, body
+    JSAsyncArrowExpression !JSAnnot !JSArrowParameterList !JSAnnot !JSConciseBody
+  | -- | async, fn, *, name, lb, parameter list, rb, block
+    JSAsyncGeneratorExpression !JSAnnot !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   | -- | firstpart, dot, name
     JSMemberDot !JSExpression !JSAnnot !JSExpression
   | JSMemberExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot -- expr, lb, args, rb
@@ -553,6 +569,14 @@ data JSClassElement
     JSPrivateMethod !JSAnnot !String !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   | -- | get/set, #, name, lb, params, rb, block
     JSPrivateAccessor !JSAccessor !JSAnnot !String !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
+  | -- | name, =, optional initializer, autosemi
+    JSClassField !JSPropertyName !JSAnnot !(Maybe JSExpression) !JSSemi
+  | -- | static, name, =, optional initializer, autosemi
+    JSClassStaticField !JSAnnot !JSPropertyName !JSAnnot !(Maybe JSExpression) !JSSemi
+  | -- | static, block
+    JSClassStaticBlock !JSAnnot !JSBlock
+  | -- | async, *, name, lb, params, rb, block
+    JSAsyncGeneratorMethodDefinition !JSAnnot !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
 
 -- -----------------------------------------------------------------------------
@@ -623,6 +647,12 @@ instance ShowStripped JSStatement where
   ss (JSVariable _ xs _as) = "JSVariable " <> ss xs
   ss (JSWhile _ _lb x1 _rb x2) = "JSWhile (" <> ss x1 <> ") (" <> ss x2 <> ")"
   ss (JSWith _ _lb x1 _rb x _) = "JSWith (" <> ss x1 <> ") (" <> ss x <> ")"
+  ss (JSDebugger _ _) = "JSDebugger"
+  ss (JSAsyncGenerator _ _ _ n _lb pl _rb x3 _) = "JSAsyncGenerator " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+  ss (JSForAwaitOf _ _ _lb x1 _i x2 _rb x3) = "JSForAwaitOf " <> ss x1 <> " (" <> ss x2 <> ") (" <> ss x3 <> ")"
+  ss (JSForAwaitVarOf _ _ _lb _v x1 _i x2 _rb x3) = "JSForAwaitVarOf (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+  ss (JSForAwaitLetOf _ _ _lb _v x1 _i x2 _rb x3) = "JSForAwaitLetOf (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
+  ss (JSForAwaitConstOf _ _ _lb _v x1 _i x2 _rb x3) = "JSForAwaitConstOf (" <> ss x1 <> ") (" <> ss x2 <> ") (" <> ss x3 <> ")"
 
 instance ShowStripped JSExpression where
   ss (JSArrayLiteral _lb xs _rb) = "JSArrayLiteral " <> ss xs
@@ -642,6 +672,8 @@ instance ShowStripped JSExpression where
   ss (JSFunctionExpression _ n _lb pl _rb x3) = "JSFunctionExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
   ss (JSGeneratorExpression _ _ n _lb pl _rb x3) = "JSGeneratorExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
   ss (JSAsyncFunctionExpression _ _ n _lb pl _rb x3) = "JSAsyncFunctionExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
+  ss (JSAsyncArrowExpression _ ps _ body) = "JSAsyncArrowExpression (" <> ss ps <> ") => " <> ss body
+  ss (JSAsyncGeneratorExpression _ _ _ n _lb pl _rb x3) = "JSAsyncGeneratorExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
   ss (JSHexInteger _ s) = "JSHexInteger " <> singleQuote (s)
   ss (JSBinaryInteger _ s) = "JSBinaryInteger " <> singleQuote (s)
   ss (JSOctal _ s) = "JSOctal " <> singleQuote (s)
@@ -853,6 +885,12 @@ instance ShowStripped JSClassElement where
   ss (JSPrivateField _ name _ (Just initializer) _) = "JSPrivateField " <> singleQuote ("#" <> name) <> " (" <> ss initializer <> ")"
   ss (JSPrivateMethod _ name _ params _ block) = "JSPrivateMethod " <> singleQuote ("#" <> name) <> " " <> ss params <> " (" <> ss block <> ")"
   ss (JSPrivateAccessor accessor _ name _ params _ block) = "JSPrivateAccessor " <> ss accessor <> " " <> singleQuote ("#" <> name) <> " " <> ss params <> " (" <> ss block <> ")"
+  ss (JSClassField name _ Nothing _) = "JSClassField (" <> ss name <> ")"
+  ss (JSClassField name _ (Just initializer) _) = "JSClassField (" <> ss name <> ") (" <> ss initializer <> ")"
+  ss (JSClassStaticField _ name _ Nothing _) = "JSClassStaticField (" <> ss name <> ")"
+  ss (JSClassStaticField _ name _ (Just initializer) _) = "JSClassStaticField (" <> ss name <> ") (" <> ss initializer <> ")"
+  ss (JSClassStaticBlock _ block) = "JSClassStaticBlock (" <> ss block <> ")"
+  ss (JSAsyncGeneratorMethodDefinition _ _ x1 _lb x2s _rb x3) = "JSAsyncGeneratorMethodDefinition (" <> ss x1 <> ") " <> ss x2s <> " (" <> ss x3 <> ")"
 
 instance ShowStripped a => ShowStripped (JSCommaList a) where
   ss xs = "(" <> commaJoin (map ss $ fromCommaList xs) <> ")"

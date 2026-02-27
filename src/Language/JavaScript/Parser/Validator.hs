@@ -69,6 +69,7 @@ import Data.List (group, intercalate, isSuffixOf, nub, sort)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import qualified Numeric
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Generics (Generic)
@@ -829,7 +830,7 @@ validateDuplicateLabelsInStatements stmts =
     findDuplicateLabels labelList =
       let labelCounts = Map.fromListWith (++) [(name, [pos]) | (name, pos) <- labelList]
           duplicateEntries = Map.filter ((> 1) . length) labelCounts
-       in [(name, head positions) | (name, positions) <- Map.toList duplicateEntries]
+       in [(name, p) | (name, p : _) <- Map.toList duplicateEntries]
 
 -- | Validate program-level constraints.
 validateProgramLevel :: [JSStatement] -> [ValidationError]
@@ -1437,10 +1438,11 @@ validateStringEscapes = go
     validateUnicodeCodePoint rest = case break (== '}') rest of
       (hexDigits, '}' : remaining)
         | length hexDigits >= 1 && length hexDigits <= 6 && all isHexDigit hexDigits ->
-          let codePoint = read ("0x" ++ hexDigits) :: Int
-           in if codePoint <= 0x10FFFF
-                then go remaining
-                else [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
+          case Numeric.readHex hexDigits of
+            [(codePoint, "")] | codePoint <= 0x10FFFF -> go remaining
+            [(codePoint, "")] ->
+              [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
+            _ -> [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
         | otherwise -> [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
       _ -> [InvalidEscapeSequence (Text.pack "\\u{") (TokenPn 0 0 0)] ++ go rest
 
@@ -2309,10 +2311,11 @@ validateEnumType enumName enumValues pos =
 
 -- | Find duplicate enum values
 findDuplicateEnumValues :: [JSDocEnumValue] -> TokenPosn -> [ValidationError]
-findDuplicateEnumValues values pos =
+findDuplicateEnumValues [] _ = []
+findDuplicateEnumValues values@(firstVal : _) pos =
   let valueNames = map jsDocEnumValueName values
       duplicates = findDuplicatesInList valueNames
-  in map (\name -> JSDocEnumValueDuplicate name (jsDocEnumValueName (head values)) pos) duplicates
+  in map (\name -> JSDocEnumValueDuplicate name (jsDocEnumValueName firstVal) pos) duplicates
 
 -- | Validate individual enum value
 validateEnumValue :: TokenPosn -> JSDocEnumValue -> [ValidationError]
@@ -2342,9 +2345,9 @@ validateEnumValueTypeConsistency enumName values pos =
   let literalValues = mapMaybe jsDocEnumValueLiteral values
       types = map getEnumLiteralType literalValues
       uniqueTypes = nub types
-  in if length uniqueTypes > 1
-     then [JSDocEnumValueTypeMismatch enumName (head types) (types !! 1) pos]
-     else []
+  in case uniqueTypes of
+       (t1 : t2 : _) -> [JSDocEnumValueTypeMismatch enumName t1 t2 pos]
+       _ -> []
   where
     getEnumLiteralType :: Text -> Text
     getEnumLiteralType literal

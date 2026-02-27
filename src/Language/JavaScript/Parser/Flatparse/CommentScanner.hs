@@ -56,7 +56,7 @@ scanComments bs = go 0
       | matchesAt i '/' = handleSlash i
       | matchesAt i '"' = go (skipDoubleString (i + 1))
       | matchesAt i '\'' = go (skipSingleString (i + 1))
-      | matchesAt i '`' = go (skipTemplate (i + 1))
+      | matchesAt i '`' = scanTemplate (i + 1)
       | otherwise = go (i + 1)
 
     -- Scan a contiguous whitespace run.
@@ -99,7 +99,61 @@ scanComments bs = go 0
       | matchesAt i '\'' = i + 1
       | otherwise = skipSingleString (i + 1)
 
+    -- Scan a template literal for comments inside interpolation expressions.
+    -- Template string parts (between backtick and ${, or between } and backtick)
+    -- cannot contain comments, but ${...} interpolation expressions CAN.
+    scanTemplate !i
+      | i >= len = []
+      | matchesAt i '\\' = scanTemplate (i + 2)
+      | matchesAt i '`' = go (i + 1)
+      | matchesAt i '$' && i + 1 < len && matchesAt (i + 1) '{' =
+          scanTemplateBrace (i + 2) 1
+      | otherwise = scanTemplate (i + 1)
+
+    -- Scan inside a ${...} interpolation expression for comments/whitespace.
+    -- This is effectively like the main 'go' loop but tracking brace depth
+    -- and resuming template scanning after the closing '}'.
+    scanTemplateBrace !i !depth
+      | i >= len = []
+      | depth <= 0 = scanTemplate i
+      | isWS (charAt i) = scanTemplateBraceWS i (i + 1) depth
+      | matchesAt i '/' = handleTemplateBraceSlash i depth
+      | matchesAt i '{' = scanTemplateBrace (i + 1) (depth + 1)
+      | matchesAt i '}' = scanTemplateBrace (i + 1) (depth - 1)
+      | matchesAt i '"' = scanTemplateBrace (skipDoubleString (i + 1)) depth
+      | matchesAt i '\'' = scanTemplateBrace (skipSingleString (i + 1)) depth
+      | matchesAt i '`' = scanTemplateBrace (skipTemplate (i + 1)) depth
+      | otherwise = scanTemplateBrace (i + 1) depth
+
+    -- Scan whitespace inside ${...}
+    scanTemplateBraceWS !start !i !depth
+      | i >= len = mkWS start i : []
+      | isWS (charAt i) = scanTemplateBraceWS start (i + 1) depth
+      | otherwise = mkWS start i : scanTemplateBrace i depth
+
+    -- Handle '/' inside ${...} — could be comment or division
+    handleTemplateBraceSlash !i !depth
+      | i + 1 >= len = scanTemplateBrace (i + 1) depth
+      | matchesAt (i + 1) '/' = scanTemplateBraceLineComment i (i + 2) depth
+      | matchesAt (i + 1) '*' = scanTemplateBraceBlockComment i (i + 2) depth
+      | otherwise = scanTemplateBrace (i + 1) depth
+
+    -- Scan // comment inside ${...}
+    scanTemplateBraceLineComment !start !i !depth
+      | i >= len = mkComment start i : []
+      | isLineEnd (charAt i) = mkComment start (i + 1) : scanTemplateBrace (i + 1) depth
+      | otherwise = scanTemplateBraceLineComment start (i + 1) depth
+
+    -- Scan /* ... */ comment inside ${...}
+    scanTemplateBraceBlockComment !start !i !depth
+      | i >= len = mkComment start i : []
+      | i + 1 < len && matchesAt i '*' && matchesAt (i + 1) '/' =
+          mkComment start (i + 2) : scanTemplateBrace (i + 2) depth
+      | otherwise = scanTemplateBraceBlockComment start (i + 1) depth
+
     -- Skip a template literal, handling escape sequences and ${...}.
+    -- Returns the position after the closing backtick.
+    -- Used only inside nested templates within ${...} expressions.
     skipTemplate !i
       | i >= len = i
       | matchesAt i '\\' = skipTemplate (i + 2)
@@ -109,6 +163,8 @@ scanComments bs = go 0
       | otherwise = skipTemplate (i + 1)
 
     -- Skip a ${...} inside a template, tracking brace depth.
+    -- Skips strings and nested templates but does NOT skip comments,
+    -- since comments inside template interpolations are valid JS.
     skipTemplateBrace !i !depth
       | i >= len = i
       | depth <= 0 = i

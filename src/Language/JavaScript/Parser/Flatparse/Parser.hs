@@ -316,10 +316,10 @@ offsetToLineCol lineStarts offset = (line, col)
   where
     numLines = VU.length lineStarts
     line = bsearch 0 (numLines - 1)
-    col = offset - VU.unsafeIndex lineStarts (line - 1) + 1
+    col = offset - (VU.!) lineStarts (line - 1) + 1
     bsearch !lo !hi
       | lo >= hi = lo + 1
-      | mid + 1 < numLines && VU.unsafeIndex lineStarts (mid + 1) <= offset = bsearch (mid + 1) hi
+      | mid + 1 < numLines && (VU.!) lineStarts (mid + 1) <= offset = bsearch (mid + 1) hi
       | otherwise = bsearch lo mid
       where mid = (lo + hi) `div` 2
 
@@ -332,7 +332,7 @@ fixPositions input = everywhere (mkT fixTokenPosn)
     inputLen = BS.length input
     lineStarts = buildLineStarts input
     fixTokenPosn (TokenPn remainingBytes 0 0)
-      | remainingBytes > 0 =
+      | remainingBytes >= 0 && remainingBytes <= inputLen =
           let offset = inputLen - remainingBytes
               (line, col) = offsetToLineCol lineStarts offset
           in TokenPn offset line col
@@ -415,10 +415,10 @@ findNextOffset vec target
   where
     bsearch !lo !hi
       | lo > hi = Nothing
-      | VU.unsafeIndex vec mid >= target =
+      | (VU.!) vec mid >= target =
           case bsearch lo (mid - 1) of
             Just smaller -> Just smaller
-            Nothing -> Just (VU.unsafeIndex vec mid)
+            Nothing -> Just ((VU.!) vec mid)
       | otherwise = bsearch (mid + 1) hi
       where mid = (lo + hi) `div` 2
 
