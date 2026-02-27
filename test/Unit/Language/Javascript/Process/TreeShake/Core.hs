@@ -489,8 +489,3 @@ identifierMatches :: Text.Text -> JSIdent -> Bool
 identifierMatches identifier (JSIdentName _ name) = Text.pack name == identifier
 identifierMatches _ JSIdentNone = False
 
--- | Convert comma list to regular list (duplicate helper).
-fromCommaList :: JSCommaList a -> [a]
-fromCommaList JSLNil = []
-fromCommaList (JSLOne x) = [x]
-fromCommaList (JSLCons rest _ x) = x : fromCommaList rest

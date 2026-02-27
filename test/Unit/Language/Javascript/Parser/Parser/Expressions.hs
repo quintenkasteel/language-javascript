@@ -29,7 +29,7 @@ import Language.JavaScript.Parser.AST
     JSTemplatePart (..),
     JSUnaryOp (..),
   )
-import Language.JavaScript.Parser.Grammar7
+import Language.JavaScript.Parser.Parser
 import Language.JavaScript.Parser.Parser (parseUsing)
 import Test.Hspec
 

@@ -43,8 +43,7 @@ import Criterion.Main
 import Data.List (foldl')
 import qualified Data.Text as Text
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
-import Language.JavaScript.Parser.Grammar7 (parseProgram)
-import Language.JavaScript.Parser.Parser (parseUsing)
+import Language.JavaScript.Parser.Parser (parseProgram, parseUsing)
 import Test.Hspec
 
 -- | Performance metrics for a benchmark run

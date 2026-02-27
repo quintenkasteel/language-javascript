@@ -7,11 +7,9 @@ module Integration.Language.Javascript.Parser.Minification
 where
 
 import Control.Monad (forM_)
-import Language.JavaScript.Parser hiding (parseModule)
+import Language.JavaScript.Parser
 import qualified Language.JavaScript.Parser.AST as AST
-import Language.JavaScript.Parser.Grammar7
-import Language.JavaScript.Parser.Lexer (Alex)
-import Language.JavaScript.Parser.Parser hiding (parseModule)
+import Language.JavaScript.Parser.Parser
 import Language.JavaScript.Process.Minify
 import Test.Hspec
 
@@ -353,5 +351,5 @@ minifyProg = minifyWith parseProgram
 minifyModule :: String -> String
 minifyModule = minifyWith parseModule
 
-minifyWith :: (Alex AST.JSAST) -> String -> String
-minifyWith p str = either id (renderToString . minifyJS) (parseUsing p str "src")
+minifyWith :: (String -> String -> Either String AST.JSAST) -> String -> String
+minifyWith p str = either id (renderToString . minifyJS) (p str "src")

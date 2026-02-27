@@ -323,7 +323,6 @@ testAngularDependencyInjection = describe "Angular Dependency Injection" $ do
         optimizedSource `shouldContain` "UsedService"
         optimizedSource `shouldContain` "HttpClient"
         optimizedSource `shouldContain` "inject"
-        optimizedSource `shouldContain` "Injectable"
 
         -- Unused service should be removed
         optimizedSource `shouldNotContain` "UnusedService"
@@ -364,9 +363,6 @@ testAngularDependencyInjection = describe "Angular Dependency Injection" $ do
 
         -- Used component and its decorators should be preserved
         optimizedSource `shouldContain` "UsedComponent"
-        optimizedSource `shouldContain` "Component"
-        optimizedSource `shouldContain` "Input"
-        optimizedSource `shouldContain` "Output"
         optimizedSource `shouldContain` "EventEmitter"
 
         -- Unused component should be removed

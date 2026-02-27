@@ -1,0 +1,27 @@
+{
+  "name": "language-javascript-qq",
+  "displayName": "language-javascript Quasi-Quoter Support",
+  "description": "JavaScript syntax highlighting inside Haskell quasi-quoters [js|...|], [jsast|...|], and [jsx|...|]",
+  "version": "0.1.0",
+  "publisher": "language-javascript",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "inline.js-in-haskell",
+        "path": "./syntaxes/js-injection.json",
+        "injectTo": [
+          "source.haskell"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.javascript": "javascript"
+        }
+      }
+    ]
+  }
+}

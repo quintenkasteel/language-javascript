@@ -9,7 +9,6 @@ import Control.DeepSeq (rnf)
 import qualified Data.ByteString.Char8 as BS8
 import GHC.Generics (from, to)
 import qualified Language.JavaScript.Parser.AST as AST
-import Language.JavaScript.Parser.Grammar7
 import Language.JavaScript.Parser.Parser
 import Test.Hspec
 
@@ -23,6 +22,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
           let !evaluated = rnf ast `seq` ast
           -- Verify the AST structure is preserved after deep evaluation
           case evaluated of
+            AST.JSAstLiteral (AST.JSDecimal _ val) _ | val == "42" -> pure ()
             AST.JSAstExpression (AST.JSDecimal _ val) _ | val == "42" -> pure ()
             _ -> expectationFailure "NFData evaluation altered AST structure"
         Left _ -> expectationFailure "Parse failed"

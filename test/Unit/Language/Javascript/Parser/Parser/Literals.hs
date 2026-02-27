@@ -10,8 +10,7 @@ import Data.Char (chr, isPrint)
 import Data.List (isInfixOf)
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST (JSAST (..))
-import Language.JavaScript.Parser.Grammar7
-import Language.JavaScript.Parser.Parser (parseUsing)
+import Language.JavaScript.Parser.Parser
 import Test.Hspec
 
 testLiteralParser :: Spec
@@ -249,4 +248,4 @@ mkTestStrings quote =
         else '"' : (s ++ ['"'])
 
 testLiteral :: String -> Either String JSAST
-testLiteral str = parseUsing parseLiteral str "src"
+testLiteral str = parseExpression str "src"

@@ -111,6 +111,7 @@ import Language.JavaScript.Parser.AST
     JSTryFinally (..),
     JSUnaryOp (..),
     JSVarInitializer (..),
+    fromCommaList,
   )
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Parser.Token
@@ -1142,11 +1143,6 @@ validateAssignmentTarget expr = case expr of
 
 -- Helper functions for comprehensive validation
 
--- | Extract comma-separated list items.
-fromCommaList :: JSCommaList a -> [a]
-fromCommaList JSLNil = []
-fromCommaList (JSLOne x) = [x]
-fromCommaList (JSLCons list _comma x) = fromCommaList list ++ [x]
 
 -- | Convert JSCommaTrailingList to regular list.
 fromCommaTrailingList :: JSCommaTrailingList a -> [a]

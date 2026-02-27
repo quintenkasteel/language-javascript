@@ -50,8 +50,7 @@ import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Data.Word (Word64)
 import qualified GHC.Stats as Stats
 import qualified Language.JavaScript.Parser.AST as AST
-import Language.JavaScript.Parser.Grammar7 (parseProgram)
-import Language.JavaScript.Parser.Parser (parseUsing)
+import Language.JavaScript.Parser.Parser (parseProgram, parseUsing)
 import System.Mem (performGC)
 import Test.Hspec
 

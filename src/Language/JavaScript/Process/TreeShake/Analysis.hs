@@ -1133,10 +1133,6 @@ countUnused = Map.size . Map.filter (not . (^. isUsed))
 countSideEffects :: UsageMap -> Int  
 countSideEffects = Map.size . Map.filter (^. Types.hasSideEffects)
 
-fromCommaList :: JSCommaList a -> [a]
-fromCommaList JSLNil = []
-fromCommaList (JSLOne x) = [x]
-fromCommaList (JSLCons rest _ x) = fromCommaList rest <> [x]
 
 when :: Applicative f => Bool -> f () -> f ()
 when True action = action

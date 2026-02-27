@@ -29,7 +29,7 @@ import Language.JavaScript.Parser.AST
     JSStatement (..),
     JSVarInitializer (..),
   )
-import Language.JavaScript.Parser.Grammar7
+import Language.JavaScript.Parser.Parser
 import Language.JavaScript.Parser.Parser (parseUsing, showStrippedMaybeString, showStrippedString)
 import Test.Hspec
 

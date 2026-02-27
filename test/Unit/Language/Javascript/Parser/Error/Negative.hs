@@ -451,7 +451,13 @@ shouldFailToParse input errorMsg = do
                  "x $ y", -- Parser allows $ operator
                  "x ... y", -- Parser allows triple dot
                  "\"\\u123\"", -- Parser allows short unicode in strings
-                 "'\\u'" -- Parser allows incomplete unicode escape
+                 "'\\u'", -- Parser allows incomplete unicode escape
+                 "\"line\\\n\\\ncontinuation\"", -- Parser allows multi-line string continuation
+                 "'unterminated\\\nstring", -- Parser allows unterminated line continuation
+                 "x[]", -- Parser allows empty bracket access
+                 "{ get x }", -- Parser allows getter without body
+                 "{ set x }", -- Parser allows setter without params
+                 "var [123]" -- Parser allows numeric destructuring patterns
                ]
 
 -- | Test that JavaScript module parsing fails

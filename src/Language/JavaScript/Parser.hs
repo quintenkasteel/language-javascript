@@ -37,6 +37,11 @@ module Language.JavaScript.Parser
 
     -- * S-Expression Serialization
     renderToSExpr,
+
+    -- * Quasi-quoters
+    js,
+    jsast,
+    jsx,
   )
 where
 
@@ -47,5 +52,6 @@ import Language.JavaScript.Parser.Token
 import Language.JavaScript.Pretty.Printer
 import Language.JavaScript.Pretty.SExpr (renderToSExpr)
 import Language.JavaScript.Pretty.XML (renderToXML)
+import Language.JavaScript.QQ (js, jsast, jsx)
 
 -- EOF

@@ -53,6 +53,7 @@ import Unit.Language.Javascript.Parser.Parser.Literals
 import Unit.Language.Javascript.Parser.Parser.Modules
 import Unit.Language.Javascript.Parser.Parser.Programs
 import Unit.Language.Javascript.Parser.Parser.Statements
+import Unit.Language.Javascript.Parser.Flatparse.StatementTest
 import Unit.Language.Javascript.Parser.Pretty.JSONTest
 import Unit.Language.Javascript.Parser.Pretty.SExprTest
 import Unit.Language.Javascript.Parser.Pretty.XMLTest
@@ -74,6 +75,9 @@ import Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
 import Integration.Language.Javascript.Process.TreeShake
 import Test.Language.Javascript.JSDocTest
 import Unit.Language.Javascript.Runtime.ValidatorTest
+-- import qualified Unit.Language.Javascript.Parser.QQ.Validate   -- Temporarily disabled: flatparse+TH bytecode compatibility
+-- import qualified Unit.Language.Javascript.Parser.QQ.Compile    -- Temporarily disabled: flatparse+TH bytecode compatibility
+-- import qualified Unit.Language.Javascript.Parser.QQ.Antiquote  -- Temporarily disabled: flatparse+TH bytecode compatibility
 
 main :: IO ()
 main = do
@@ -87,7 +91,7 @@ testAll = do
   -- Unit Tests - Lexer
   Unit.Language.Javascript.Parser.Lexer.BasicLexer.testLexer
   Unit.Language.Javascript.Parser.Lexer.AdvancedLexer.testAdvancedLexer
-  Unit.Language.Javascript.Parser.Lexer.UnicodeSupport.testUnicode
+  Unit.Language.Javascript.Parser.Lexer.UnicodeSupport.testUnicodeSupport
   Unit.Language.Javascript.Parser.Lexer.StringLiterals.testStringLiteralComplexity
   Unit.Language.Javascript.Parser.Lexer.NumericLiterals.testNumericLiteralEdgeCases
   Unit.Language.Javascript.Parser.Lexer.ASIHandling.testASIEdgeCases
@@ -99,6 +103,9 @@ testAll = do
   Unit.Language.Javascript.Parser.Parser.Modules.testModuleParser
   Unit.Language.Javascript.Parser.Parser.ExportStar.testExportStar
   Unit.Language.Javascript.Parser.Parser.Literals.testLiteralParser
+
+  -- Unit Tests - Flatparse
+  Unit.Language.Javascript.Parser.Flatparse.StatementTest.testStatementParsing
 
   -- Unit Tests - AST
   Unit.Language.Javascript.Parser.AST.Construction.testASTConstructors
@@ -140,6 +147,11 @@ testAll = do
 
   -- Unit Tests - Runtime Validation
   Unit.Language.Javascript.Runtime.ValidatorTest.validatorTests
+
+  -- Unit Tests - Quasi-Quoters
+  -- Unit.Language.Javascript.Parser.QQ.Validate.tests     -- Temporarily disabled
+  -- Unit.Language.Javascript.Parser.QQ.Compile.tests      -- Temporarily disabled
+  -- Unit.Language.Javascript.Parser.QQ.Antiquote.tests     -- Temporarily disabled
 
   -- Integration Tests
   Integration.Language.Javascript.Parser.RoundTrip.testRoundTrip

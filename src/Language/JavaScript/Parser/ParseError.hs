@@ -32,7 +32,8 @@ where
 import Control.DeepSeq (NFData)
 import qualified Data.Text as Text
 import GHC.Generics (Generic)
-import Language.JavaScript.Parser.Lexer
+-- import Language.JavaScript.Parser.Lexer  -- No longer needed with flatparse
+import Language.JavaScript.Parser.Token (Token, tokenSpan)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn)
 
 -- | Parse context information for enhanced error reporting

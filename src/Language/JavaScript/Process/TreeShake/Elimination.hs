@@ -814,11 +814,6 @@ buildCommaList [] = JSLNil
 buildCommaList [x] = JSLOne x
 buildCommaList (x:xs) = JSLCons (buildCommaList xs) JSNoAnnot x
 
--- | Convert comma list to regular list.
-fromCommaList :: JSCommaList a -> [a]
-fromCommaList JSLNil = []
-fromCommaList (JSLOne x) = [x]
-fromCommaList (JSLCons rest _ x) = x : fromCommaList rest
 
 -- | Check if comma list is empty.
 isCommaListEmpty :: JSCommaList a -> Bool

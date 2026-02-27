@@ -1,0 +1,27 @@
+{
+  "scopeName": "inline.js-in-haskell",
+  "injectionSelector": "L:source.haskell",
+  "patterns": [
+    {
+      "name": "meta.embedded.block.javascript",
+      "begin": "\\[(js|jsast|jsx)\\|",
+      "end": "\\|\\]",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.quasi-quoter.begin.haskell"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.quasi-quoter.end.haskell"
+        }
+      },
+      "contentName": "meta.embedded.block.javascript",
+      "patterns": [
+        {
+          "include": "source.js"
+        }
+      ]
+    }
+  ]
+}

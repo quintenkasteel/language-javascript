@@ -3,22 +3,16 @@
 
 -- | Advanced Error Recovery Testing for JavaScript Parser
 --
--- This module implements Task 3.4: sophisticated error recovery testing that validates
--- best-in-class developer experience for JavaScript parsing. It provides comprehensive
--- testing for:
+-- Tests parser behavior on invalid JavaScript inputs, verifying that:
 --
---   * Local correction recovery (missing operators, brackets, semicolons)
---   * Error production testing (common syntax error patterns)
---   * Multi-error reporting (accumulate multiple errors in single parse)
---   * Suggestion system for common mistakes with helpful recovery hints
---   * Advanced recovery point accuracy and parser state consistency
---   * Performance impact assessment of sophisticated error recovery
+--   * Invalid syntax is correctly rejected (produces Left)
+--   * Valid syntax is correctly accepted (produces Right)
+--   * The parser does not crash on malformed input
+--   * Large and deeply nested invalid inputs are handled gracefully
 --
--- The tests focus on sophisticated error handling that provides developers with:
---   - Precise error locations and context information
---   - Helpful suggestions for fixing common JavaScript mistakes
---   - Multiple error detection to reduce edit-compile-test cycles
---   - Robust recovery that continues parsing after errors
+-- All tests use behavioral assertions (isLeft/isRight) rather than
+-- matching internal error message formats, making them robust across
+-- parser implementations.
 --
 -- @since 0.7.1.0
 module Unit.Language.Javascript.Parser.Error.AdvancedRecovery
@@ -26,7 +20,7 @@ module Unit.Language.Javascript.Parser.Error.AdvancedRecovery
   )
 where
 
-import Control.DeepSeq (deepseq)
+import Data.Either (isLeft, isRight)
 import Language.JavaScript.Parser
 import Test.Hspec
 
@@ -46,308 +40,138 @@ testAdvancedErrorRecovery = describe "Advanced Error Recovery and Multi-Error De
 
   describe "Multi-error reporting" $ do
     testMultipleErrorAccumulation
-    testErrorReportingContinuation
-    testErrorPriorityRanking
 
-  describe "Suggestion system validation" $ do
+  describe "Error suggestion quality" $ do
     testErrorSuggestionQuality
-    testContextualSuggestions
-    testRecoveryStrategyEffectiveness
 
   describe "Recovery point accuracy" $ do
     testPreciseErrorLocations
-    testRecoveryPointSelection
     testParserStateConsistency
 
--- | Test local correction recovery for missing operators
+-- | Test that invalid expressions with missing operators are rejected
 testMissingOperatorRecovery :: Spec
 testMissingOperatorRecovery = describe "Missing operator recovery" $ do
-  it "suggests missing binary operator in expression" $ do
-    let result = parse "var x = a b;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 10 1 11, tokenLiteral = \"b\", tokenComment = [WhiteSpace (TokenPn 9 1 10) \" \"]}"
-      Right _ -> return () -- Parser may treat as separate expressions
-  it "recovers from missing assignment operator" $ do
-    let result = parse "var x 5; var y = 10;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "DecimalToken {tokenSpan = TokenPn 6 1 7, tokenLiteral = \"5\", tokenComment = [WhiteSpace (TokenPn 5 1 6) \" \"]}"
-      Right _ -> return () -- May succeed with ASI
-  it "handles missing comparison operator in condition" $ do
-    let result = parse "if (x y) { console.log('test'); }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 6 1 7, tokenLiteral = \"y\", tokenComment = [WhiteSpace (TokenPn 5 1 6) \" \"]}"
-      Right _ -> return () -- May parse as separate expressions
+  it "rejects two expressions where one is expected in condition" $
+    parse "if (x y) { console.log('test'); }" "test" `shouldSatisfy` isLeft
 
--- | Test local correction recovery for missing brackets
+-- | Test that missing brackets cause parse failures
 testMissingBracketRecovery :: Spec
 testMissingBracketRecovery = describe "Missing bracket recovery" $ do
-  it "suggests missing opening parenthesis in function call" $ do
-    let result = parse "console.log 'hello');" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "RightParenToken {tokenSpan = TokenPn 19 1 20, tokenComment = []}"
-      Right _ -> return () -- May parse as separate statements
-  it "recovers from missing closing brace in object literal" $ do
-    let result = parse "var obj = { a: 1, b: 2; var x = 5;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "SemiColonToken {tokenSpan = TokenPn 22 1 23, tokenComment = []}"
-      Right _ -> return () -- Parser may recover
-  it "handles missing square bracket in array access" $ do
-    let result = parse "arr[0; console.log('done');" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "SemiColonToken {tokenSpan = TokenPn 5 1 6, tokenComment = []}"
-      Right _ -> return () -- May parse with recovery
+  it "rejects missing opening parenthesis in function call" $
+    parse "console.log 'hello');" "test" `shouldSatisfy` isLeft
 
--- | Test local correction recovery for missing semicolons
+  it "rejects semicolon instead of closing brace in object literal" $
+    parse "var obj = { a: 1, b: 2; var x = 5;" "test" `shouldSatisfy` isLeft
+
+  it "rejects missing closing square bracket in array access" $
+    parse "arr[0; console.log('done');" "test" `shouldSatisfy` isLeft
+
+-- | Test semicolon insertion behavior
 testMissingSemicolonRecovery :: Spec
 testMissingSemicolonRecovery = describe "Missing semicolon recovery" $ do
-  it "suggests semicolon insertion point accurately" $ do
-    let result = parse "var x = 1 var y = 2;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "VarToken {tokenSpan = TokenPn 10 1 11, tokenLiteral = \"var\", tokenComment = [WhiteSpace (TokenPn 9 1 10) \" \"]}"
-      Right _ -> return () -- ASI may handle this
-  it "identifies problematic statement boundaries" $ do
-    let result = parse "function test() { return 1 return 2; }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "ReturnToken {tokenSpan = TokenPn 27 1 28, tokenLiteral = \"return\", tokenComment = [WhiteSpace (TokenPn 26 1 27) \" \"]}"
-      Right _ -> return () -- Second return unreachable but valid
-  it "handles semicolon insertion in control structures" $ do
-    let result = parse "for (var i = 0; i < 10 i++) { console.log(i); }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 23 1 24, tokenLiteral = \"i\", tokenComment = [WhiteSpace (TokenPn 22 1 23) \" \"]}"
-      Right _ -> expectationFailure "Expected parse error"
+  it "rejects for-loop with missing semicolon between condition and update" $
+    parse "for (var i = 0; i < 10 i++) { console.log(i); }" "test" `shouldSatisfy` isLeft
 
--- | Test local correction recovery for missing commas
+-- | Test missing comma detection in parameter lists and literals
 testMissingCommaRecovery :: Spec
 testMissingCommaRecovery = describe "Missing comma recovery" $ do
-  it "suggests comma in function parameter list" $ do
-    let result = parse "function test(a b c) { return a + b + c; }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 16 1 17, tokenLiteral = \"b\", tokenComment = [WhiteSpace (TokenPn 15 1 16) \" \"]}"
-      Right _ -> expectationFailure "Expected parse error"
+  it "rejects missing commas in function parameter list" $
+    parse "function test(a b c) { return a + b + c; }" "test" `shouldSatisfy` isLeft
 
-  it "recovers from missing comma in array literal" $ do
-    let result = parse "var arr = [1 2 3, 4, 5];" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "DecimalToken {tokenSpan = TokenPn 13 1 14, tokenLiteral = \"2\", tokenComment = [WhiteSpace (TokenPn 12 1 13) \" \"]}"
-      Right _ -> return () -- May parse with recovery
-  it "handles missing comma in object property list" $ do
-    let result = parse "var obj = { a: 1 b: 2, c: 3 };" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 17 1 18, tokenLiteral = \"b\", tokenComment = [WhiteSpace (TokenPn 16 1 17) \" \"]}"
-      Right _ -> return () -- May succeed with ASI
+  it "rejects missing comma between object properties" $
+    parse "var obj = { a: 1 b: 2, c: 3 };" "test" `shouldSatisfy` isLeft
 
 -- | Test common JavaScript syntax error patterns
 testCommonSyntaxErrorPatterns :: Spec
 testCommonSyntaxErrorPatterns = describe "Common syntax error patterns" $ do
-  it "detects and suggests fix for assignment vs equality" $ do
-    let result = parse "if (x = 5) { console.log('assigned'); }" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- Assignment in condition is valid
-  it "identifies malformed arrow function syntax" $ do
-    let result = parse "var fn = (x, y) = x + y;" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null) -- Parser detects syntax error
-      Right _ -> return () -- Parser may successfully parse this syntax
-  it "suggests correction for malformed object method" $ do
-    let result = parse "var obj = { method: function() { return 1; } };" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- This is actually valid ES5 syntax
+  it "accepts assignment in condition (valid JS)" $ do
+    case parse "if (x = 5) { console.log('assigned'); }" "test" of
+      Left _ -> expectationFailure "Assignment in condition is valid JavaScript"
+      Right _ -> pure ()
+
+  it "accepts valid object method syntax" $ do
+    case parse "var obj = { method: function() { return 1; } };" "test" of
+      Left _ -> expectationFailure "Object method is valid ES5 syntax"
+      Right _ -> pure ()
 
 -- | Test typical JavaScript mistakes developers make
 testTypicalJavaScriptMistakes :: Spec
 testTypicalJavaScriptMistakes = describe "Typical JavaScript developer mistakes" $ do
-  it "suggests hoisting fix for function declaration issues" $ do
-    let result = parse "console.log(fn()); function fn() { return 'test'; }" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- Function hoisting is valid
-  it "identifies scope-related variable access errors" $ do
-    let result = parse "{ let x = 1; } console.log(x);" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- Parser doesn't do semantic analysis
-  it "suggests const vs let vs var usage patterns" $ do
-    let result = parse "const x; x = 5;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "SemiColonToken {tokenSpan = TokenPn 7 1 8, tokenComment = []}"
-      Right _ -> return () -- Parser may handle const differently
+  it "accepts function hoisting (valid JS)" $ do
+    case parse "console.log(fn()); function fn() { return 'test'; }" "test" of
+      Left _ -> expectationFailure "Function hoisting is valid JavaScript"
+      Right _ -> pure ()
+
+  it "accepts block-scoped code (parser does not check semantics)" $ do
+    case parse "{ let x = 1; } console.log(x);" "test" of
+      Left _ -> expectationFailure "Parser should accept this (scope is semantic)"
+      Right _ -> pure ()
+
+  it "accepts valid ES5 callback pattern" $ do
+    case parse "var self = this; setTimeout(function() { self.method(); }, 1000);" "test" of
+      Left _ -> expectationFailure "Valid legacy ES5 syntax"
+      Right _ -> pure ()
 
 -- | Test modern JavaScript feature error patterns
 testModernJSFeatureErrors :: Spec
 testModernJSFeatureErrors = describe "Modern JavaScript feature errors" $ do
-  it "suggests async/await syntax corrections" $ do
-    let result = parse "function test() { await fetch('/api'); }" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- May parse as identifier 'await'
-  it "identifies destructuring assignment errors" $ do
-    let result = parse "var {a, b, } = obj;" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- Trailing comma may be allowed
-  it "suggests template literal syntax fixes" $ do
-    let result = parse "var msg = `Hello ${name`;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "lexical error @ line 1 and column 26"
-      Right _ -> expectationFailure "Expected parse error"
+  it "accepts await as identifier in non-async function" $ do
+    case parse "function test() { await fetch('/api'); }" "test" of
+      Left _ -> expectationFailure "await should be treated as identifier in non-async context"
+      Right _ -> pure ()
 
--- | Test multiple error accumulation in single parse
+  it "accepts trailing comma in destructuring (valid ES2017+)" $ do
+    case parse "var {a, b, } = obj;" "test" of
+      Left _ -> expectationFailure "Trailing commas in destructuring are valid ES2017+"
+      Right _ -> pure ()
+
+  it "rejects unterminated template literal interpolation" $
+    parse "var msg = `Hello ${name`;" "test" `shouldSatisfy` isLeft
+
+-- | Test parser behavior on multiple errors in single input
 testMultipleErrorAccumulation :: Spec
 testMultipleErrorAccumulation = describe "Multiple error accumulation" $ do
-  it "should ideally collect multiple independent errors" $ do
-    let result = parse "function bad( { var x = ; class Another extends { }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 20 1 21, tokenLiteral = \"x\", tokenComment = [WhiteSpace (TokenPn 19 1 20) \" \"]}"
-      Right _ -> expectationFailure "Expected parse errors"
+  it "rejects input with multiple syntax errors" $
+    parse "function bad( { var x = ; class Another extends { }" "test" `shouldSatisfy` isLeft
 
-  it "prioritizes critical errors over minor ones" $ do
-    let result = parse "var x = function( { return; } + invalid;" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "SemiColonToken {tokenSpan = TokenPn 26 1 27, tokenComment = []}"
-      Right _ -> return () -- May succeed with recovery
-  it "groups related errors for better understanding" $ do
-    let result = parse "{ var x = 1 var y = 2 var z = }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "RightCurlyToken {tokenSpan = TokenPn 30 1 31, tokenComment = [WhiteSpace (TokenPn 29 1 30) \" \"]}"
-      Right _ -> return () -- May parse with ASI
+  it "rejects missing parenthesis in function declaration" $
+    parse "function test( { var unused_var = 1; }" "test" `shouldSatisfy` isLeft
 
--- | Test error reporting continuation after recovery
-testErrorReportingContinuation :: Spec
-testErrorReportingContinuation = describe "Error reporting continuation" $ do
-  it "continues parsing after function parameter errors" $ do
-    let result = parse "function bad(a, , c) { return a + c; } function good() { return 42; }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "CommaToken {tokenSpan = TokenPn 16 1 17, tokenComment = [WhiteSpace (TokenPn 15 1 16) \" \"]}"
-      Right _ -> return () -- May recover successfully
-  it "reports errors in multiple statements" $ do
-    let result = parse "var x = ; function test( { var y = 1; }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "SemiColonToken {tokenSpan = TokenPn 8 1 9, tokenComment = [WhiteSpace (TokenPn 7 1 8) \" \"]}"
-      Right _ -> return () -- Parser may recover
-  it "maintains error context across scope boundaries" $ do
-    let result = parse "{ var x = incomplete; } { var y = also_bad; }" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- May parse with recovery
+  it "rejects incomplete function expression" $
+    parse "var x = function incomplete(" "test" `shouldSatisfy` isLeft
 
--- | Test error priority ranking system
-testErrorPriorityRanking :: Spec
-testErrorPriorityRanking = describe "Error priority ranking" $ do
-  it "ranks syntax errors higher than style issues" $ do
-    let result = parse "function test( { var unused_var = 1; }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "IdentifierToken {tokenSpan = TokenPn 21 1 22, tokenLiteral = \"unused_var\", tokenComment = [WhiteSpace (TokenPn 20 1 21) \" \"]}"
-      Right _ -> expectationFailure "Expected parse error"
+  it "rejects incomplete function in array literal" $
+    parse "[1, 2, , , 5, function bad( ]" "test" `shouldSatisfy` isLeft
 
-  it "prioritizes blocking errors over warnings" $ do
-    let result = parse "var x = function incomplete(" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "TailToken {tokenSpan = TokenPn 0 0 0, tokenComment = []}"
-      Right _ -> expectationFailure "Expected parse error"
+  it "rejects double comma in function parameters" $
+    parse "function test(a, , c) { return a + c; }" "test" `shouldSatisfy` isLeft
 
--- | Test error suggestion quality and helpfulness
+  it "rejects missing expression after equals in function body" $
+    parse "function test() { var x = ; return x; }" "test" `shouldSatisfy` isLeft
+
+-- | Test that parser produces non-empty errors and handles valid edge cases
 testErrorSuggestionQuality :: Spec
 testErrorSuggestionQuality = describe "Error suggestion quality" $ do
-  it "provides actionable suggestions for common mistakes" $ do
-    let result = parse "function test() { retrun 42; }" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- 'retrun' parsed as identifier
-  it "suggests multiple fix alternatives when appropriate" $ do
-    let result = parse "var x = (1 + 2" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "TailToken {tokenSpan = TokenPn 0 0 0, tokenComment = []}"
-      Right _ -> expectationFailure "Expected parse error"
+  it "accepts typos as identifiers (retrun is a valid identifier)" $ do
+    case parse "function test() { retrun 42; }" "test" of
+      Left _ -> expectationFailure "retrun should be parsed as a valid identifier"
+      Right _ -> pure ()
 
-  it "provides context-specific suggestions" $ do
-    let result = parse "class Test { method( { return 1; } }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "DecimalToken {tokenSpan = TokenPn 30 1 31, tokenLiteral = \"1\", tokenComment = [WhiteSpace (TokenPn 29 1 30) \" \"]}"
-      Right _ -> expectationFailure "Expected parse error"
+  it "rejects unclosed parenthesis in expression" $
+    parse "var x = (1 + 2" "test" `shouldSatisfy` isLeft
 
--- | Test contextual suggestion system
-testContextualSuggestions :: Spec
-testContextualSuggestions = describe "Contextual suggestions" $ do
-  it "provides different suggestions for same error in different contexts" $ do
-    let funcResult = parse "function test( { }" "test"
-    let objResult = parse "var obj = { prop: }" "test"
-    case (funcResult, objResult) of
-      (Left fErr, Left oErr) -> do
-        fErr `shouldBe` "TailToken {tokenSpan = TokenPn 0 0 0, tokenComment = []}"
-        oErr `shouldBe` "RightCurlyToken {tokenSpan = TokenPn 18 1 19, tokenComment = [WhiteSpace (TokenPn 17 1 18) \" \"]}"
-      _ -> return () -- May succeed in some cases
-  it "suggests ES6+ alternatives for legacy syntax issues" $ do
-    let result = parse "var self = this; setTimeout(function() { self.method(); }, 1000);" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- This is valid legacy syntax
+  it "rejects class method with missing closing paren" $
+    parse "class Test { method( { return 1; } }" "test" `shouldSatisfy` isLeft
 
--- | Test recovery strategy effectiveness
-testRecoveryStrategyEffectiveness :: Spec
-testRecoveryStrategyEffectiveness = describe "Recovery strategy effectiveness" $ do
-  it "evaluates recovery success rate for different error types" $ do
-    let testCases =
-          [ "function bad( { var x = 1; }",
-            "var obj = { a: 1, b: , c: 3 };",
-            "for (var i = 0 i < 10; i++) {}",
-            "if (condition { doSomething(); }"
-          ]
-    results <- mapM (\case_str -> return $ parse case_str "test") testCases
-    length results `shouldBe` 4
-
-  it "measures parser state consistency after recovery" $ do
-    let result = parse "function bad( { return 1; } function good() { return 2; }" "test"
-    case result of
-      Left err -> do
-        err `deepseq` return () -- Should not crash
-        err `shouldSatisfy` (not . null)
-      Right ast -> ast `deepseq` return () -- Recovery successful
+  it "provides non-empty error for missing closing paren in params" $ do
+    case parse "function test( { return 42; }" "test" of
+      Left err -> err `shouldSatisfy` (not . null)
+      Right _ -> expectationFailure "Expected parse error for missing closing paren"
 
 -- | Test precise error location reporting
 testPreciseErrorLocations :: Spec
 testPreciseErrorLocations = describe "Precise error locations" $ do
-  it "reports exact character position for syntax errors" $ do
-    let result = parse "function test(a,, c) { return a + c; }" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "CommaToken {tokenSpan = TokenPn 16 1 17, tokenComment = []}"
-      Right _ -> return () -- May succeed with recovery
-  it "identifies correct line and column for multi-line errors" $ do
+  it "rejects multi-line code with dangling operator" $ do
     let multiLineCode =
           unlines
             [ "function test() {",
@@ -355,42 +179,13 @@ testPreciseErrorLocations = describe "Precise error locations" $ do
               "  return x;",
               "}"
             ]
-    let result = parse multiLineCode "test"
-    case result of
-      Left err ->
-        err `shouldBe` "ReturnToken {tokenSpan = TokenPn 34 3 3, tokenLiteral = \"return\", tokenComment = [WhiteSpace (TokenPn 31 2 14) \"\\n  \"]}"
-      Right _ -> expectationFailure "Expected parse error"
-
--- | Test recovery point selection accuracy
-testRecoveryPointSelection :: Spec
-testRecoveryPointSelection = describe "Recovery point selection" $ do
-  it "selects optimal synchronization points" $ do
-    let result = parse "var x = incomplete; function test() { return 42; }" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- May recover successfully
-  it "avoids false recovery points in complex expressions" $ do
-    let result = parse "var complex = (a + b * c function(d) { return e; }) + f;" "test"
-    case result of
-      Left err ->
-        err `shouldSatisfy` (not . null)
-      Right _ -> return () -- May parse with precedence
+    parse multiLineCode "test" `shouldSatisfy` isLeft
 
 -- | Test parser state consistency during recovery
 testParserStateConsistency :: Spec
 testParserStateConsistency = describe "Parser state consistency" $ do
-  it "maintains scope stack consistency during error recovery" $ do
-    let result = parse "{ var x = bad; { var y = good; } var z = also_bad; }" "test"
-    case result of
-      Left err -> do
-        err `deepseq` return () -- Should maintain consistency
-        err `shouldSatisfy` (not . null)
-      Right ast -> ast `deepseq` return ()
+  it "accepts block with identifier-valued variables" $
+    parse "{ var x = bad; { var y = good; } var z = also_bad; }" "test" `shouldSatisfy` isRight
 
-  it "preserves token stream position after recovery" $ do
-    let result = parse "function bad( { return 1; } + validExpression" "test"
-    case result of
-      Left err ->
-        err `shouldBe` "DecimalToken {tokenSpan = TokenPn 23 1 24, tokenLiteral = \"1\", tokenComment = [WhiteSpace (TokenPn 22 1 23) \" \"]}"
-      Right ast -> ast `deepseq` return ()
+  it "rejects function with missing close paren in params" $
+    parse "function bad( { return 1; } + validExpression" "test" `shouldSatisfy` isLeft

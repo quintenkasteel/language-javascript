@@ -750,9 +750,9 @@ testAdvancedBuiltinUsage = describe "Advanced Builtin Usage" $ do
         optimizedSource `shouldContain` "usedMap"
         optimizedSource `shouldContain` "addToUsedMap"
 
-        -- Conservative tree shaking preserves unused map patterns
-        optimizedSource `shouldContain` "unusedMap"
-        optimizedSource `shouldContain` "addToUnusedMap"
+        -- Unused map patterns are correctly eliminated
+        optimizedSource `shouldNotContain` "unusedMap"
+        optimizedSource `shouldNotContain` "addToUnusedMap"
 
       Left err -> expectationFailure $ "Parse failed: " ++ err
 
