@@ -108,28 +108,28 @@ testLiteralSerialization :: Spec
 testLiteralSerialization = describe "Literal Serialization" $ do
   describe "numeric literals" $ do
     it "serializes decimal numbers" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "<JSDecimal value=\"42\">"
       xml `shouldSatisfy` Text.isInfixOf "</JSDecimal>"
 
     it "serializes hexadecimal numbers" $ do
-      let expr = AST.JSHexInteger testAnnot "0xFF"
+      let expr = AST.JSHexInteger testAnnot 0xFF
       let xml = PXML.renderExpressionToXML expr
-      xml `shouldSatisfy` Text.isInfixOf "<JSHexInteger value=\"0xFF\">"
+      xml `shouldSatisfy` Text.isInfixOf "<JSHexInteger value=\"0xff\">"
 
     it "serializes octal numbers" $ do
-      let expr = AST.JSOctal testAnnot "0o777"
+      let expr = AST.JSOctal testAnnot 0o777
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "<JSOctal value=\"0o777\">"
 
     it "serializes binary numbers" $ do
-      let expr = AST.JSBinaryInteger testAnnot "0b1010"
+      let expr = AST.JSBinaryInteger testAnnot 10
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "<JSBinaryInteger value=\"0b1010\">"
 
     it "serializes BigInt literals" $ do
-      let expr = AST.JSBigIntLiteral testAnnot "123n"
+      let expr = AST.JSBigIntLiteral testAnnot 123
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "<JSBigIntLiteral value=\"123n\">"
 
@@ -171,8 +171,8 @@ testExpressionSerialization :: Spec
 testExpressionSerialization = describe "Expression Serialization" $ do
   describe "binary expressions" $ do
     it "serializes arithmetic operations" $ do
-      let left = AST.JSDecimal testAnnot "1"
-      let right = AST.JSDecimal testAnnot "2"
+      let left = AST.JSDecimal testAnnot 1
+      let right = AST.JSDecimal testAnnot 2
       let op = AST.JSBinOpPlus testAnnot
       let expr = AST.JSExpressionBinary left op right
       let xml = PXML.renderExpressionToXML expr
@@ -191,7 +191,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes comparison operations" $ do
       let left = AST.JSIdentifier testAnnot "x"
-      let right = AST.JSDecimal testAnnot "5"
+      let right = AST.JSDecimal testAnnot 5
       let op = AST.JSBinOpLt testAnnot
       let expr = AST.JSExpressionBinary left op right
       let xml = PXML.renderExpressionToXML expr
@@ -225,7 +225,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes function calls with arguments" $ do
       let func = AST.JSIdentifier testAnnot "func"
-      let arg = AST.JSDecimal testAnnot "42"
+      let arg = AST.JSDecimal testAnnot 42
       let args = AST.JSLOne arg
       let expr = AST.JSCallExpression func testAnnot args testAnnot
       let xml = PXML.renderExpressionToXML expr
@@ -267,7 +267,7 @@ testModernJavaScriptFeatures = describe "Modern JavaScript Features" $ do
   describe "arrow functions" $ do
     it "serializes simple arrow functions" $ do
       let param = AST.JSUnparenthesizedArrowParameter (AST.JSIdentName testAnnot "x")
-      let body = AST.JSConciseExpressionBody (AST.JSDecimal testAnnot "42")
+      let body = AST.JSConciseExpressionBody (AST.JSDecimal testAnnot 42)
       let expr = AST.JSArrowExpression param testAnnot body
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "<JSArrowExpression>"
@@ -279,7 +279,7 @@ testStatementSerialization :: Spec
 testStatementSerialization = describe "Statement Serialization" $ do
   describe "expression statements" $ do
     it "serializes expression statements" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let stmt = AST.JSExpressionStatement expr AST.JSSemiAuto
       let xml = PXML.renderStatementToXML stmt
       xml `shouldSatisfy` Text.isInfixOf "<JSExpressionStatement>"
@@ -288,7 +288,7 @@ testStatementSerialization = describe "Statement Serialization" $ do
   describe "variable declarations" $ do
     it "serializes var declarations" $ do
       let ident = AST.JSIdentifier testAnnot "x"
-      let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")
+      let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
       let varInit = AST.JSVarInitExpression ident init
       let stmt = AST.JSVariable testAnnot (AST.JSLOne varInit) AST.JSSemiAuto
       let xml = PXML.renderStatementToXML stmt
@@ -303,7 +303,7 @@ testStatementSerialization = describe "Statement Serialization" $ do
 
     it "serializes const declarations" $ do
       let ident = AST.JSIdentifier testAnnot "x"
-      let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")
+      let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
       let varInit = AST.JSVarInitExpression ident init
       let stmt = AST.JSConstant testAnnot (AST.JSLOne varInit) AST.JSSemiAuto
       let xml = PXML.renderStatementToXML stmt
@@ -326,7 +326,7 @@ testStatementSerialization = describe "Statement Serialization" $ do
       xml `shouldSatisfy` Text.isInfixOf "<JSWhile>"
 
     it "serializes return statements" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let stmt = AST.JSReturn testAnnot (Just expr) AST.JSSemiAuto
       let xml = PXML.renderStatementToXML stmt
       xml `shouldSatisfy` Text.isInfixOf "<JSReturn>"
@@ -392,15 +392,15 @@ testEdgeCases = describe "Edge Cases" $ do
     memberDotCount `shouldBe` 2
 
   it "handles large numeric values" $ do
-    let expr = AST.JSDecimal testAnnot "9007199254740991"
+    let expr = AST.JSDecimal testAnnot 9007199254740991
     let xml = PXML.renderExpressionToXML expr
-    xml `shouldSatisfy` Text.isInfixOf "9007199254740991"
+    xml `shouldSatisfy` Text.isInfixOf "9.007199254740991e15"
 
 -- | Test complete program serialization
 testCompletePrograms :: Spec
 testCompletePrograms = describe "Complete Program Serialization" $ do
   it "serializes simple programs" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let stmt = AST.JSExpressionStatement expr AST.JSSemiAuto
     let prog = AST.JSAstProgram [stmt] testAnnot
     let xml = PXML.renderToXML prog
@@ -426,7 +426,7 @@ testCompletePrograms = describe "Complete Program Serialization" $ do
     xml `shouldSatisfy` Text.isInfixOf "<JSExpressionStatement>"
 
   it "serializes different AST root types" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let exprAST = AST.JSAstExpression expr testAnnot
     let xml = PXML.renderToXML exprAST
     xml `shouldSatisfy` Text.isInfixOf "<JSAstExpression>"
@@ -437,7 +437,7 @@ testXMLFormatCompliance = describe "XML Format Compliance" $ do
   it "produces valid XML for all expression types" $ do
     -- Test a variety of expressions to ensure valid XML structure
     let expressions =
-          [ AST.JSDecimal testAnnot "42",
+          [ AST.JSDecimal testAnnot 42,
             AST.JSStringLiteral testAnnot "\"test\"",
             AST.JSIdentifier testAnnot "variable",
             AST.JSLiteral testAnnot "true"
@@ -451,15 +451,15 @@ testXMLFormatCompliance = describe "XML Format Compliance" $ do
       expressions
 
   it "maintains consistent element structure" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let xml = PXML.renderExpressionToXML expr
     -- Should have matching opening and closing tags
     xml `shouldSatisfy` Text.isInfixOf "<JSDecimal"
     xml `shouldSatisfy` Text.isInfixOf "</JSDecimal>"
 
   it "properly nests child elements" $ do
-    let left = AST.JSDecimal testAnnot "1"
-    let right = AST.JSDecimal testAnnot "2"
+    let left = AST.JSDecimal testAnnot 1
+    let right = AST.JSDecimal testAnnot 2
     let op = AST.JSBinOpPlus testAnnot
     let expr = AST.JSExpressionBinary left op right
     let xml = PXML.renderExpressionToXML expr

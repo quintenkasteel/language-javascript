@@ -97,31 +97,31 @@ testLiteralSerialization :: Spec
 testLiteralSerialization = describe "Literal Serialization" $ do
   describe "numeric literals" $ do
     it "serializes decimal numbers" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let sexpr = PSExpr.renderExpressionToSExpr expr
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSDecimal"
       sexpr `shouldSatisfy` Text.isInfixOf "\"42\""
 
     it "serializes hexadecimal numbers" $ do
-      let expr = AST.JSHexInteger testAnnot "0xFF"
+      let expr = AST.JSHexInteger testAnnot 0xFF
       let sexpr = PSExpr.renderExpressionToSExpr expr
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSHexInteger"
-      sexpr `shouldSatisfy` Text.isInfixOf "\"0xFF\""
+      sexpr `shouldSatisfy` Text.isInfixOf "\"0xff\""
 
     it "serializes octal numbers" $ do
-      let expr = AST.JSOctal testAnnot "0o777"
+      let expr = AST.JSOctal testAnnot 0o777
       let sexpr = PSExpr.renderExpressionToSExpr expr
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSOctal"
       sexpr `shouldSatisfy` Text.isInfixOf "\"0o777\""
 
     it "serializes binary numbers" $ do
-      let expr = AST.JSBinaryInteger testAnnot "0b1010"
+      let expr = AST.JSBinaryInteger testAnnot 10
       let sexpr = PSExpr.renderExpressionToSExpr expr
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSBinaryInteger"
       sexpr `shouldSatisfy` Text.isInfixOf "\"0b1010\""
 
     it "serializes BigInt literals" $ do
-      let expr = AST.JSBigIntLiteral testAnnot "123n"
+      let expr = AST.JSBigIntLiteral testAnnot 123
       let sexpr = PSExpr.renderExpressionToSExpr expr
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSBigIntLiteral"
       sexpr `shouldSatisfy` Text.isInfixOf "\"123n\""
@@ -168,8 +168,8 @@ testExpressionSerialization :: Spec
 testExpressionSerialization = describe "Expression Serialization" $ do
   describe "binary expressions" $ do
     it "serializes arithmetic operations" $ do
-      let left = AST.JSDecimal testAnnot "1"
-      let right = AST.JSDecimal testAnnot "2"
+      let left = AST.JSDecimal testAnnot 1
+      let right = AST.JSDecimal testAnnot 2
       let op = AST.JSBinOpPlus testAnnot
       let expr = AST.JSExpressionBinary left op right
       let sexpr = PSExpr.renderExpressionToSExpr expr
@@ -188,7 +188,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes comparison operations" $ do
       let left = AST.JSIdentifier testAnnot "x"
-      let right = AST.JSDecimal testAnnot "5"
+      let right = AST.JSDecimal testAnnot 5
       let op = AST.JSBinOpLt testAnnot
       let expr = AST.JSExpressionBinary left op right
       let sexpr = PSExpr.renderExpressionToSExpr expr
@@ -222,7 +222,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes function calls with arguments" $ do
       let func = AST.JSIdentifier testAnnot "func"
-      let arg = AST.JSDecimal testAnnot "42"
+      let arg = AST.JSDecimal testAnnot 42
       let args = AST.JSLOne arg
       let expr = AST.JSCallExpression func testAnnot args testAnnot
       let sexpr = PSExpr.renderExpressionToSExpr expr
@@ -266,7 +266,7 @@ testModernJavaScriptFeatures = describe "Modern JavaScript Features" $ do
   describe "arrow functions" $ do
     it "serializes simple arrow functions" $ do
       let param = AST.JSUnparenthesizedArrowParameter (AST.JSIdentName testAnnot "x")
-      let body = AST.JSConciseExpressionBody (AST.JSDecimal testAnnot "42")
+      let body = AST.JSConciseExpressionBody (AST.JSDecimal testAnnot 42)
       let expr = AST.JSArrowExpression param testAnnot body
       let sexpr = PSExpr.renderExpressionToSExpr expr
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSArrowExpression"
@@ -278,7 +278,7 @@ testStatementSerialization :: Spec
 testStatementSerialization = describe "Statement Serialization" $ do
   describe "expression statements" $ do
     it "serializes expression statements" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let stmt = AST.JSExpressionStatement expr AST.JSSemiAuto
       let sexpr = PSExpr.renderStatementToSExpr stmt
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSExpressionStatement"
@@ -288,7 +288,7 @@ testStatementSerialization = describe "Statement Serialization" $ do
   describe "variable declarations" $ do
     it "serializes var declarations" $ do
       let ident = AST.JSIdentifier testAnnot "x"
-      let initializer = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")
+      let initializer = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
       let varInit = AST.JSVarInitExpression ident initializer
       let stmt = AST.JSVariable testAnnot (AST.JSLOne varInit) AST.JSSemiAuto
       let sexpr = PSExpr.renderStatementToSExpr stmt
@@ -303,7 +303,7 @@ testStatementSerialization = describe "Statement Serialization" $ do
 
     it "serializes const declarations" $ do
       let ident = AST.JSIdentifier testAnnot "x"
-      let initializer = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")
+      let initializer = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
       let varInit = AST.JSVarInitExpression ident initializer
       let stmt = AST.JSConstant testAnnot (AST.JSLOne varInit) AST.JSSemiAuto
       let sexpr = PSExpr.renderStatementToSExpr stmt
@@ -316,7 +316,7 @@ testStatementSerialization = describe "Statement Serialization" $ do
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSEmptyStatement"
 
     it "serializes return statements" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let stmt = AST.JSReturn testAnnot (Just expr) AST.JSSemiAuto
       let sexpr = PSExpr.renderStatementToSExpr stmt
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSReturn"
@@ -385,15 +385,15 @@ testEdgeCases = describe "Edge Cases" $ do
     memberDotCount `shouldBe` 2
 
   it "handles large numeric values" $ do
-    let expr = AST.JSDecimal testAnnot "9007199254740991"
+    let expr = AST.JSDecimal testAnnot 9007199254740991
     let sexpr = PSExpr.renderExpressionToSExpr expr
-    sexpr `shouldSatisfy` Text.isInfixOf "9007199254740991"
+    sexpr `shouldSatisfy` Text.isInfixOf "9.007199254740991e15"
 
 -- | Test complete program serialization
 testCompletePrograms :: Spec
 testCompletePrograms = describe "Complete Program Serialization" $ do
   it "serializes simple programs" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let stmt = AST.JSExpressionStatement expr AST.JSSemiAuto
     let prog = AST.JSAstProgram [stmt] testAnnot
     let sexpr = PSExpr.renderToSExpr prog
@@ -419,7 +419,7 @@ testCompletePrograms = describe "Complete Program Serialization" $ do
     sexpr `shouldSatisfy` Text.isInfixOf "(JSExpressionStatement"
 
   it "serializes different AST root types" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let exprAST = AST.JSAstExpression expr testAnnot
     let sexpr = PSExpr.renderToSExpr exprAST
     sexpr `shouldSatisfy` Text.isPrefixOf "(JSAstExpression"
@@ -430,7 +430,7 @@ testSExprFormatCompliance = describe "S-Expression Format Compliance" $ do
   it "produces valid S-expressions for all expression types" $ do
     -- Test a variety of expressions to ensure valid S-expression structure
     let expressions =
-          [ AST.JSDecimal testAnnot "42",
+          [ AST.JSDecimal testAnnot 42,
             AST.JSStringLiteral testAnnot "\"test\"",
             AST.JSIdentifier testAnnot "variable",
             AST.JSLiteral testAnnot "true"
@@ -444,7 +444,7 @@ testSExprFormatCompliance = describe "S-Expression Format Compliance" $ do
       expressions
 
   it "maintains proper list structure" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let sexpr = PSExpr.renderExpressionToSExpr expr
     -- Should have matching parentheses
     let openCount = Text.count "(" sexpr
@@ -452,8 +452,8 @@ testSExprFormatCompliance = describe "S-Expression Format Compliance" $ do
     openCount `shouldBe` closeCount
 
   it "properly nests child expressions" $ do
-    let left = AST.JSDecimal testAnnot "1"
-    let right = AST.JSDecimal testAnnot "2"
+    let left = AST.JSDecimal testAnnot 1
+    let right = AST.JSDecimal testAnnot 2
     let op = AST.JSBinOpPlus testAnnot
     let expr = AST.JSExpressionBinary left op right
     let sexpr = PSExpr.renderExpressionToSExpr expr

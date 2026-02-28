@@ -52,7 +52,6 @@ module Language.JavaScript.Pretty.JSON
   )
 where
 
-import qualified Data.ByteString.Char8 as BS8
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -138,25 +137,25 @@ renderExpressionToJSON expr = case expr of
       formatJSONObject
         [ ("type", "\"JSDecimal\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
+          ("value", escapeJSONString (AST.showJSDouble value))
         ]
     renderHexLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSHexInteger\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
+          ("value", escapeJSONString (AST.showJSHex value))
         ]
     renderOctalLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSOctal\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
+          ("value", escapeJSONString (AST.showJSOctal value))
         ]
     renderBigIntLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSBigIntLiteral\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
+          ("value", escapeJSONString (show value <> "n"))
         ]
     renderStringLiteral annot value =
       formatJSONObject

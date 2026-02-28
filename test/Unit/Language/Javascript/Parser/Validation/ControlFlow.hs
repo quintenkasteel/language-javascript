@@ -151,7 +151,7 @@ createSwitchWithBreak =
         noAnnot
         [ JSCase
             noAnnot
-            (JSDecimal noAnnot "1")
+            (JSDecimal noAnnot 1)
             noAnnot
             [ JSBreak noAnnot JSIdentNone auto
             ]
@@ -231,7 +231,7 @@ createSwitchWithContinue =
         noAnnot
         [ JSCase
             noAnnot
-            (JSDecimal noAnnot "1")
+            (JSDecimal noAnnot 1)
             noAnnot
             [ JSContinue noAnnot JSIdentNone auto
             ]
@@ -248,7 +248,7 @@ createSimpleLabel =
     [ JSLabelled
         (JSIdentName noAnnot "label")
         noAnnot
-        (JSExpressionStatement (JSDecimal noAnnot "42") auto)
+        (JSExpressionStatement (JSDecimal noAnnot 42) auto)
     ]
     noAnnot
 
@@ -274,11 +274,11 @@ createDuplicateLabels =
     [ JSLabelled
         (JSIdentName noAnnot "duplicate")
         noAnnot
-        (JSExpressionStatement (JSDecimal noAnnot "1") auto),
+        (JSExpressionStatement (JSDecimal noAnnot 1) auto),
       JSLabelled
         (JSIdentName noAnnot "duplicate")
         noAnnot
-        (JSExpressionStatement (JSDecimal noAnnot "2") auto)
+        (JSExpressionStatement (JSDecimal noAnnot 2) auto)
     ]
     noAnnot
 

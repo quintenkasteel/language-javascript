@@ -99,6 +99,9 @@ module Language.JavaScript.Parser.Flatparse.Grammar
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
+import Data.List (foldl', filter)
+import Data.Maybe (fromMaybe)
+import Text.Read (readMaybe)
 import qualified FlatParse.Basic as FP
 import Control.Applicative (pure, (*>), (<*>), (<$>))
 
@@ -1093,14 +1096,15 @@ numericLit = do
   raw <- numericLiteral
   pure (classifyNumeric (fpPosToAnnot pos) raw)
 
--- | Classify numeric literal by format.
+-- | Classify numeric literal by format and parse into proper numeric type.
+-- Decimal literals become 'Double', all integer formats become 'Integer'.
 classifyNumeric :: JSAnnot -> ByteString -> JSExpression
 classifyNumeric a s
-  | hasBigIntSuffix = JSBigIntLiteral a s
-  | hasPrefix "0x" || hasPrefix "0X" = JSHexInteger a s
-  | hasPrefix "0b" || hasPrefix "0B" = JSBinaryInteger a s
-  | hasOctalPrefix = JSOctal a s
-  | otherwise = JSDecimal a s
+  | hasBigIntSuffix = JSBigIntLiteral a (parseBigIntValue s)
+  | hasPrefix "0x" || hasPrefix "0X" = JSHexInteger a (parseHexValue s)
+  | hasPrefix "0b" || hasPrefix "0B" = JSBinaryInteger a (parseBinaryValue s)
+  | hasOctalPrefix = JSOctal a (parseOctalValue s)
+  | otherwise = JSDecimal a (parseDecimalValue s)
   where
     hasBigIntSuffix = not (BS8.null s) && BS8.last s == 'n'
     hasPrefix p = p `BS8.isPrefixOf` s
@@ -1110,6 +1114,60 @@ classifyNumeric a s
           let c = BS8.index s 1
           in c == 'o' || c == 'O' || (c >= '0' && c <= '7')
       | otherwise = False
+
+-- | Parse a decimal numeric string to Double, stripping numeric separators.
+-- Handles leading-dot decimals like @.5@ which Haskell's 'read' rejects.
+-- Returns 0 for malformed input rather than crashing.
+parseDecimalValue :: ByteString -> Double
+parseDecimalValue bs = fromMaybe 0 (readMaybe cleaned)
+  where
+    cleaned = prependZero (filter (/= '_') (BS8.unpack bs))
+    prependZero ('.':rest) = '0' : '.' : rest
+    prependZero s = s
+
+-- | Parse a hex numeric string (with 0x prefix) to Integer.
+-- Returns 0 for malformed input rather than crashing.
+parseHexValue :: ByteString -> Integer
+parseHexValue bs = fromMaybe 0 (readMaybe ("0x" <> filter (/= '_') (BS8.unpack (BS8.drop 2 bs))))
+
+-- | Parse a binary numeric string (with 0b prefix) to Integer.
+parseBinaryValue :: ByteString -> Integer
+parseBinaryValue bs = foldl' (\acc c -> acc * 2 + binDigitVal c) 0 digits
+  where
+    digits = filter (/= '_') (BS8.unpack (BS8.drop 2 bs))
+    binDigitVal '0' = 0
+    binDigitVal '1' = 1
+    binDigitVal _ = 0
+
+-- | Parse an octal numeric string to Integer.
+-- Returns 0 for malformed input rather than crashing.
+parseOctalValue :: ByteString -> Integer
+parseOctalValue bs
+  | BS8.length bs >= 2, c == 'o' || c == 'O' =
+      fromMaybe 0 (readMaybe ("0o" <> filter (/= '_') (BS8.unpack (BS8.drop 2 bs))))
+  | otherwise =
+      fromMaybe 0 (readMaybe ("0o" <> filter (/= '_') (BS8.unpack (BS8.drop 1 bs))))
+  where
+    c = BS8.index bs 1
+
+-- | Parse a BigInt literal to Integer (strip trailing 'n' and classify base).
+-- Handles edge cases like @123.456n@ (truncates to integer) and @123e4n@
+-- (evaluates scientific notation then truncates) for parser tolerance.
+-- Returns 0 for malformed input rather than crashing.
+parseBigIntValue :: ByteString -> Integer
+parseBigIntValue bs = classifyAndParse (BS8.init bs)
+  where
+    classifyAndParse s
+      | "0x" `BS8.isPrefixOf` s || "0X" `BS8.isPrefixOf` s = parseHexValue s
+      | "0b" `BS8.isPrefixOf` s || "0B" `BS8.isPrefixOf` s = parseBinaryValue s
+      | "0o" `BS8.isPrefixOf` s || "0O" `BS8.isPrefixOf` s = parseOctalValue s
+      | otherwise = parseDecimalAsInteger (filter (/= '_') (BS8.unpack s))
+    parseDecimalAsInteger str
+      | any (`elem` (".eE" :: String)) str =
+          truncate (fromMaybe 0 (readMaybe (prependZero str) :: Maybe Double))
+      | otherwise = fromMaybe 0 (readMaybe str)
+    prependZero ('.':rest) = '0' : '.' : rest
+    prependZero s = s
 
 -- | Parse regex literal: @/pattern/flags@ (zero-copy).
 regexLiteral :: JSParser JSExpression

@@ -52,7 +52,6 @@ module Language.JavaScript.Pretty.SExpr
   )
 where
 
-import qualified Data.ByteString.Char8 as BS8
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -118,31 +117,31 @@ renderExpressionToSExpr expr = case expr of
   AST.JSDecimal annot value ->
     formatSExprList
       [ "JSDecimal",
-        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
+        escapeSExprString (AST.showJSDouble value),
         renderAnnotation annot
       ]
   AST.JSHexInteger annot value ->
     formatSExprList
       [ "JSHexInteger",
-        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
+        escapeSExprString (AST.showJSHex value),
         renderAnnotation annot
       ]
   AST.JSOctal annot value ->
     formatSExprList
       [ "JSOctal",
-        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
+        escapeSExprString (AST.showJSOctal value),
         renderAnnotation annot
       ]
   AST.JSBinaryInteger annot value ->
     formatSExprList
       [ "JSBinaryInteger",
-        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
+        escapeSExprString (AST.showJSBinary value),
         renderAnnotation annot
       ]
   AST.JSBigIntLiteral annot value ->
     formatSExprList
       [ "JSBigIntLiteral",
-        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
+        escapeSExprString (show value <> "n"),
         renderAnnotation annot
       ]
   AST.JSStringLiteral annot value ->

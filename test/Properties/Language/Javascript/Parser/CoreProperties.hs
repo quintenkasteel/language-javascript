@@ -50,7 +50,6 @@ where
 
 import Control.Monad (forM_)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
 import qualified Language.JavaScript.Parser as Parser
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation
@@ -321,13 +320,13 @@ testTokenToASTPositionMapping = describe "Token to AST position mapping" $ do
     let original = "42"
     case Parser.parse original "test" of
       Right (AST.JSAstProgram [AST.JSExpressionStatement (AST.JSDecimal _ num) _] _) ->
-        num `shouldBe` "42"
+        num `shouldBe` 42.0
       Right ast -> expectationFailure ("Unexpected AST structure: " ++ show ast)
       Left err -> expectationFailure ("Parse failed: " ++ show err)
 
   it "preserves expression complexity relationships" $ do
-    let simple = literalNumber "42"
-        complex = AST.JSExpressionBinary (literalNumber "1") (AST.JSBinOpPlus AST.JSNoAnnot) (literalNumber "2")
+    let simple = literalNumber 42
+        complex = AST.JSExpressionBinary (literalNumber 1) (AST.JSBinOpPlus AST.JSNoAnnot) (literalNumber 2)
     expressionComplexity simple < expressionComplexity complex `shouldBe` True
 
 -- | Test source location invariants
@@ -336,21 +335,21 @@ testSourceLocationInvariants = describe "Source location invariants" $ do
   it "AST maintains logical structure ordering" $ do
     let program =
           AST.JSAstProgram
-            [ AST.JSExpressionStatement (literalNumber "1") (AST.JSSemi AST.JSNoAnnot),
-              AST.JSExpressionStatement (literalNumber "2") (AST.JSSemi AST.JSNoAnnot)
+            [ AST.JSExpressionStatement (literalNumber 1) (AST.JSSemi AST.JSNoAnnot),
+              AST.JSExpressionStatement (literalNumber 2) (AST.JSSemi AST.JSNoAnnot)
             ]
             AST.JSNoAnnot
         AST.JSAstProgram stmts _ = program
     all isValidStatement stmts `shouldBe` True
 
   it "block statements contain their child statements" $ do
-    let childStmt = AST.JSExpressionStatement (literalNumber "42") (AST.JSSemi AST.JSNoAnnot)
+    let childStmt = AST.JSExpressionStatement (literalNumber 42) (AST.JSSemi AST.JSNoAnnot)
         blockStmt = AST.JSStatementBlock AST.JSNoAnnot [childStmt] AST.JSNoAnnot AST.JSSemiAuto
     statementContainsChild blockStmt childStmt `shouldBe` True
 
   it "expression statements don't contain other statements" $ do
-    let stmt1 = AST.JSExpressionStatement (literalNumber "1") (AST.JSSemi AST.JSNoAnnot)
-        stmt2 = AST.JSExpressionStatement (literalNumber "2") (AST.JSSemi AST.JSNoAnnot)
+    let stmt1 = AST.JSExpressionStatement (literalNumber 1) (AST.JSSemi AST.JSNoAnnot)
+        stmt2 = AST.JSExpressionStatement (literalNumber 2) (AST.JSSemi AST.JSNoAnnot)
     statementContainsChild stmt1 stmt2 `shouldBe` False
 
 -- | Test position calculation correctness
@@ -381,9 +380,9 @@ testStructuralEquivalence = describe "Structural equivalence" $ do
           == structurallyEquivalent prog2 prog1
 
   it "structural equivalence is transitive" $ do
-    let prog1 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot
-        prog2 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot
-        prog3 = AST.JSAstProgram [simpleExprStmt (literalNumber "42")] AST.JSNoAnnot
+    let prog1 = AST.JSAstProgram [simpleExprStmt (literalNumber 42)] AST.JSNoAnnot
+        prog2 = AST.JSAstProgram [simpleExprStmt (literalNumber 42)] AST.JSNoAnnot
+        prog3 = AST.JSAstProgram [simpleExprStmt (literalNumber 42)] AST.JSNoAnnot
     structurallyEquivalent prog1 prog2 `shouldBe` True
     structurallyEquivalent prog2 prog3 `shouldBe` True
     structurallyEquivalent prog1 prog3 `shouldBe` True
@@ -438,9 +437,9 @@ genValidExpression =
       genCallExpression
     ]
 
--- | Generate ByteString numbers
-genNumber :: Gen ByteString
-genNumber = BS8.pack . show <$> (arbitrary :: Gen Int)
+-- | Generate Double numbers for JSDecimal constructor
+genNumber :: Gen Double
+genNumber = fromIntegral . abs <$> (arbitrary :: Gen Int)
 
 -- | Generate ByteString quoted strings
 genQuotedString :: Gen ByteString
@@ -845,7 +844,7 @@ simpleExprStmt :: AST.JSExpression -> AST.JSStatement
 simpleExprStmt expr = AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
 
 -- | Construct a numeric literal expression
-literalNumber :: ByteString -> AST.JSExpression
+literalNumber :: Double -> AST.JSExpression
 literalNumber num = AST.JSDecimal AST.JSNoAnnot num
 
 -- | Construct a string literal expression

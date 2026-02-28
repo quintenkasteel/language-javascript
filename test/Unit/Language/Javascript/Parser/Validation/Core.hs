@@ -34,7 +34,7 @@ testValidator = describe "AST Validator Tests" $ do
     it "provides specific error types for return outside function" $ do
       let invalidProgram =
             JSAstProgram
-              [ JSReturn noAnnot (Just (JSDecimal noAnnot "42")) auto
+              [ JSReturn noAnnot (Just (JSDecimal noAnnot 42)) auto
               ]
               noAnnot
       case validate invalidProgram of
@@ -65,7 +65,7 @@ testValidator = describe "AST Validator Tests" $ do
       let invalidProgram =
             JSAstProgram
               [ JSExpressionStatement
-                  (JSYieldExpression noAnnot (Just (JSDecimal noAnnot "42")))
+                  (JSYieldExpression noAnnot (Just (JSDecimal noAnnot 42)))
                   auto
               ]
               noAnnot
@@ -95,9 +95,9 @@ testValidator = describe "AST Validator Tests" $ do
       let invalidProgram =
             JSAstProgram
               [ JSAssignStatement
-                  (JSDecimal noAnnot "42")
+                  (JSDecimal noAnnot 42)
                   (JSAssign noAnnot)
-                  (JSDecimal noAnnot "24")
+                  (JSDecimal noAnnot 24)
                   auto
               ]
               noAnnot
@@ -135,7 +135,7 @@ testValidator = describe "AST Validator Tests" $ do
                   ( JSLOne
                       ( JSVarInitExpression
                           (JSIdentifier noAnnot "x")
-                          (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                          (JSVarInit noAnnot (JSDecimal noAnnot 42))
                       )
                   )
                   auto
@@ -196,7 +196,7 @@ testValidator = describe "AST Validator Tests" $ do
                   noAnnot
                   [ JSCase
                       noAnnot
-                      (JSDecimal noAnnot "1")
+                      (JSDecimal noAnnot 1)
                       noAnnot
                       [ JSBreak noAnnot JSIdentNone auto
                       ]
@@ -256,7 +256,7 @@ testValidator = describe "AST Validator Tests" $ do
                       [ JSExpressionStatement
                           ( JSYieldExpression
                               noAnnot
-                              (Just (JSDecimal noAnnot "42"))
+                              (Just (JSDecimal noAnnot 42))
                           )
                           auto
                       ]
@@ -275,7 +275,7 @@ testValidator = describe "AST Validator Tests" $ do
                   ( JSLOne
                       ( JSVarInitExpression
                           (JSIdentifier noAnnot "x")
-                          (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                          (JSVarInit noAnnot (JSDecimal noAnnot 42))
                       )
                   )
                   auto
@@ -309,7 +309,7 @@ testValidator = describe "AST Validator Tests" $ do
             JSAstProgram
               [ JSReturn
                   noAnnot
-                  (Just (JSDecimal noAnnot "42"))
+                  (Just (JSDecimal noAnnot 42))
                   auto
               ]
               noAnnot
@@ -327,7 +327,7 @@ testValidator = describe "AST Validator Tests" $ do
                   ( JSLOne
                       ( JSVarInitExpression
                           (JSIdentifier noAnnot "x")
-                          (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                          (JSVarInit noAnnot (JSDecimal noAnnot 42))
                       )
                   )
                   auto
@@ -344,7 +344,7 @@ testValidator = describe "AST Validator Tests" $ do
                       ( JSLOne
                           ( JSVarInitExpression
                               (JSIdentifier noAnnot "x")
-                              (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                              (JSVarInit noAnnot (JSDecimal noAnnot 42))
                           )
                       )
                       auto
@@ -382,7 +382,7 @@ testValidator = describe "AST Validator Tests" $ do
       let validTargets =
             [ JSIdentifier noAnnot "x",
               JSMemberDot (JSIdentifier noAnnot "obj") noAnnot (JSIdentifier noAnnot "prop"),
-              JSMemberSquare (JSIdentifier noAnnot "arr") noAnnot (JSDecimal noAnnot "0") noAnnot,
+              JSMemberSquare (JSIdentifier noAnnot "arr") noAnnot (JSDecimal noAnnot 0) noAnnot,
               JSArrayLiteral noAnnot [] noAnnot, -- Destructuring
               JSObjectLiteral noAnnot (JSCTLNone JSLNil) noAnnot -- Destructuring
             ]
@@ -390,7 +390,7 @@ testValidator = describe "AST Validator Tests" $ do
       mapM_ (\target -> validateAssignmentTarget target `shouldBe` []) validTargets
 
     it "rejects invalid assignment targets with specific errors" $ do
-      let invalidLiteral = JSDecimal noAnnot "42"
+      let invalidLiteral = JSDecimal noAnnot 42
       case validateAssignmentTarget invalidLiteral of
         [InvalidAssignmentTarget _ _] -> pure ()
         other -> expectationFailure $ "Expected InvalidAssignmentTarget but got: " ++ show other
@@ -422,7 +422,7 @@ testValidator = describe "AST Validator Tests" $ do
                               noAnnot
                               [ JSReturn
                                   noAnnot
-                                  (Just (JSDecimal noAnnot "42"))
+                                  (Just (JSDecimal noAnnot 42))
                                   auto
                               ]
                               noAnnot
@@ -722,7 +722,7 @@ testValidator = describe "AST Validator Tests" $ do
                   ( JSLOne
                       ( JSVarInitExpression
                           (JSIdentifier noAnnot "x")
-                          (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                          (JSVarInit noAnnot (JSDecimal noAnnot 42))
                       )
                   )
                   auto
@@ -741,7 +741,7 @@ testValidator = describe "AST Validator Tests" $ do
       validate emptyModule `shouldSatisfy` isRight
 
     it "validates single expression" $ do
-      let exprAST = JSAstExpression (JSDecimal noAnnot "42") noAnnot
+      let exprAST = JSAstExpression (JSDecimal noAnnot 42) noAnnot
       validate exprAST `shouldSatisfy` isRight
 
     it "validates single statement" $ do
@@ -755,7 +755,7 @@ testValidator = describe "AST Validator Tests" $ do
                   ( JSExpressionBinary
                       (JSIdentifier noAnnot "x")
                       (JSBinOpGt noAnnot)
-                      (JSDecimal noAnnot "0")
+                      (JSDecimal noAnnot 0)
                   )
                   noAnnot
                   ( JSCallExpression
@@ -787,11 +787,11 @@ testValidator = describe "AST Validator Tests" $ do
     it "validates various numeric literals" $ do
       let numericProgram =
             JSAstProgram
-              [ JSExpressionStatement (JSDecimal noAnnot "42") auto,
-                JSExpressionStatement (JSDecimal noAnnot "3.14") auto,
-                JSExpressionStatement (JSDecimal noAnnot "1e10") auto,
-                JSExpressionStatement (JSHexInteger noAnnot "0xFF") auto,
-                JSExpressionStatement (JSBigIntLiteral noAnnot "123n") auto
+              [ JSExpressionStatement (JSDecimal noAnnot 42) auto,
+                JSExpressionStatement (JSDecimal noAnnot 3.14) auto,
+                JSExpressionStatement (JSDecimal noAnnot 1e10) auto,
+                JSExpressionStatement (JSHexInteger noAnnot 0xFF) auto,
+                JSExpressionStatement (JSBigIntLiteral noAnnot 123) auto
               ]
               noAnnot
       validate numericProgram `shouldSatisfy` isRight
@@ -828,7 +828,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "x")
-                            (JSVarInit noAnnot (JSYieldExpression noAnnot (Just (JSDecimal noAnnot "1"))))
+                            (JSVarInit noAnnot (JSYieldExpression noAnnot (Just (JSDecimal noAnnot 1))))
                         )
                     )
                     noAnnot
@@ -858,7 +858,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "x")
-                            (JSVarInit noAnnot (JSYieldExpression noAnnot (Just (JSDecimal noAnnot "1"))))
+                            (JSVarInit noAnnot (JSYieldExpression noAnnot (Just (JSDecimal noAnnot 1))))
                         )
                     )
                     noAnnot
@@ -1017,7 +1017,7 @@ testValidator = describe "AST Validator Tests" $ do
                 [ JSLabelled
                     (JSIdentName noAnnot "label")
                     noAnnot
-                    (JSExpressionStatement (JSDecimal noAnnot "42") auto),
+                    (JSExpressionStatement (JSDecimal noAnnot 42) auto),
                   JSBreak noAnnot (JSIdentName noAnnot "label") auto
                 ]
                 noAnnot
@@ -1095,7 +1095,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLabelled
                         (JSIdentName noAnnot "label")
                         noAnnot
-                        (JSExpressionStatement (JSDecimal noAnnot "42") auto)
+                        (JSExpressionStatement (JSDecimal noAnnot 42) auto)
                     )
                 ]
                 noAnnot
@@ -1116,7 +1116,7 @@ testValidator = describe "AST Validator Tests" $ do
         let invalidProgram =
               JSAstProgram
                 [ JSAssignStatement
-                    (JSDecimal noAnnot "42")
+                    (JSDecimal noAnnot 42)
                     (JSAssign noAnnot)
                     ( JSArrayLiteral
                         noAnnot
@@ -1182,7 +1182,7 @@ testValidator = describe "AST Validator Tests" $ do
                 [ JSForIn
                     noAnnot
                     noAnnot
-                    (JSDecimal noAnnot "42")
+                    (JSDecimal noAnnot 42)
                     (JSBinOpIn noAnnot)
                     (JSIdentifier noAnnot "obj")
                     noAnnot
@@ -1248,7 +1248,7 @@ testValidator = describe "AST Validator Tests" $ do
                 [ JSForOf
                     noAnnot
                     noAnnot
-                    (JSDecimal noAnnot "42")
+                    (JSDecimal noAnnot 42)
                     (JSBinOpOf noAnnot)
                     (JSIdentifier noAnnot "array")
                     noAnnot
@@ -1332,9 +1332,9 @@ testValidator = describe "AST Validator Tests" $ do
                                 noAnnot
                                 ( JSArrayLiteral
                                     noAnnot
-                                    [ JSArrayElement (JSDecimal noAnnot "1"),
+                                    [ JSArrayElement (JSDecimal noAnnot 1),
                                       JSArrayComma noAnnot,
-                                      JSArrayElement (JSDecimal noAnnot "2")
+                                      JSArrayElement (JSDecimal noAnnot 2)
                                     ]
                                     noAnnot
                                 )
@@ -1375,7 +1375,7 @@ testValidator = describe "AST Validator Tests" $ do
                                             ( JSPropertyNameandValue
                                                 (JSPropertyIdent noAnnot "x")
                                                 noAnnot
-                                                [JSDecimal noAnnot "1"]
+                                                [JSDecimal noAnnot 1]
                                             )
                                         )
                                     )
@@ -1786,7 +1786,7 @@ testValidator = describe "AST Validator Tests" $ do
         let invalidProgram =
               JSAstProgram
                 [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto,
-                  JSExpressionStatement (JSOctal noAnnot "0123") auto
+                  JSExpressionStatement (JSOctal noAnnot 0o123) auto
                 ]
                 noAnnot
         case validate invalidProgram of
@@ -1803,7 +1803,7 @@ testValidator = describe "AST Validator Tests" $ do
       it "accepts octal literals outside strict mode" $ do
         let validProgram =
               JSAstProgram
-                [ JSExpressionStatement (JSOctal noAnnot "0123") auto
+                [ JSExpressionStatement (JSOctal noAnnot 0o123) auto
                 ]
                 noAnnot
         validate validProgram `shouldSatisfy` isRight
@@ -1857,14 +1857,14 @@ testValidator = describe "AST Validator Tests" $ do
                                     ( JSPropertyNameandValue
                                         (JSPropertyIdent noAnnot "prop")
                                         noAnnot
-                                        [JSDecimal noAnnot "1"]
+                                        [JSDecimal noAnnot 1]
                                     )
                                 )
                                 noAnnot
                                 ( JSPropertyNameandValue
                                     (JSPropertyIdent noAnnot "prop")
                                     noAnnot
-                                    [JSDecimal noAnnot "2"]
+                                    [JSDecimal noAnnot 2]
                                 )
                             )
                         )
@@ -1897,14 +1897,14 @@ testValidator = describe "AST Validator Tests" $ do
                                     ( JSPropertyNameandValue
                                         (JSPropertyIdent noAnnot "prop1")
                                         noAnnot
-                                        [JSDecimal noAnnot "1"]
+                                        [JSDecimal noAnnot 1]
                                     )
                                 )
                                 noAnnot
                                 ( JSPropertyNameandValue
                                     (JSPropertyIdent noAnnot "prop2")
                                     noAnnot
-                                    [JSDecimal noAnnot "2"]
+                                    [JSDecimal noAnnot 2]
                                 )
                             )
                         )
@@ -1925,7 +1925,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "arguments")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     auto
@@ -1951,7 +1951,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "eval")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     auto
@@ -1977,7 +1977,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "implements")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     auto
@@ -2003,7 +2003,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "validName")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     auto
@@ -2081,7 +2081,7 @@ testValidator = describe "AST Validator Tests" $ do
                         auto
                     ),
                   JSModuleStatementListItem
-                    (JSExpressionStatement (JSOctal noAnnot "0123") auto)
+                    (JSExpressionStatement (JSOctal noAnnot 0o123) auto)
                 ]
                 noAnnot
         case validate moduleProgram of
@@ -2325,14 +2325,14 @@ testValidator = describe "AST Validator Tests" $ do
                                 noAnnot
                                 ( JSArrayLiteral
                                     noAnnot
-                                    [ JSArrayElement (JSDecimal noAnnot "1"),
+                                    [ JSArrayElement (JSDecimal noAnnot 1),
                                       JSArrayComma noAnnot,
                                       JSArrayElement
                                         ( JSArrayLiteral
                                             noAnnot
-                                            [ JSArrayElement (JSDecimal noAnnot "2"),
+                                            [ JSArrayElement (JSDecimal noAnnot 2),
                                               JSArrayComma noAnnot,
-                                              JSArrayElement (JSDecimal noAnnot "3")
+                                              JSArrayElement (JSDecimal noAnnot 3)
                                             ]
                                             noAnnot
                                         )
@@ -2489,7 +2489,7 @@ testValidator = describe "AST Validator Tests" $ do
                             ( JSLOne
                                 ( JSVarInitExpression
                                     (JSIdentifier noAnnot "i")
-                                    (JSVarInit noAnnot (JSDecimal noAnnot "0"))
+                                    (JSVarInit noAnnot (JSDecimal noAnnot 0))
                                 )
                             )
                             auto,
@@ -2499,7 +2499,7 @@ testValidator = describe "AST Validator Tests" $ do
                             ( JSExpressionBinary
                                 (JSIdentifier noAnnot "i")
                                 (JSBinOpLt noAnnot)
-                                (JSDecimal noAnnot "10")
+                                (JSDecimal noAnnot 10)
                             )
                             noAnnot
                             ( JSStatementBlock
@@ -3058,13 +3058,13 @@ testValidator = describe "AST Validator Tests" $ do
                             ( JSLOne
                                 ( JSVarInitExpression
                                     (JSIdentifier noAnnot "a")
-                                    (JSVarInit noAnnot (JSDecimal noAnnot "1"))
+                                    (JSVarInit noAnnot (JSDecimal noAnnot 1))
                                 )
                             )
                             noAnnot
                             ( JSVarInitExpression
                                 (JSIdentifier noAnnot "b")
-                                (JSVarInit noAnnot (JSDecimal noAnnot "2"))
+                                (JSVarInit noAnnot (JSDecimal noAnnot 2))
                             )
                         )
                         noAnnot
@@ -3137,7 +3137,7 @@ testValidator = describe "AST Validator Tests" $ do
                             ( JSLOne
                                 ( JSVarInitExpression
                                     (JSIdentifier noAnnot "myFunction")
-                                    (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                                    (JSVarInit noAnnot (JSDecimal noAnnot 42))
                                 )
                             )
                             auto
@@ -3339,7 +3339,7 @@ testValidator = describe "AST Validator Tests" $ do
                         ( JSLOne
                             ( JSVarInitExpression
                                 (JSIdentifier noAnnot "i")
-                                (JSVarInit noAnnot (JSDecimal noAnnot "0"))
+                                (JSVarInit noAnnot (JSDecimal noAnnot 0))
                             )
                         )
                         noAnnot
@@ -3347,7 +3347,7 @@ testValidator = describe "AST Validator Tests" $ do
                             ( JSExpressionBinary
                                 (JSIdentifier noAnnot "i")
                                 (JSBinOpLt noAnnot)
-                                (JSDecimal noAnnot "10")
+                                (JSDecimal noAnnot 10)
                             )
                         )
                         noAnnot
@@ -3370,7 +3370,7 @@ testValidator = describe "AST Validator Tests" $ do
                                     ( JSLOne
                                         ( JSVarInitExpression
                                             (JSIdentifier noAnnot "j")
-                                            (JSVarInit noAnnot (JSDecimal noAnnot "0"))
+                                            (JSVarInit noAnnot (JSDecimal noAnnot 0))
                                         )
                                     )
                                     noAnnot
@@ -3378,7 +3378,7 @@ testValidator = describe "AST Validator Tests" $ do
                                         ( JSExpressionBinary
                                             (JSIdentifier noAnnot "j")
                                             (JSBinOpLt noAnnot)
-                                            (JSDecimal noAnnot "5")
+                                            (JSDecimal noAnnot 5)
                                         )
                                     )
                                     noAnnot
@@ -3427,7 +3427,7 @@ testValidator = describe "AST Validator Tests" $ do
                     noAnnot
                     [ JSCase
                         noAnnot
-                        (JSDecimal noAnnot "1")
+                        (JSDecimal noAnnot 1)
                         noAnnot
                         [JSBreak noAnnot JSIdentNone auto],
                       JSDefault
@@ -3436,7 +3436,7 @@ testValidator = describe "AST Validator Tests" $ do
                         [JSExpressionStatement (JSStringLiteral noAnnot "first default") auto],
                       JSCase
                         noAnnot
-                        (JSDecimal noAnnot "2")
+                        (JSDecimal noAnnot 2)
                         noAnnot
                         [JSBreak noAnnot JSIdentNone auto],
                       JSDefault
@@ -3470,12 +3470,12 @@ testValidator = describe "AST Validator Tests" $ do
                     noAnnot
                     [ JSCase
                         noAnnot
-                        (JSDecimal noAnnot "1")
+                        (JSDecimal noAnnot 1)
                         noAnnot
                         [JSBreak noAnnot JSIdentNone auto],
                       JSCase
                         noAnnot
-                        (JSDecimal noAnnot "2")
+                        (JSDecimal noAnnot 2)
                         noAnnot
                         [JSBreak noAnnot JSIdentNone auto],
                       JSDefault
@@ -3720,7 +3720,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "integers")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     auto,
@@ -3729,7 +3729,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "floats")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "3.14159"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 3.14159))
                         )
                     )
                     auto,
@@ -3738,7 +3738,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "scientific")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "1.23e-4"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 1.23e-4))
                         )
                     )
                     auto
@@ -3754,7 +3754,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "hex")
-                            (JSVarInit noAnnot (JSHexInteger noAnnot "0xFF"))
+                            (JSVarInit noAnnot (JSHexInteger noAnnot 0xFF))
                         )
                     )
                     auto,
@@ -3763,7 +3763,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "octal")
-                            (JSVarInit noAnnot (JSOctal noAnnot "0o755"))
+                            (JSVarInit noAnnot (JSOctal noAnnot 0o755))
                         )
                     )
                     auto
@@ -3779,7 +3779,7 @@ testValidator = describe "AST Validator Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "bigInt")
-                            (JSVarInit noAnnot (JSBigIntLiteral noAnnot "123456789012345678901234567890n"))
+                            (JSVarInit noAnnot (JSBigIntLiteral noAnnot 123456789012345678901234567890))
                         )
                     )
                     auto
@@ -3905,14 +3905,14 @@ testValidator = describe "AST Validator Tests" $ do
                                                 ( JSPropertyNameandValue
                                                     (JSPropertyIdent noAnnot "prop")
                                                     noAnnot
-                                                    [JSDecimal noAnnot "1"]
+                                                    [JSDecimal noAnnot 1]
                                                 )
                                             )
                                             noAnnot
                                             ( JSPropertyNameandValue
                                                 (JSPropertyIdent noAnnot "prop")
                                                 noAnnot
-                                                [JSDecimal noAnnot "2"]
+                                                [JSDecimal noAnnot 2]
                                             )
                                         )
                                     )
@@ -4090,7 +4090,7 @@ testValidator = describe "AST Validator Tests" $ do
                                                                 ( JSExpressionBinary
                                                                     (JSIdentifier noAnnot "item")
                                                                     (JSBinOpTimes noAnnot)
-                                                                    (JSDecimal noAnnot "2")
+                                                                    (JSDecimal noAnnot 2)
                                                                 )
                                                             )
                                                         )

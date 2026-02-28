@@ -7,7 +7,6 @@ module Unit.Language.Javascript.Parser.AST.Generic
 where
 
 import Control.DeepSeq (rnf)
-import qualified Data.ByteString.Char8 as BS8
 import GHC.Generics (from, to)
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.Parser
@@ -23,8 +22,8 @@ testGenericNFData = describe "Generic and NFData instances" $ do
           let !evaluated = rnf ast `seq` ast
           -- Verify the AST structure is preserved after deep evaluation
           case evaluated of
-            AST.JSAstLiteral (AST.JSDecimal _ val) _ | val == "42" -> pure ()
-            AST.JSAstExpression (AST.JSDecimal _ val) _ | val == "42" -> pure ()
+            AST.JSAstLiteral (AST.JSDecimal _ val) _ | val == 42.0 -> pure ()
+            AST.JSAstExpression (AST.JSDecimal _ val) _ | val == 42.0 -> pure ()
             _ -> expectationFailure "NFData evaluation altered AST structure"
         Left _ -> expectationFailure "Parse failed"
 
@@ -87,14 +86,14 @@ testGenericNFData = describe "Generic and NFData instances" $ do
     it "can deep evaluate AST components" $ do
       let annotation = AST.JSNoAnnot
       let identifier = AST.JSIdentifier annotation "test"
-      let literal = AST.JSDecimal annotation "42"
+      let literal = AST.JSDecimal annotation 42
       -- Test NFData on individual AST components
       let !evalAnnot = rnf annotation `seq` annotation
       let !evalIdent = rnf identifier `seq` identifier
       let !evalLiteral = rnf literal `seq` literal
       -- Verify components maintain their values after evaluation
       case (evalAnnot, evalIdent, evalLiteral) of
-        (AST.JSNoAnnot, AST.JSIdentifier _ testVal, AST.JSDecimal _ val42) | testVal == "test" && val42 == "42" -> pure ()
+        (AST.JSNoAnnot, AST.JSIdentifier _ testVal, AST.JSDecimal _ val42) | testVal == "test" && val42 == 42 -> pure ()
         _ -> expectationFailure "NFData evaluation altered AST component values"
 
   describe "Generic instances" $ do
@@ -118,12 +117,12 @@ testGenericNFData = describe "Generic and NFData instances" $ do
 
     it "generic instances compile correctly" $ do
       -- Test that Generic instances are well-formed and functional
-      let expr = AST.JSDecimal AST.JSNoAnnot "123"
+      let expr = AST.JSDecimal AST.JSNoAnnot 123
       let generic = from expr
       let reconstructed = to generic
       -- Verify Generic round-trip preserves exact structure
       case (expr, reconstructed) of
-        (AST.JSDecimal _ val1, AST.JSDecimal _ val2) | val1 == "123" && val2 == "123" -> pure ()
+        (AST.JSDecimal _ val1, AST.JSDecimal _ val2) | val1 == 123 && val2 == 123 -> pure ()
         _ -> expectationFailure "Generic round-trip failed to preserve structure"
       -- Verify Generic representation is meaningful (non-empty and contains structure)
       let genericStr = show generic

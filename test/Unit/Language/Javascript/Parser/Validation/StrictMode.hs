@@ -52,7 +52,7 @@ phase1ReservedWordTests :: Spec
 phase1ReservedWordTests = describe "Phase 1: Reserved Word Validation" $ do
   describe "eval as identifier in expression contexts" $ do
     testReservedInContext "eval" "variable declaration" $
-      JSVariable noAnnot (createVarInit "eval" "42") auto
+      JSVariable noAnnot (createVarInit "eval" 42) auto
 
     testReservedInContext "eval" "function parameter" $
       JSFunction
@@ -78,7 +78,7 @@ phase1ReservedWordTests = describe "Phase 1: Reserved Word Validation" $ do
       JSAssignStatement
         (JSIdentifier noAnnot "eval")
         (JSAssign noAnnot)
-        (JSDecimal noAnnot "42")
+        (JSDecimal noAnnot 42)
         auto
 
     testReservedInContext "eval" "catch parameter" $
@@ -102,22 +102,22 @@ phase1ReservedWordTests = describe "Phase 1: Reserved Word Validation" $ do
         ( JSLOne
             ( JSVarInitExpression
                 (JSIdentifier noAnnot "eval")
-                (JSVarInit noAnnot (JSDecimal noAnnot "0"))
+                (JSVarInit noAnnot (JSDecimal noAnnot 0))
             )
         )
         noAnnot
-        (JSLOne (JSDecimal noAnnot "10"))
+        (JSLOne (JSDecimal noAnnot 10))
         noAnnot
-        (JSLOne (JSDecimal noAnnot "1"))
+        (JSLOne (JSDecimal noAnnot 1))
         noAnnot
-        (JSExpressionStatement (JSDecimal noAnnot "1") auto)
+        (JSExpressionStatement (JSDecimal noAnnot 1) auto)
 
     testReservedInContext "eval" "arrow function parameter" $
       JSExpressionStatement
         ( JSArrowExpression
             (JSUnparenthesizedArrowParameter (JSIdentName noAnnot "eval"))
             noAnnot
-            (JSConciseExpressionBody (JSDecimal noAnnot "42"))
+            (JSConciseExpressionBody (JSDecimal noAnnot 42))
         )
         auto
 
@@ -161,7 +161,7 @@ phase1ReservedWordTests = describe "Phase 1: Reserved Word Validation" $ do
 
   describe "arguments as identifier in expression contexts" $ do
     testReservedInContext "arguments" "variable declaration" $
-      JSVariable noAnnot (createVarInit "arguments" "42") auto
+      JSVariable noAnnot (createVarInit "arguments" 42) auto
 
     testReservedInContext "arguments" "function parameter" $
       JSFunction
@@ -348,13 +348,13 @@ phase2AssignmentTargetTests = describe "Phase 2: Assignment Target Validation" $
                       ( JSAssignExpression
                           (JSIdentifier noAnnot "eval")
                           (JSAssign noAnnot)
-                          (JSDecimal noAnnot "1")
+                          (JSDecimal noAnnot 1)
                       )
                       noAnnot
                       ( JSAssignExpression
                           (JSIdentifier noAnnot "x")
                           (JSAssign noAnnot)
-                          (JSDecimal noAnnot "2")
+                          (JSDecimal noAnnot 2)
                       )
                   )
                   auto
@@ -366,15 +366,15 @@ phase2AssignmentTargetTests = describe "Phase 2: Assignment Target Validation" $
             createStrictProgram
               [ JSExpressionStatement
                   ( JSExpressionTernary
-                      (JSDecimal noAnnot "true")
+                      (JSLiteral noAnnot "true")
                       noAnnot
                       ( JSAssignExpression
                           (JSIdentifier noAnnot "arguments")
                           (JSAssign noAnnot)
-                          (JSDecimal noAnnot "1")
+                          (JSDecimal noAnnot 1)
                       )
                       noAnnot
-                      (JSDecimal noAnnot "2")
+                      (JSDecimal noAnnot 2)
                   )
                   auto
               ]
@@ -392,7 +392,7 @@ phase2AssignmentTargetTests = describe "Phase 2: Assignment Target Validation" $
                           ( JSAssignExpression
                               (JSIdentifier noAnnot "eval")
                               (JSAssign noAnnot)
-                              (JSDecimal noAnnot "42")
+                              (JSDecimal noAnnot 42)
                           )
                       )
                       noAnnot
@@ -411,7 +411,7 @@ phase2AssignmentTargetTests = describe "Phase 2: Assignment Target Validation" $
                           ( JSAssignExpression
                               (JSIdentifier noAnnot "arguments")
                               (JSAssign noAnnot)
-                              (JSDecimal noAnnot "42")
+                              (JSDecimal noAnnot 42)
                           )
                       ]
                       noAnnot
@@ -431,7 +431,7 @@ phase2AssignmentTargetTests = describe "Phase 2: Assignment Target Validation" $
                               [ JSAssignExpression
                                   (JSIdentifier noAnnot "eval")
                                   (JSAssign noAnnot)
-                                  (JSDecimal noAnnot "42")
+                                  (JSDecimal noAnnot 42)
                               ]
                             )
                           ]
@@ -474,7 +474,7 @@ phase2AssignmentTargetTests = describe "Phase 2: Assignment Target Validation" $
                   ( JSExpressionBinary
                       (JSUnaryExpression (JSUnaryOpIncr noAnnot) (JSIdentifier noAnnot "eval"))
                       (JSBinOpPlus noAnnot)
-                      (JSDecimal noAnnot "5")
+                      (JSDecimal noAnnot 5)
                   )
                   auto
               ]
@@ -551,7 +551,7 @@ phase3ComplexExpressionTests = describe "Phase 3: Complex Expression Validation"
                   noAnnot
                   (JSIdentifier noAnnot "eval")
                   noAnnot
-                  (JSExpressionStatement (JSDecimal noAnnot "1") auto)
+                  (JSExpressionStatement (JSDecimal noAnnot 1) auto)
               ]
       validateProgram program `shouldFailWith` isReservedWordError "eval"
 
@@ -563,7 +563,7 @@ phase3ComplexExpressionTests = describe "Phase 3: Complex Expression Validation"
                   noAnnot
                   (JSIdentifier noAnnot "arguments")
                   noAnnot
-                  (JSExpressionStatement (JSDecimal noAnnot "1") auto)
+                  (JSExpressionStatement (JSDecimal noAnnot 1) auto)
               ]
       validateProgram program `shouldFailWith` isReservedWordError "arguments"
 
@@ -575,11 +575,11 @@ phase3ComplexExpressionTests = describe "Phase 3: Complex Expression Validation"
                   noAnnot
                   (JSLOne (JSIdentifier noAnnot "eval"))
                   noAnnot
-                  (JSLOne (JSDecimal noAnnot "true"))
+                  (JSLOne (JSLiteral noAnnot "true"))
                   noAnnot
-                  (JSLOne (JSDecimal noAnnot "1"))
+                  (JSLOne (JSDecimal noAnnot 1))
                   noAnnot
-                  (JSExpressionStatement (JSDecimal noAnnot "1") auto)
+                  (JSExpressionStatement (JSDecimal noAnnot 1) auto)
               ]
       validateProgram program `shouldFailWith` isReservedWordError "eval"
 
@@ -691,7 +691,7 @@ phase4FunctionContextTests = describe "Phase 4: Function Context Validation" $ d
                   ( JSLOne
                       ( JSVarInitExpression
                           (JSIdentifier noAnnot "eval")
-                          (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                          (JSVarInit noAnnot (JSDecimal noAnnot 42))
                       )
                   )
                   noAnnot
@@ -708,7 +708,7 @@ phase4FunctionContextTests = describe "Phase 4: Function Context Validation" $ d
                   ( JSArrowExpression
                       (JSUnparenthesizedArrowParameter (JSIdentName noAnnot "eval"))
                       noAnnot
-                      (JSConciseExpressionBody (JSDecimal noAnnot "42"))
+                      (JSConciseExpressionBody (JSDecimal noAnnot 42))
                   )
                   auto
               ]
@@ -729,7 +729,7 @@ phase4FunctionContextTests = describe "Phase 4: Function Context Validation" $ d
                           noAnnot
                       )
                       noAnnot
-                      (JSConciseExpressionBody (JSDecimal noAnnot "42"))
+                      (JSConciseExpressionBody (JSDecimal noAnnot 42))
                   )
                   auto
               ]
@@ -819,7 +819,7 @@ edgeCaseTests = describe "Edge Case Validation" $ do
       let program =
             JSAstProgram
               [ JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto,
-                JSVariable noAnnot (createVarInit "eval" "42") auto
+                JSVariable noAnnot (createVarInit "eval" 42) auto
               ]
               noAnnot
       validateProgram program `shouldFailWith` isReservedWordError "eval"
@@ -876,7 +876,7 @@ edgeCaseTests = describe "Edge Case Validation" $ do
               [ JSModuleStatementListItem
                   ( JSVariable
                       noAnnot
-                      (createVarInit "eval" "42")
+                      (createVarInit "eval" 42)
                       auto
                   )
               ]
@@ -911,7 +911,7 @@ testAssignmentToReserved word opConstructor desc =
             [ JSAssignStatement
                 (JSIdentifier noAnnot word)
                 (opConstructor noAnnot)
-                (JSDecimal noAnnot "42")
+                (JSDecimal noAnnot 42)
                 auto
             ]
     validateProgram program `shouldFailWith` isReservedWordError word
@@ -938,7 +938,7 @@ isReservedWordViolation (ReservedWordAsIdentifier _ _) = True
 isReservedWordViolation _ = False
 
 -- | Create variable initialization expression.
-createVarInit :: ByteString -> ByteString -> JSCommaList JSExpression
+createVarInit :: ByteString -> Double -> JSCommaList JSExpression
 createVarInit name value =
   JSLOne
     ( JSVarInitExpression

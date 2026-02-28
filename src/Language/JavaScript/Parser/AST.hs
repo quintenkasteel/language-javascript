@@ -82,20 +82,26 @@ module Language.JavaScript.Parser.AST
     binOpEq,
     showStripped,
     fromCommaList,
+    showJSDouble,
+    showJSHex,
+    showJSBinary,
+    showJSOctal,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
+import Data.Char (intToDigit)
 import Data.Data
+import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import qualified Data.List as List
 import GHC.Generics (Generic)
 import Language.Haskell.TH.Syntax (Lift)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Parser.Token
+import Numeric (showHex, showIntAtBase)
 
 -- ---------------------------------------------------------------------
 
@@ -311,12 +317,17 @@ data JSStatement
 data JSExpression
   = -- | Terminals
     JSIdentifier !JSAnnot !ByteString
-  | JSDecimal !JSAnnot !ByteString
+  | -- | Decimal numeric literal (e.g., @42@, @3.14@, @1e5@)
+    JSDecimal !JSAnnot !Double
   | JSLiteral !JSAnnot !ByteString
-  | JSHexInteger !JSAnnot !ByteString
-  | JSBinaryInteger !JSAnnot !ByteString
-  | JSOctal !JSAnnot !ByteString
-  | JSBigIntLiteral !JSAnnot !ByteString
+  | -- | Hexadecimal integer literal (e.g., @0xFF@)
+    JSHexInteger !JSAnnot !Integer
+  | -- | Binary integer literal (e.g., @0b1010@)
+    JSBinaryInteger !JSAnnot !Integer
+  | -- | Octal integer literal (e.g., @0o77@)
+    JSOctal !JSAnnot !Integer
+  | -- | BigInt literal (e.g., @42n@, @0xFFn@)
+    JSBigIntLiteral !JSAnnot !Integer
   | JSStringLiteral !JSAnnot !ByteString
   | JSRegEx !JSAnnot !ByteString
   | -- | lb, contents, rb
@@ -667,7 +678,7 @@ instance ShowStripped JSExpression where
   ss (JSCallExpressionDot ex _os xs) = "JSCallExpressionDot (" <> ss ex <> "," <> ss xs <> ")"
   ss (JSCallExpressionSquare ex _os xs _cs) = "JSCallExpressionSquare (" <> ss ex <> "," <> ss xs <> ")"
   ss (JSClassExpression _ n h _lb xs _rb) = "JSClassExpression " <> ssid n <> " (" <> ss h <> ") " <> ss xs
-  ss (JSDecimal _ s) = "JSDecimal " <> singleQuote (bsToStr s)
+  ss (JSDecimal _ d) = "JSDecimal " <> singleQuote (showJSDouble d)
   ss (JSCommaExpression l _ r) = "JSExpression [" <> ss l <> "," <> ss r <> "]"
   ss (JSExpressionBinary x2 op x3) = "JSExpressionBinary (" <> ss op <> "," <> ss x2 <> "," <> ss x3 <> ")"
   ss (JSExpressionParen _lp x _rp) = "JSExpressionParen (" <> ss x <> ")"
@@ -679,10 +690,10 @@ instance ShowStripped JSExpression where
   ss (JSAsyncFunctionExpression _ _ n _lb pl _rb x3) = "JSAsyncFunctionExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
   ss (JSAsyncArrowExpression _ ps _ body) = "JSAsyncArrowExpression (" <> ss ps <> ") => " <> ss body
   ss (JSAsyncGeneratorExpression _ _ _ n _lb pl _rb x3) = "JSAsyncGeneratorExpression " <> ssid n <> " " <> ss pl <> " (" <> ss x3 <> ")"
-  ss (JSHexInteger _ s) = "JSHexInteger " <> singleQuote (bsToStr s)
-  ss (JSBinaryInteger _ s) = "JSBinaryInteger " <> singleQuote (bsToStr s)
-  ss (JSOctal _ s) = "JSOctal " <> singleQuote (bsToStr s)
-  ss (JSBigIntLiteral _ s) = "JSBigIntLiteral " <> singleQuote (bsToStr s)
+  ss (JSHexInteger _ n) = "JSHexInteger " <> singleQuote (showJSHex n)
+  ss (JSBinaryInteger _ n) = "JSBinaryInteger " <> singleQuote (showJSBinary n)
+  ss (JSOctal _ n) = "JSOctal " <> singleQuote (showJSOctal n)
+  ss (JSBigIntLiteral _ n) = "JSBigIntLiteral " <> singleQuote (show n <> "n")
   ss (JSIdentifier _ s) = "JSIdentifier " <> singleQuote (bsToStr s)
   ss (JSLiteral _ s) | BS8.null s = "JSLiteral ''"
   ss (JSLiteral _ s) = "JSLiteral " <> singleQuote (bsToStr s)
@@ -915,6 +926,30 @@ instance ShowStripped a => ShowStripped [a] where
 -- need to be rendered as human-readable text.
 bsToStr :: ByteString -> String
 bsToStr = Text.unpack . Text.decodeUtf8
+
+-- | Render a Double as a compact JavaScript numeric string.
+-- Whole numbers render without decimal point (e.g., @42.0@ becomes @"42"@).
+-- Fractional values use Haskell's 'show' (e.g., @3.14@ stays @"3.14"@).
+showJSDouble :: Double -> String
+showJSDouble d
+  | d == fromIntegral n && abs d < 1e15 = show n
+  | otherwise = show d
+  where
+    n = round d :: Integer
+
+-- | Render an Integer as a hexadecimal string with @0x@ prefix.
+showJSHex :: Integer -> String
+showJSHex n = "0x" <> showHex n ""
+
+-- | Render an Integer as a binary string with @0b@ prefix.
+showJSBinary :: Integer -> String
+showJSBinary n = "0b" <> showIntAtBase 2 intToDigit n ""
+
+-- | Render an Integer as an octal string with @0o@ prefix.
+showJSOctal :: Integer -> String
+showJSOctal n = "0o" <> showOct' n ""
+  where
+    showOct' = showIntAtBase 8 intToDigit
 
 -- | Join ByteStrings with commas, filtering out empty ByteStrings.
 --

@@ -20,7 +20,7 @@ testMinifyExpr = describe "Minify expressions:" $ do
     minifyExpr " 1 " `shouldBe` "1"
     minifyExpr " this " `shouldBe` "this"
     minifyExpr " 0x12ab " `shouldBe` "0x12ab"
-    minifyExpr " 0567 " `shouldBe` "0567"
+    minifyExpr " 0567 " `shouldBe` "0o567"
     minifyExpr " 'helo' " `shouldBe` "'helo'"
     minifyExpr " \"good bye\" " `shouldBe` "\"good bye\""
     minifyExpr " /\\n/g " `shouldBe` "/\\n/g"

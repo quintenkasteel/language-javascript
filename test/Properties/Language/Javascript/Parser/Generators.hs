@@ -678,28 +678,26 @@ genAtomicStatement =
 genLiteralExpression :: Gen JSExpression
 genLiteralExpression =
   oneof
-    [ JSDecimal <$> genJSAnnot <*> genValidNumber,
+    [ JSDecimal <$> genJSAnnot <*> genDecimalDouble,
       JSLiteral <$> genJSAnnot <*> genBooleanLiteral,
       JSStringLiteral <$> genJSAnnot <*> genValidString,
-      JSHexInteger <$> genJSAnnot <*> genHexNumber,
-      JSBinaryInteger <$> genJSAnnot <*> genBinaryNumber,
-      JSOctal <$> genJSAnnot <*> genOctalNumber,
-      JSBigIntLiteral <$> genJSAnnot <*> genBigIntNumber,
+      JSHexInteger <$> genJSAnnot <*> genHexInteger,
+      JSBinaryInteger <$> genJSAnnot <*> genBinaryInteger,
+      JSOctal <$> genJSAnnot <*> genOctalInteger,
+      JSBigIntLiteral <$> genJSAnnot <*> genBigIntInteger,
       JSRegEx <$> genJSAnnot <*> genRegexLiteral
     ]
   where
     genBooleanLiteral = elements ["true", "false", "null", "undefined"]
-    genHexNumber = (BS8.append "0x") <$> genHexDigits
-    genBinaryNumber = (BS8.append "0b") <$> genBinaryDigits
-    genOctalNumber = (BS8.append "0o") <$> genOctalDigits
-    genBigIntNumber = (<> "n") <$> genValidNumber
+    genDecimalDouble = fromIntegral . abs <$> (arbitrary :: Gen Int)
+    genHexInteger = abs <$> (arbitrary :: Gen Integer)
+    genBinaryInteger = abs <$> (arbitrary :: Gen Integer)
+    genOctalInteger = abs <$> (arbitrary :: Gen Integer)
+    genBigIntInteger = abs <$> (arbitrary :: Gen Integer)
     genRegexLiteral = do
       pat <- genRegexPattern
       flags <- genRegexFlags
       return (BS8.pack ("/" ++ pat ++ "/" ++ flags))
-    genHexDigits = BS8.pack <$> listOf1 (elements "0123456789abcdefABCDEF")
-    genBinaryDigits = BS8.pack <$> listOf1 (elements "01")
-    genOctalDigits = BS8.pack <$> listOf1 (elements "01234567")
     genRegexPattern = listOf (elements "abcdefghijklmnopqrstuvwxyz.*+?[](){}|^$\\")
     genRegexFlags = sublistOf "gimsuvy"
 

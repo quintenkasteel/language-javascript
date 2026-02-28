@@ -76,7 +76,7 @@ testModuleParser = describe "Parse modules:" $ do
       result -> expectationFailure ("Expected JSExportLocals with empty clause and semicolon, got: " ++ show result)
     -- Export const declaration - preserve 'a' variable name
     case parseModule "export const a = 1;" "test" of
-      Right (JSAstModule [JSModuleExportDeclaration _ (JSExport (JSConstant _ (JSLOne (JSVarInitExpression (JSIdentifier _ "a") (JSVarInit _ (JSDecimal _ "1")))) _) _)] _) -> pure ()
+      Right (JSAstModule [JSModuleExportDeclaration _ (JSExport (JSConstant _ (JSLOne (JSVarInitExpression (JSIdentifier _ "a") (JSVarInit _ (JSDecimal _ 1)))) _) _)] _) -> pure ()
       result -> expectationFailure ("Expected JSExport with const 'a', got: " ++ show result)
     -- Export function declaration - preserve 'f' function name
     case parseModule "export function f() {};" "test" of

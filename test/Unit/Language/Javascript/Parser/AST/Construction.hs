@@ -1,3 +1,4 @@
+{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 
@@ -23,7 +24,6 @@ module Unit.Language.Javascript.Parser.AST.Construction
 where
 
 import Control.DeepSeq (deepseq)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
@@ -78,7 +78,7 @@ testTerminalExpressions = describe "Terminal expressions" $ do
     expr `deepseq` (return ())
 
   it "constructs JSDecimal correctly" $ do
-    let expr = AST.JSDecimal testAnnot "42.5"
+    let expr = AST.JSDecimal testAnnot 42.5
     expr `shouldSatisfy` isJSDecimal
     extractLiteral expr `shouldBe` "42.5"
 
@@ -88,22 +88,22 @@ testTerminalExpressions = describe "Terminal expressions" $ do
     extractLiteral expr `shouldBe` "true"
 
   it "constructs JSHexInteger correctly" $ do
-    let expr = AST.JSHexInteger testAnnot "0xFF"
+    let expr = AST.JSHexInteger testAnnot 0xFF
     expr `shouldSatisfy` isJSHexInteger
-    extractLiteral expr `shouldBe` "0xFF"
+    extractLiteral expr `shouldBe` "0xff"
 
   it "constructs JSBinaryInteger correctly" $ do
-    let expr = AST.JSBinaryInteger testAnnot "0b1010"
+    let expr = AST.JSBinaryInteger testAnnot 0b1010
     expr `shouldSatisfy` isJSBinaryInteger
     extractLiteral expr `shouldBe` "0b1010"
 
   it "constructs JSOctal correctly" $ do
-    let expr = AST.JSOctal testAnnot "0o777"
+    let expr = AST.JSOctal testAnnot 0o777
     expr `shouldSatisfy` isJSOctal
     extractLiteral expr `shouldBe` "0o777"
 
   it "constructs JSBigIntLiteral correctly" $ do
-    let expr = AST.JSBigIntLiteral testAnnot "123n"
+    let expr = AST.JSBigIntLiteral testAnnot 123
     expr `shouldSatisfy` isJSBigIntLiteral
     extractLiteral expr `shouldBe` "123n"
 
@@ -127,7 +127,7 @@ testNonTerminalExpressions = describe "Non-terminal expressions" $ do
 
   it "constructs JSAssignExpression correctly" $ do
     let lhs = AST.JSIdentifier testAnnot "x"
-    let rhs = AST.JSDecimal testAnnot "42"
+    let rhs = AST.JSDecimal testAnnot 42
     let op = AST.JSAssign testAnnot
     let expr = AST.JSAssignExpression lhs op rhs
     expr `shouldSatisfy` isJSAssignExpression
@@ -160,20 +160,20 @@ testNonTerminalExpressions = describe "Non-terminal expressions" $ do
     expr `shouldSatisfy` isJSClassExpression
 
   it "constructs JSCommaExpression correctly" $ do
-    let left = AST.JSDecimal testAnnot "1"
-    let right = AST.JSDecimal testAnnot "2"
+    let left = AST.JSDecimal testAnnot 1
+    let right = AST.JSDecimal testAnnot 2
     let expr = AST.JSCommaExpression left testAnnot right
     expr `shouldSatisfy` isJSCommaExpression
 
   it "constructs JSExpressionBinary correctly" $ do
-    let left = AST.JSDecimal testAnnot "1"
-    let right = AST.JSDecimal testAnnot "2"
+    let left = AST.JSDecimal testAnnot 1
+    let right = AST.JSDecimal testAnnot 2
     let op = AST.JSBinOpPlus testAnnot
     let expr = AST.JSExpressionBinary left op right
     expr `shouldSatisfy` isJSExpressionBinary
 
   it "constructs JSExpressionParen correctly" $ do
-    let innerExpr = AST.JSDecimal testAnnot "42"
+    let innerExpr = AST.JSDecimal testAnnot 42
     let expr = AST.JSExpressionParen testAnnot innerExpr testAnnot
     expr `shouldSatisfy` isJSExpressionParen
 
@@ -185,14 +185,14 @@ testNonTerminalExpressions = describe "Non-terminal expressions" $ do
 
   it "constructs JSExpressionTernary correctly" $ do
     let cond = AST.JSIdentifier testAnnot "x"
-    let trueVal = AST.JSDecimal testAnnot "1"
-    let falseVal = AST.JSDecimal testAnnot "2"
+    let trueVal = AST.JSDecimal testAnnot 1
+    let falseVal = AST.JSDecimal testAnnot 2
     let expr = AST.JSExpressionTernary cond testAnnot trueVal testAnnot falseVal
     expr `shouldSatisfy` isJSExpressionTernary
 
   it "constructs JSArrowExpression correctly" $ do
     let params = AST.JSUnparenthesizedArrowParameter testIdent
-    let body = AST.JSConciseExpressionBody (AST.JSDecimal testAnnot "42")
+    let body = AST.JSConciseExpressionBody (AST.JSDecimal testAnnot 42)
     let expr = AST.JSArrowExpression params testAnnot body
     expr `shouldSatisfy` isJSArrowExpression
 
@@ -276,12 +276,12 @@ testNonTerminalExpressions = describe "Non-terminal expressions" $ do
 
   it "constructs JSVarInitExpression correctly" $ do
     let ident = AST.JSIdentifier testAnnot "x"
-    let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")
+    let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
     let expr = AST.JSVarInitExpression ident init
     expr `shouldSatisfy` isJSVarInitExpression
 
   it "constructs JSYieldExpression correctly" $ do
-    let expr = AST.JSYieldExpression testAnnot (Just (AST.JSDecimal testAnnot "42"))
+    let expr = AST.JSYieldExpression testAnnot (Just (AST.JSDecimal testAnnot 42))
     expr `shouldSatisfy` isJSYieldExpression
 
   it "constructs JSYieldFromExpression correctly" $ do
@@ -316,7 +316,7 @@ testStatementConstructors = describe "Statement constructors" $ do
     let decl =
           AST.JSVarInitExpression
             (AST.JSIdentifier testAnnot "x")
-            (AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42"))
+            (AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42))
     let stmt = AST.JSConstant testAnnot (AST.JSLOne decl) testSemi
     stmt `shouldSatisfy` isJSConstant
 
@@ -376,12 +376,12 @@ testStatementConstructors = describe "Statement constructors" $ do
     stmt `shouldSatisfy` isJSEmptyStatement
 
   it "constructs JSExpressionStatement correctly" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let stmt = AST.JSExpressionStatement expr testSemi
     stmt `shouldSatisfy` isJSExpressionStatement
 
   it "constructs JSReturn correctly" $ do
-    let stmt = AST.JSReturn testAnnot (Just (AST.JSDecimal testAnnot "42")) testSemi
+    let stmt = AST.JSReturn testAnnot (Just (AST.JSDecimal testAnnot 42)) testSemi
     stmt `shouldSatisfy` isJSReturn
 
   it "constructs JSSwitch correctly" $ do
@@ -527,7 +527,7 @@ testUtilityConstructors = describe "Utility constructors" $ do
     annot `shouldSatisfy` isJSAnnot
 
   it "constructs JSCommaList correctly" $ do
-    let list = AST.JSLOne (AST.JSDecimal testAnnot "1")
+    let list = AST.JSLOne (AST.JSDecimal testAnnot 1)
     list `shouldSatisfy` isJSCommaList
 
   it "constructs JSBlock correctly" $ do
@@ -549,16 +549,16 @@ testPatternMatchingCoverage = describe "Pattern matching coverage" $ do
 
 -- Helper functions for constructor testing
 
-extractLiteral :: AST.JSExpression -> ByteString
-extractLiteral (AST.JSIdentifier _ s) = s
-extractLiteral (AST.JSDecimal _ s) = s
-extractLiteral (AST.JSLiteral _ s) = s
-extractLiteral (AST.JSHexInteger _ s) = s
-extractLiteral (AST.JSBinaryInteger _ s) = s
-extractLiteral (AST.JSOctal _ s) = s
-extractLiteral (AST.JSBigIntLiteral _ s) = s
-extractLiteral (AST.JSStringLiteral _ s) = s
-extractLiteral (AST.JSRegEx _ s) = s
+extractLiteral :: AST.JSExpression -> String
+extractLiteral (AST.JSIdentifier _ s) = BS8.unpack s
+extractLiteral (AST.JSDecimal _ d) = AST.showJSDouble d
+extractLiteral (AST.JSLiteral _ s) = BS8.unpack s
+extractLiteral (AST.JSHexInteger _ n) = AST.showJSHex n
+extractLiteral (AST.JSBinaryInteger _ n) = AST.showJSBinary n
+extractLiteral (AST.JSOctal _ n) = AST.showJSOctal n
+extractLiteral (AST.JSBigIntLiteral _ n) = show n <> "n"
+extractLiteral (AST.JSStringLiteral _ s) = BS8.unpack s
+extractLiteral (AST.JSRegEx _ s) = BS8.unpack s
 extractLiteral _ = ""
 
 -- Constructor identification functions (predicates)
@@ -1066,27 +1066,27 @@ isJSBlock (AST.JSBlock {}) = True
 allExpressionConstructors :: [AST.JSExpression]
 allExpressionConstructors =
   [ AST.JSIdentifier testAnnot "test",
-    AST.JSDecimal testAnnot "42",
+    AST.JSDecimal testAnnot 42,
     AST.JSLiteral testAnnot "true",
-    AST.JSHexInteger testAnnot "0xFF",
-    AST.JSBinaryInteger testAnnot "0b1010",
-    AST.JSOctal testAnnot "0o777",
-    AST.JSBigIntLiteral testAnnot "123n",
+    AST.JSHexInteger testAnnot 0xFF,
+    AST.JSBinaryInteger testAnnot 0b1010,
+    AST.JSOctal testAnnot 0o777,
+    AST.JSBigIntLiteral testAnnot 123,
     AST.JSStringLiteral testAnnot "\"hello\"",
     AST.JSRegEx testAnnot "/test/",
     AST.JSArrayLiteral testAnnot [] testAnnot,
-    AST.JSAssignExpression (AST.JSIdentifier testAnnot "x") (AST.JSAssign testAnnot) (AST.JSDecimal testAnnot "1"),
+    AST.JSAssignExpression (AST.JSIdentifier testAnnot "x") (AST.JSAssign testAnnot) (AST.JSDecimal testAnnot 1),
     AST.JSAwaitExpression testAnnot (AST.JSIdentifier testAnnot "promise"),
     AST.JSCallExpression (AST.JSIdentifier testAnnot "f") testAnnot AST.JSLNil testAnnot,
     AST.JSCallExpressionDot (AST.JSIdentifier testAnnot "obj") testAnnot (AST.JSIdentifier testAnnot "method"),
     AST.JSCallExpressionSquare (AST.JSIdentifier testAnnot "obj") testAnnot (AST.JSStringLiteral testAnnot "\"key\"") testAnnot,
     AST.JSClassExpression testAnnot testIdent AST.JSExtendsNone testAnnot [] testAnnot,
-    AST.JSCommaExpression (AST.JSDecimal testAnnot "1") testAnnot (AST.JSDecimal testAnnot "2"),
-    AST.JSExpressionBinary (AST.JSDecimal testAnnot "1") (AST.JSBinOpPlus testAnnot) (AST.JSDecimal testAnnot "2"),
-    AST.JSExpressionParen testAnnot (AST.JSDecimal testAnnot "42") testAnnot,
+    AST.JSCommaExpression (AST.JSDecimal testAnnot 1) testAnnot (AST.JSDecimal testAnnot 2),
+    AST.JSExpressionBinary (AST.JSDecimal testAnnot 1) (AST.JSBinOpPlus testAnnot) (AST.JSDecimal testAnnot 2),
+    AST.JSExpressionParen testAnnot (AST.JSDecimal testAnnot 42) testAnnot,
     AST.JSExpressionPostfix (AST.JSIdentifier testAnnot "x") (AST.JSUnaryOpIncr testAnnot),
-    AST.JSExpressionTernary (AST.JSIdentifier testAnnot "x") testAnnot (AST.JSDecimal testAnnot "1") testAnnot (AST.JSDecimal testAnnot "2"),
-    AST.JSArrowExpression (AST.JSUnparenthesizedArrowParameter testIdent) testAnnot (AST.JSConciseExpressionBody (AST.JSDecimal testAnnot "42")),
+    AST.JSExpressionTernary (AST.JSIdentifier testAnnot "x") testAnnot (AST.JSDecimal testAnnot 1) testAnnot (AST.JSDecimal testAnnot 2),
+    AST.JSArrowExpression (AST.JSUnparenthesizedArrowParameter testIdent) testAnnot (AST.JSConciseExpressionBody (AST.JSDecimal testAnnot 42)),
     AST.JSFunctionExpression testAnnot testIdent testAnnot AST.JSLNil testAnnot (AST.JSBlock testAnnot [] testAnnot),
     AST.JSGeneratorExpression testAnnot testAnnot testIdent testAnnot AST.JSLNil testAnnot (AST.JSBlock testAnnot [] testAnnot),
     AST.JSAsyncFunctionExpression testAnnot testAnnot testIdent testAnnot AST.JSLNil testAnnot (AST.JSBlock testAnnot [] testAnnot),
@@ -1102,8 +1102,8 @@ allExpressionConstructors =
     AST.JSSpreadExpression testAnnot (AST.JSIdentifier testAnnot "args"),
     AST.JSTemplateLiteral Nothing testAnnot "hello" [],
     AST.JSUnaryExpression (AST.JSUnaryOpNot testAnnot) (AST.JSIdentifier testAnnot "x"),
-    AST.JSVarInitExpression (AST.JSIdentifier testAnnot "x") (AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")),
-    AST.JSYieldExpression testAnnot (Just (AST.JSDecimal testAnnot "42")),
+    AST.JSVarInitExpression (AST.JSIdentifier testAnnot "x") (AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)),
+    AST.JSYieldExpression testAnnot (Just (AST.JSDecimal testAnnot 42)),
     AST.JSYieldFromExpression testAnnot testAnnot (AST.JSIdentifier testAnnot "generator"),
     AST.JSImportMeta testAnnot testAnnot
   ]
@@ -1114,7 +1114,7 @@ allStatementConstructors =
     AST.JSBreak testAnnot testIdent testSemi,
     AST.JSLet testAnnot AST.JSLNil testSemi,
     AST.JSClass testAnnot testIdent AST.JSExtendsNone testAnnot [] testAnnot testSemi,
-    AST.JSConstant testAnnot (AST.JSLOne (AST.JSVarInitExpression (AST.JSIdentifier testAnnot "x") (AST.JSVarInit testAnnot (AST.JSDecimal testAnnot "42")))) testSemi,
+    AST.JSConstant testAnnot (AST.JSLOne (AST.JSVarInitExpression (AST.JSIdentifier testAnnot "x") (AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)))) testSemi,
     AST.JSContinue testAnnot testIdent testSemi,
     AST.JSDoWhile testAnnot (AST.JSEmptyStatement testAnnot) testAnnot testAnnot (AST.JSLiteral testAnnot "true") testAnnot testSemi,
     AST.JSFor testAnnot testAnnot AST.JSLNil testAnnot AST.JSLNil testAnnot AST.JSLNil testAnnot (AST.JSEmptyStatement testAnnot),
@@ -1136,10 +1136,10 @@ allStatementConstructors =
     AST.JSIfElse testAnnot testAnnot (AST.JSLiteral testAnnot "true") testAnnot (AST.JSEmptyStatement testAnnot) testAnnot (AST.JSEmptyStatement testAnnot),
     AST.JSLabelled testIdent testAnnot (AST.JSEmptyStatement testAnnot),
     AST.JSEmptyStatement testAnnot,
-    AST.JSExpressionStatement (AST.JSDecimal testAnnot "42") testSemi,
-    AST.JSAssignStatement (AST.JSIdentifier testAnnot "x") (AST.JSAssign testAnnot) (AST.JSDecimal testAnnot "42") testSemi,
+    AST.JSExpressionStatement (AST.JSDecimal testAnnot 42) testSemi,
+    AST.JSAssignStatement (AST.JSIdentifier testAnnot "x") (AST.JSAssign testAnnot) (AST.JSDecimal testAnnot 42) testSemi,
     AST.JSMethodCall (AST.JSIdentifier testAnnot "obj") testAnnot AST.JSLNil testAnnot testSemi,
-    AST.JSReturn testAnnot (Just (AST.JSDecimal testAnnot "42")) testSemi,
+    AST.JSReturn testAnnot (Just (AST.JSDecimal testAnnot 42)) testSemi,
     AST.JSSwitch testAnnot testAnnot (AST.JSIdentifier testAnnot "x") testAnnot testAnnot [] testAnnot testSemi,
     AST.JSThrow testAnnot (AST.JSIdentifier testAnnot "error") testSemi,
     AST.JSTry testAnnot (AST.JSBlock testAnnot [] testAnnot) [] AST.JSNoFinally,

@@ -103,28 +103,28 @@ testLiteralSerialization :: Spec
 testLiteralSerialization = describe "Literal Serialization" $ do
   describe "numeric literals" $ do
     it "serializes decimal numbers" $ do
-      let expr = AST.JSDecimal testAnnot "42"
+      let expr = AST.JSDecimal testAnnot 42
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSDecimal"
       json `shouldSatisfy` Text.isInfixOf "\"42\""
       validateJSON json
 
     it "serializes hexadecimal numbers" $ do
-      let expr = AST.JSHexInteger testAnnot "0xFF"
+      let expr = AST.JSHexInteger testAnnot 0xFF
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSHexInteger"
-      json `shouldSatisfy` Text.isInfixOf "\"0xFF\""
+      json `shouldSatisfy` Text.isInfixOf "\"0xff\""
       validateJSON json
 
     it "serializes octal numbers" $ do
-      let expr = AST.JSOctal testAnnot "0o77"
+      let expr = AST.JSOctal testAnnot 0o77
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSOctal"
       json `shouldSatisfy` Text.isInfixOf "\"0o77\""
       validateJSON json
 
     it "serializes BigInt literals" $ do
-      let expr = AST.JSBigIntLiteral testAnnot "123n"
+      let expr = AST.JSBigIntLiteral testAnnot 123
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSBigIntLiteral"
       json `shouldSatisfy` Text.isInfixOf "\"123n\""
@@ -180,8 +180,8 @@ testExpressionSerialization :: Spec
 testExpressionSerialization = describe "Expression Serialization" $ do
   describe "binary expressions" $ do
     it "serializes arithmetic operations" $ do
-      let left = AST.JSDecimal noAnnot "2"
-      let right = AST.JSDecimal noAnnot "3"
+      let left = AST.JSDecimal noAnnot 2
+      let right = AST.JSDecimal noAnnot 3
       let op = AST.JSBinOpPlus noAnnot
       let expr = AST.JSExpressionBinary left op right
       let json = PJSON.renderExpressionToJSON expr
@@ -201,7 +201,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes comparison operations" $ do
       let left = AST.JSIdentifier noAnnot "a"
-      let right = AST.JSDecimal noAnnot "5"
+      let right = AST.JSDecimal noAnnot 5
       let op = AST.JSBinOpLt noAnnot
       let expr = AST.JSExpressionBinary left op right
       let json = PJSON.renderExpressionToJSON expr
@@ -222,7 +222,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes bracket notation member access" $ do
       let obj = AST.JSIdentifier noAnnot "array"
-      let index = AST.JSDecimal noAnnot "0"
+      let index = AST.JSDecimal noAnnot 0
       let expr = AST.JSMemberSquare obj noAnnot index noAnnot
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSMemberSquare"
@@ -233,7 +233,7 @@ testExpressionSerialization = describe "Expression Serialization" $ do
   describe "function calls" $ do
     it "serializes simple function calls" $ do
       let func = AST.JSIdentifier noAnnot "myFunction"
-      let args = AST.JSLOne (AST.JSDecimal noAnnot "42")
+      let args = AST.JSLOne (AST.JSDecimal noAnnot 42)
       let expr = AST.JSCallExpression func noAnnot args noAnnot
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSCallExpression"
@@ -243,8 +243,8 @@ testExpressionSerialization = describe "Expression Serialization" $ do
 
     it "serializes function calls with multiple arguments" $ do
       let func = AST.JSIdentifier noAnnot "add"
-      let arg1 = AST.JSDecimal noAnnot "1"
-      let arg2 = AST.JSDecimal noAnnot "2"
+      let arg1 = AST.JSDecimal noAnnot 1
+      let arg2 = AST.JSDecimal noAnnot 2
       let args = AST.JSLCons (AST.JSLOne arg1) noAnnot arg2
       let expr = AST.JSCallExpression func noAnnot args noAnnot
       let json = PJSON.renderExpressionToJSON expr
@@ -268,7 +268,7 @@ testModernFeatures = describe "Modern JavaScript Features" $ do
 
     it "serializes optional member square access" $ do
       let obj = AST.JSIdentifier noAnnot "arr"
-      let key = AST.JSDecimal noAnnot "0"
+      let key = AST.JSDecimal noAnnot 0
       let expr = AST.JSOptionalMemberSquare obj noAnnot key noAnnot
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSOptionalMemberSquare"
@@ -308,7 +308,7 @@ testModernFeatures = describe "Modern JavaScript Features" $ do
     it "serializes arrow functions with parenthesized parameters" $ do
       let paramList = AST.JSLOne (AST.JSIdentifier noAnnot "a")
       let param = AST.JSParenthesizedArrowParameterList noAnnot paramList noAnnot
-      let body = AST.JSConciseExpressionBody (AST.JSDecimal noAnnot "42")
+      let body = AST.JSConciseExpressionBody (AST.JSDecimal noAnnot 42)
       let expr = AST.JSArrowExpression param noAnnot body
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSArrowExpression"
@@ -320,7 +320,7 @@ testStatementSerialization :: Spec
 testStatementSerialization = describe "Statement Serialization" $ do
   describe "expression statements" $ do
     it "serializes expression statements" $ do
-      let expr = AST.JSDecimal noAnnot "42"
+      let expr = AST.JSDecimal noAnnot 42
       let stmt = AST.JSExpressionStatement expr AST.JSSemiAuto
       let json = PJSON.renderStatementToJSON stmt
       json `shouldSatisfy` Text.isInfixOf "JSStatementExpression"
@@ -416,7 +416,7 @@ testAnnotationSerialization = describe "Annotation Serialization" $ do
 testCompletePrograms :: Spec
 testCompletePrograms = describe "Complete Program Serialization" $ do
   it "serializes simple programs" $ do
-    let expr = AST.JSDecimal noAnnot "42"
+    let expr = AST.JSDecimal noAnnot 42
     let stmt = AST.JSExpressionStatement expr AST.JSSemiAuto
     let program = [stmt]
     let json = PJSON.renderProgramToJSON program
@@ -426,8 +426,8 @@ testCompletePrograms = describe "Complete Program Serialization" $ do
     validateJSON json
 
   it "serializes complex programs with multiple statements" $ do
-    let expr1 = AST.JSDecimal noAnnot "1"
-    let expr2 = AST.JSDecimal noAnnot "2"
+    let expr1 = AST.JSDecimal noAnnot 1
+    let expr2 = AST.JSDecimal noAnnot 2
     let stmt1 = AST.JSExpressionStatement expr1 AST.JSSemiAuto
     let stmt2 = AST.JSExpressionStatement expr2 AST.JSSemiAuto
     let program = [stmt1, stmt2]
@@ -438,7 +438,7 @@ testCompletePrograms = describe "Complete Program Serialization" $ do
     validateJSON json
 
   it "serializes different AST root types" $ do
-    let expr = AST.JSDecimal noAnnot "123"
+    let expr = AST.JSDecimal noAnnot 123
     let ast = AST.JSAstExpression expr noAnnot
     let json = PJSON.renderToJSON ast
     json `shouldSatisfy` Text.isInfixOf "JSAstExpression"
@@ -463,19 +463,19 @@ testEdgeCases = describe "Edge Cases" $ do
     validateJSON json
 
   it "handles complex nested structures" $ do
-    let innerExpr = AST.JSDecimal noAnnot "1"
+    let innerExpr = AST.JSDecimal noAnnot 1
     let left = AST.JSExpressionBinary innerExpr (AST.JSBinOpPlus noAnnot) innerExpr
-    let right = AST.JSDecimal noAnnot "2"
+    let right = AST.JSDecimal noAnnot 2
     let outerExpr = AST.JSExpressionBinary left (AST.JSBinOpTimes noAnnot) right
     let json = PJSON.renderExpressionToJSON outerExpr
     json `shouldSatisfy` Text.isInfixOf "JSExpressionBinary"
     validateJSON json
 
   it "handles large numeric values" $ do
-    let expr = AST.JSDecimal noAnnot "1.7976931348623157e+308"
+    let expr = AST.JSDecimal noAnnot 1.7976931348623157e+308
     let json = PJSON.renderExpressionToJSON expr
     json `shouldSatisfy` Text.isInfixOf "JSDecimal"
-    json `shouldSatisfy` Text.isInfixOf "1.7976931348623157e+308"
+    json `shouldSatisfy` Text.isInfixOf "1.7976931348623157e308"
     validateJSON json
 
 -- | Test JSON format compliance
@@ -483,7 +483,7 @@ testJSONCompliance :: Spec
 testJSONCompliance = describe "JSON Format Compliance" $ do
   it "produces valid JSON for all expression types" $ do
     let expressions =
-          [ AST.JSDecimal noAnnot "42",
+          [ AST.JSDecimal noAnnot 42,
             AST.JSStringLiteral noAnnot "test",
             AST.JSIdentifier noAnnot "myVar",
             AST.JSLiteral noAnnot "true"
@@ -498,9 +498,9 @@ testJSONCompliance = describe "JSON Format Compliance" $ do
   it "produces parseable JSON with standard libraries" $ do
     let expr =
           AST.JSExpressionBinary
-            (AST.JSDecimal noAnnot "1")
+            (AST.JSDecimal noAnnot 1)
             (AST.JSBinOpPlus noAnnot)
-            (AST.JSDecimal noAnnot "2")
+            (AST.JSDecimal noAnnot 2)
     let json = PJSON.renderExpressionToJSON expr
 
     -- Validate with Aeson
@@ -508,7 +508,7 @@ testJSONCompliance = describe "JSON Format Compliance" $ do
     parsed `shouldSatisfy` isJust
 
   it "maintains consistent field ordering" $ do
-    let expr = AST.JSDecimal testAnnot "42"
+    let expr = AST.JSDecimal testAnnot 42
     let json = PJSON.renderExpressionToJSON expr
     -- Type field should come first
     json `shouldSatisfy` Text.isPrefixOf "{\"type\""
@@ -538,9 +538,9 @@ testJSONCompliance = describe "JSON Format Compliance" $ do
       ( \op -> do
           let expr =
                 AST.JSExpressionBinary
-                  (AST.JSDecimal noAnnot "1")
+                  (AST.JSDecimal noAnnot 1)
                   op
-                  (AST.JSDecimal noAnnot "2")
+                  (AST.JSDecimal noAnnot 2)
           let json = PJSON.renderExpressionToJSON expr
           validateJSON json
       )

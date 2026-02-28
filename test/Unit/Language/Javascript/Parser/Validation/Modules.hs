@@ -591,7 +591,7 @@ defaultExportTests = describe "Default Export Tests" $ do
                         ( JSLOne
                             ( JSVarInitExpression
                                 (JSIdentifier noAnnot "defaultVar")
-                                (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                                (JSVarInit noAnnot (JSDecimal noAnnot 42))
                             )
                         )
                         (JSSemi noAnnot)
@@ -767,7 +767,7 @@ moduleContextTests = describe "Module Context Tests" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "internal")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     (JSSemi noAnnot)
@@ -821,7 +821,7 @@ duplicateDetectionTests = describe "Duplicate Detection Tests" $ do
                         ( JSLOne
                             ( JSVarInitExpression
                                 (JSIdentifier noAnnot "duplicate")
-                                (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                                (JSVarInit noAnnot (JSDecimal noAnnot 42))
                             )
                         )
                         (JSSemi noAnnot)
@@ -1014,7 +1014,7 @@ moduleEdgeCasesTests = describe "Module Edge Cases" $ do
                     ( JSLOne
                         ( JSVarInitExpression
                             (JSIdentifier noAnnot "onlyStatement")
-                            (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                            (JSVarInit noAnnot (JSDecimal noAnnot 42))
                         )
                     )
                     (JSSemi noAnnot)
@@ -1076,7 +1076,7 @@ moduleEdgeCasesTests = describe "Module Edge Cases" $ do
                         ( JSLOne
                             ( JSVarInitExpression
                                 (JSIdentifier noAnnot "exportedVar")
-                                (JSVarInit noAnnot (JSDecimal noAnnot "100"))
+                                (JSVarInit noAnnot (JSDecimal noAnnot 100))
                             )
                         )
                         (JSSemi noAnnot)

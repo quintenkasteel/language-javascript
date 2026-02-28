@@ -52,7 +52,6 @@ module Language.JavaScript.Pretty.XML
   )
 where
 
-import qualified Data.ByteString.Char8 as BS8
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -104,19 +103,19 @@ renderProgramToXML statements =
 renderExpressionToXML :: AST.JSExpression -> Text
 renderExpressionToXML expr = case expr of
   AST.JSDecimal annot value ->
-    formatXMLElement "JSDecimal" [("value", escapeXMLString (Text.unpack . Text.decodeUtf8 $ value))] $
+    formatXMLElement "JSDecimal" [("value", escapeXMLString (AST.showJSDouble value))] $
       renderAnnotation annot
   AST.JSHexInteger annot value ->
-    formatXMLElement "JSHexInteger" [("value", escapeXMLString (Text.unpack . Text.decodeUtf8 $ value))] $
+    formatXMLElement "JSHexInteger" [("value", escapeXMLString (AST.showJSHex value))] $
       renderAnnotation annot
   AST.JSOctal annot value ->
-    formatXMLElement "JSOctal" [("value", escapeXMLString (Text.unpack . Text.decodeUtf8 $ value))] $
+    formatXMLElement "JSOctal" [("value", escapeXMLString (AST.showJSOctal value))] $
       renderAnnotation annot
   AST.JSBinaryInteger annot value ->
-    formatXMLElement "JSBinaryInteger" [("value", escapeXMLString (Text.unpack . Text.decodeUtf8 $ value))] $
+    formatXMLElement "JSBinaryInteger" [("value", escapeXMLString (AST.showJSBinary value))] $
       renderAnnotation annot
   AST.JSBigIntLiteral annot value ->
-    formatXMLElement "JSBigIntLiteral" [("value", escapeXMLString (Text.unpack . Text.decodeUtf8 $ value))] $
+    formatXMLElement "JSBigIntLiteral" [("value", escapeXMLString (show value <> "n"))] $
       renderAnnotation annot
   AST.JSStringLiteral annot value ->
     formatXMLElement "JSStringLiteral" [("value", escapeXMLString (Text.unpack . Text.decodeUtf8 $ value))] $

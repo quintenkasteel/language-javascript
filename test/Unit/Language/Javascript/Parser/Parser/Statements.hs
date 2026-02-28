@@ -119,7 +119,7 @@ testStatementParser = describe "Parse statements:" $ do
   it "destructuring default values validation (ES2015) - actual parser capabilities" $ do
     -- Test array default values - comprehensive structural validation
     case testStatement "let [a = 1, b = 2] = array;" of
-      Right (JSAstStatement (JSLet _ (JSLOne (JSVarInitExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ "1")), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "b") (JSAssign _) (JSDecimal _ "2"))] _) (JSVarInit _ (JSIdentifier _ "array")))) _) _) -> pure ()
+      Right (JSAstStatement (JSLet _ (JSLOne (JSVarInitExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ 1)), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "b") (JSAssign _) (JSDecimal _ 2))] _) (JSVarInit _ (JSIdentifier _ "array")))) _) _) -> pure ()
       Right ast -> expectationFailure ("Expected let with array destructuring defaults, got: " ++ show ast)
       Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
 
@@ -166,7 +166,7 @@ testStatementParser = describe "Parse statements:" $ do
       Left _ -> return ()
       Right _ -> return ()
     case testStatement "function test2([a = 1, b = 2] = []) {}" of
-      Right (JSAstStatement (JSFunction _ (JSIdentName _ "test2") _ (JSLOne (JSAssignExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ "1")), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "b") (JSAssign _) (JSDecimal _ "2"))] _) (JSAssign _) (JSArrayLiteral _ [] _))) _ (JSBlock _ [] _) JSSemiAuto) _) -> pure ()
+      Right (JSAstStatement (JSFunction _ (JSIdentName _ "test2") _ (JSLOne (JSAssignExpression (JSArrayLiteral _ [JSArrayElement (JSAssignExpression (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ 1)), JSArrayComma _, JSArrayElement (JSAssignExpression (JSIdentifier _ "b") (JSAssign _) (JSDecimal _ 2))] _) (JSAssign _) (JSArrayLiteral _ [] _))) _ (JSBlock _ [] _) JSSemiAuto) _) -> pure ()
       Right ast -> expectationFailure ("Expected function with array parameter defaults, got: " ++ show ast)
       Left err -> expectationFailure ("Expected successful parse, got error: " ++ show err)
 

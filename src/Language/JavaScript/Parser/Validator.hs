@@ -1356,41 +1356,35 @@ strictModeReserved = ["arguments", "eval"]
 futureReserved :: [ByteString]
 futureReserved = ["await", "enum", "implements", "interface", "package", "private", "protected", "public"]
 
--- | Validate numeric literals.
-validateNumericLiteral :: ByteString -> [ValidationError]
-validateNumericLiteral literal
-  | BS8.all isValidNumChar literal = []
-  | otherwise = [InvalidNumericLiteral (Text.decodeUtf8 ( literal)) (TokenPn 0 0 0)]
-  where
-    isValidNumChar c = Char.isDigit c || c `elem` (".-+eE" :: String)
+-- | Validate decimal numeric literals.
+-- Format validity is guaranteed by the parser, but we check for overflow
+-- to Infinity which indicates a numeric literal too large to represent.
+validateNumericLiteral :: Double -> [ValidationError]
+validateNumericLiteral d
+  | isInfinite d = [InvalidNumericLiteral (Text.pack (show d)) (TokenPn 0 0 0)]
+  | isNaN d = [InvalidNumericLiteral (Text.pack (show d)) (TokenPn 0 0 0)]
+  | otherwise = []
 
 -- | Validate hex literals.
-validateHexLiteral :: ByteString -> [ValidationError]
-validateHexLiteral literal
-  | "0x" `BS8.isPrefixOf` literal || "0X" `BS8.isPrefixOf` literal = []
-  | otherwise = [InvalidNumericLiteral (Text.decodeUtf8 ( literal)) (TokenPn 0 0 0)]
+-- With typed Integer values, format validity is guaranteed by the parser.
+validateHexLiteral :: Integer -> [ValidationError]
+validateHexLiteral _ = []
 
 -- | Validate binary literals (ES2015).
-validateBinaryLiteral :: ByteString -> [ValidationError]
-validateBinaryLiteral literal
-  | "0b" `BS8.isPrefixOf` literal || "0B" `BS8.isPrefixOf` literal =
-    let digits = BS8.drop 2 literal
-     in if BS8.all (\c -> c == '0' || c == '1') digits
-          then []
-          else [InvalidNumericLiteral (Text.decodeUtf8 ( literal)) (TokenPn 0 0 0)]
-  | otherwise = [InvalidNumericLiteral (Text.decodeUtf8 ( literal)) (TokenPn 0 0 0)]
+-- With typed Integer values, format validity is guaranteed by the parser.
+validateBinaryLiteral :: Integer -> [ValidationError]
+validateBinaryLiteral _ = []
 
 -- | Validate octal literals in strict mode.
-validateOctalLiteral :: ValidationContext -> ByteString -> [ValidationError]
-validateOctalLiteral ctx literal
-  | contextStrictMode ctx == StrictModeOn = [InvalidOctalInStrict (Text.decodeUtf8 ( literal)) (TokenPn 0 0 0)]
+validateOctalLiteral :: ValidationContext -> Integer -> [ValidationError]
+validateOctalLiteral ctx n
+  | contextStrictMode ctx == StrictModeOn = [InvalidOctalInStrict (Text.pack (show n)) (TokenPn 0 0 0)]
   | otherwise = []
 
 -- | Validate BigInt literals.
-validateBigIntLiteral :: ByteString -> [ValidationError]
-validateBigIntLiteral literal
-  | "n" `BS8.isSuffixOf` literal = []
-  | otherwise = [InvalidBigIntLiteral (Text.decodeUtf8 ( literal)) (TokenPn 0 0 0)]
+-- With typed Integer values, format validity is guaranteed by the parser.
+validateBigIntLiteral :: Integer -> [ValidationError]
+validateBigIntLiteral _ = []
 
 -- | Validate string literals.
 validateStringLiteral :: ByteString -> [ValidationError]
@@ -1549,20 +1543,11 @@ findDuplicateFlags flags =
   let flagCounts = [(c, length (filter (== c) flags)) | c <- nub flags]
    in [c | (c, count) <- flagCounts, count > 1]
 
--- | Validate general literals.
+-- | Validate general literals (keywords like @this@, @null@, @true@, @false@, @super@).
+-- Numeric and BigInt literals are handled by their own typed constructors,
+-- so JSLiteral only holds keyword strings whose validity is guaranteed by the parser.
 validateLiteral :: ValidationContext -> ByteString -> [ValidationError]
-validateLiteral ctx literal =
-  -- Detect literal type and validate accordingly
-  if "n" `BS8.isSuffixOf` literal
-    then validateBigIntLiteral literal
-    else
-      if isNumericLiteral literal
-        then validateNumericLiteral literal
-        else validateStringLiteral literal
-  where
-    isNumericLiteral :: ByteString -> Bool
-    isNumericLiteral s =
-      maybe False (\(c, _) -> Char.isDigit c || c == '.') (BS8.uncons s)
+validateLiteral _ctx _literal = []
 
 -- Validation functions remain focused on semantic validation of parsed ASTs
 

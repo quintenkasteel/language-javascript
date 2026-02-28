@@ -60,7 +60,7 @@ arrowFunctionTests = describe "Arrow Function Validation" $ do
                   noAnnot
               )
               noAnnot
-              (JSConciseExpressionBody (JSDecimal noAnnot "42"))
+              (JSConciseExpressionBody (JSDecimal noAnnot 42))
       validateExpression emptyContext arrowExpr `shouldSatisfy` null
 
     it "validates empty parameter list" $ do
@@ -68,7 +68,7 @@ arrowFunctionTests = describe "Arrow Function Validation" $ do
             JSArrowExpression
               (JSParenthesizedArrowParameterList noAnnot JSLNil noAnnot)
               noAnnot
-              (JSConciseExpressionBody (JSDecimal noAnnot "42"))
+              (JSConciseExpressionBody (JSDecimal noAnnot 42))
       validateExpression emptyContext arrowExpr `shouldSatisfy` null
 
     it "validates multiple parameters" $ do
@@ -84,7 +84,7 @@ arrowFunctionTests = describe "Arrow Function Validation" $ do
                   noAnnot
               )
               noAnnot
-              (JSConciseExpressionBody (JSDecimal noAnnot "42"))
+              (JSConciseExpressionBody (JSDecimal noAnnot 42))
       validateExpression emptyContext arrowExpr `shouldSatisfy` null
 
     it "validates block body" $ do
@@ -142,7 +142,7 @@ asyncAwaitTests = describe "Async/Await Validation" $ do
               ( JSBlock
                   noAnnot
                   [ JSExpressionStatement
-                      (JSAwaitExpression noAnnot (JSDecimal noAnnot "42"))
+                      (JSAwaitExpression noAnnot (JSDecimal noAnnot 42))
                       auto
                   ]
                   noAnnot
@@ -151,7 +151,7 @@ asyncAwaitTests = describe "Async/Await Validation" $ do
       validateStatement emptyContext asyncFunc `shouldSatisfy` null
 
     it "rejects await outside async function" $ do
-      let awaitExpr = JSAwaitExpression noAnnot (JSDecimal noAnnot "42")
+      let awaitExpr = JSAwaitExpression noAnnot (JSDecimal noAnnot 42)
       case validateExpression emptyContext awaitExpr of
         err : _ | isAwaitOutsideAsync err -> pure ()
         _ -> expectationFailure "Expected AwaitOutsideAsync error"
@@ -170,7 +170,7 @@ asyncAwaitTests = describe "Async/Await Validation" $ do
                   [ JSExpressionStatement
                       ( JSAwaitExpression
                           noAnnot
-                          (JSAwaitExpression noAnnot (JSDecimal noAnnot "1"))
+                          (JSAwaitExpression noAnnot (JSDecimal noAnnot 1))
                       )
                       auto
                   ]
@@ -220,7 +220,7 @@ generatorTests = describe "Generator Function Validation" $ do
               ( JSBlock
                   noAnnot
                   [ JSExpressionStatement
-                      (JSYieldExpression noAnnot (Just (JSDecimal noAnnot "42")))
+                      (JSYieldExpression noAnnot (Just (JSDecimal noAnnot 42)))
                       auto
                   ]
                   noAnnot
@@ -229,7 +229,7 @@ generatorTests = describe "Generator Function Validation" $ do
       validateStatement emptyContext genFunc `shouldSatisfy` null
 
     it "rejects yield outside generator function" $ do
-      let yieldExpr = JSYieldExpression noAnnot (Just (JSDecimal noAnnot "42"))
+      let yieldExpr = JSYieldExpression noAnnot (Just (JSDecimal noAnnot 42))
       case validateExpression emptyContext yieldExpr of
         err : _ | isYieldOutsideGenerator err -> pure ()
         _ -> expectationFailure "Expected YieldOutsideGenerator error"
@@ -514,7 +514,7 @@ moduleTests = describe "Module System Validation" $ do
                       ( JSLOne
                           ( JSVarInitExpression
                               (JSIdentifier noAnnot "myVar")
-                              (JSVarInit noAnnot (JSDecimal noAnnot "42"))
+                              (JSVarInit noAnnot (JSDecimal noAnnot 42))
                           )
                       )
                       auto

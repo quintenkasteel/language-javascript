@@ -33,6 +33,7 @@ where
 import Blaze.ByteString.Builder (Builder, fromByteString, toLazyByteString)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
+import Data.Char (intToDigit)
 #if ! MIN_VERSION_base(4,13,0)
 import Data.Monoid (mempty)
 import Data.Semigroup ((<>))
@@ -49,6 +50,7 @@ import qualified Data.Text.Lazy.Encoding as LT
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
+import Numeric (showHex, showIntAtBase)
 
 -- ---------------------------------------------------------------------
 
@@ -59,6 +61,31 @@ data PosAccum = PosAccum (Int, Int) Builder
 
 str :: String -> Builder
 str = BS.fromString
+
+-- | Render a Double as compact JavaScript source text.
+-- Whole numbers render without decimal point for exact round-trip on integers.
+renderDouble :: Double -> String
+renderDouble d
+  | d == fromIntegral n && abs d < 1e15 = show n
+  | otherwise = show d
+  where
+    n = round d :: Integer
+
+-- | Render an Integer as hexadecimal with @0x@ prefix.
+renderHex :: Integer -> String
+renderHex n = "0x" <> showHex n ""
+
+-- | Render an Integer as binary with @0b@ prefix.
+renderBinary :: Integer -> String
+renderBinary n = "0b" <> showIntAtBase 2 intToDigit n ""
+
+-- | Render an Integer as octal with @0o@ prefix.
+renderOctal :: Integer -> String
+renderOctal n = "0o" <> showIntAtBase 8 intToDigit n ""
+
+-- | Render a BigInt value as decimal digits followed by @n@.
+renderBigInt :: Integer -> String
+renderBigInt n = show n <> "n"
 
 -- ---------------------------------------------------------------------
 
@@ -89,11 +116,11 @@ instance RenderJS JSAST where
 instance RenderJS JSExpression where
   -- Terminals
   (|>) pacc (JSIdentifier annot s) = pacc |> annot |> s
-  (|>) pacc (JSDecimal annot i) = pacc |> annot |> i
+  (|>) pacc (JSDecimal annot d) = pacc |> annot |> renderDouble d
   (|>) pacc (JSLiteral annot l) = pacc |> annot |> l
-  (|>) pacc (JSHexInteger annot i) = pacc |> annot |> i
-  (|>) pacc (JSBinaryInteger annot i) = pacc |> annot |> i
-  (|>) pacc (JSOctal annot i) = pacc |> annot |> i
+  (|>) pacc (JSHexInteger annot n) = pacc |> annot |> renderHex n
+  (|>) pacc (JSBinaryInteger annot n) = pacc |> annot |> renderBinary n
+  (|>) pacc (JSOctal annot n) = pacc |> annot |> renderOctal n
   (|>) pacc (JSStringLiteral annot s) = pacc |> annot |> s
   (|>) pacc (JSRegEx annot s) = pacc |> annot |> s
   -- Non-Terminals
@@ -129,7 +156,7 @@ instance RenderJS JSExpression where
   (|>) pacc (JSImportMeta i d) = pacc |> i |> "import" |> d |> ".meta"
   (|>) pacc (JSImportCall i lb expr rb) = pacc |> i |> "import" |> lb |> expr |> rb
   (|>) pacc (JSSpreadExpression a e) = pacc |> a |> "..." |> e
-  (|>) pacc (JSBigIntLiteral annot s) = pacc |> annot |> s
+  (|>) pacc (JSBigIntLiteral annot n) = pacc |> annot |> renderBigInt n
   (|>) pacc (JSOptionalMemberDot e a p) = pacc |> e |> a |> "?." |> p
   (|>) pacc (JSOptionalMemberSquare e a1 p a2) = pacc |> e |> a1 |> "?.[" |> p |> a2 |> "]"
   (|>) pacc (JSOptionalCallExpression e a1 args a2) = pacc |> e |> a1 |> "?.(" |> args |> a2 |> ")"
