@@ -107,7 +107,6 @@ isValidUnaryOp op = case op of
   JSUnaryOpTilde _ -> True
   JSUnaryOpTypeof _ -> True
   JSUnaryOpVoid _ -> True
-  _ -> True -- Accept all valid unary operators
 
 isValidStatement :: JSStatement -> Bool
 isValidStatement stmt = case stmt of

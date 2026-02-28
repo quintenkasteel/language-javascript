@@ -1,7 +1,7 @@
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-}
 
 -- | Advanced JavaScript input generators for comprehensive fuzzing.
 --
@@ -77,10 +77,9 @@ module Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
 where
 
 import Control.Monad (forM, replicateM)
-import Data.Char (chr, isAscii, isPrint, ord)
+import Data.Char (chr, ord)
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import System.Random (randomIO, randomRIO)
+import System.Random (randomRIO)
 
 -- ---------------------------------------------------------------------
 -- Malformed Input Generation

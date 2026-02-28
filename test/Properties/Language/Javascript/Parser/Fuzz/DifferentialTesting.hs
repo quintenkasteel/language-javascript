@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 -- | Differential testing framework for JavaScript parser validation.
 --
@@ -89,13 +90,12 @@ module Properties.Language.Javascript.Parser.Fuzz.DifferentialTesting
 where
 
 import Control.Exception (SomeException, catch)
-import Control.Monad (forM, forM_)
+import Control.Monad (forM)
 import Data.List (intercalate, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
-import Language.JavaScript.Parser (readJs, renderToString)
+import Language.JavaScript.Parser (readJs)
 import qualified Language.JavaScript.Parser.AST as AST
 import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
@@ -339,6 +339,10 @@ structurallyEquivalent ast1 ast2 =
 astStructure :: AST.JSAST -> String
 astStructure (AST.JSAstProgram stmts _) =
   "program(" ++ intercalate "," (map statementStructure stmts) ++ ")"
+astStructure (AST.JSAstModule _ _) = "module"
+astStructure (AST.JSAstStatement _ _) = "statement"
+astStructure (AST.JSAstExpression _ _) = "expression"
+astStructure (AST.JSAstLiteral _ _) = "literal"
 
 -- | Extract statement structure signature
 statementStructure :: AST.JSStatement -> String
@@ -384,12 +388,12 @@ categorizeParserErrors errors = map categorizeError errors
 
 -- | Categorize individual error
 categorizeError :: String -> ErrorCategory
-categorizeError error
-  | "syntax" `isInfixOf` error = SyntaxErrorCategory
-  | "semantic" `isInfixOf` error = SemanticErrorCategory
-  | "lexical" `isInfixOf` error = LexicalErrorCategory
-  | "timeout" `isInfixOf` error = TimeoutErrorCategory
-  | "crash" `isInfixOf` error = CrashErrorCategory
+categorizeError errMsg
+  | "syntax" `isInfixOf` errMsg = SyntaxErrorCategory
+  | "semantic" `isInfixOf` errMsg = SemanticErrorCategory
+  | "lexical" `isInfixOf` errMsg = LexicalErrorCategory
+  | "timeout" `isInfixOf` errMsg = TimeoutErrorCategory
+  | "crash" `isInfixOf` errMsg = CrashErrorCategory
   | otherwise = SyntaxErrorCategory
   where
     isInfixOf needle haystack = needle `elem` words haystack
@@ -652,7 +656,7 @@ analyzeErrorDistribution :: [(Text.Text, [ErrorCategory])] -> [(ErrorCategory, I
 analyzeErrorDistribution errorData =
   let allCategories = concatMap snd errorData
       categoryGroups = groupByCategory allCategories
-   in map (\cs@(c : _) -> (c, length cs)) categoryGroups
+   in concatMap (\cs -> case cs of { (c : _) -> [(c, length cs)]; [] -> [] }) categoryGroups
 
 -- | Group errors by category
 groupByCategory :: [ErrorCategory] -> [[ErrorCategory]]
@@ -698,7 +702,7 @@ groupByParser :: [PerformanceResult] -> [(ReferenceParser, [PerformanceResult])]
 groupByParser results =
   let sorted = sortBy (comparing perfParser) results
       grouped = groupBy' (\a b -> perfParser a == perfParser b) sorted
-   in map (\rs@(r : _) -> (perfParser r, rs)) grouped
+   in concatMap (\rs -> case rs of { (r : _) -> [(perfParser r, rs)]; [] -> [] }) grouped
 
 -- | Group elements by predicate
 groupBy' :: (a -> a -> Bool) -> [a] -> [[a]]
@@ -745,7 +749,7 @@ countCategories :: [String] -> [(String, Int)]
 countCategories categories =
   let sorted = sortBy compare categories
       grouped = groupBy' (==) sorted
-   in map (\cs@(c : _) -> (c, length cs)) grouped
+   in concatMap (\cs -> case cs of { (c : _) -> [(c, length cs)]; [] -> [] }) grouped
 
 -- | Format category count
 formatCategoryCount :: (String, Int) -> String

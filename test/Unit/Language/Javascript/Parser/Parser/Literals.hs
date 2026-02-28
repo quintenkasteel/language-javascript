@@ -9,8 +9,7 @@ import Control.Monad (forM_)
 import Data.Char (chr, isPrint)
 import Data.List (isInfixOf)
 import Language.JavaScript.Parser
-import Language.JavaScript.Parser.AST (JSAST (..))
-import Language.JavaScript.Parser.Parser
+import Language.JavaScript.Parser.AST (JSAST (..), JSExpression (..), JSStatement (..))
 import Test.Hspec
 
 testLiteralParser :: Spec
@@ -143,18 +142,23 @@ testLiteralParser = describe "Parse literals:" $ do
     case parse "1_000" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSDecimal _ 1000) _] _) -> pure ()
       Left err -> expectationFailure ("Expected parse to succeed for 1_000, got: " ++ show err)
+      Right result -> expectationFailure ("Expected JSDecimal 1000 for 1_000, got: " ++ show result)
     case parse "1_000_000" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSDecimal _ 1000000) _] _) -> pure ()
       Left err -> expectationFailure ("Expected parse to succeed for 1_000_000, got: " ++ show err)
+      Right result -> expectationFailure ("Expected JSDecimal 1000000 for 1_000_000, got: " ++ show result)
     case parse "0xFF_EC_DE" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ 0xFFECDE) _] _) -> pure ()
       Left err -> expectationFailure ("Expected parse to succeed for 0xFF_EC_DE, got: " ++ show err)
+      Right result -> expectationFailure ("Expected JSHexInteger for 0xFF_EC_DE, got: " ++ show result)
     case parse "3.14_15" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSDecimal _ 3.1415) _] _) -> pure ()
       Left err -> expectationFailure ("Expected parse to succeed for 3.14_15, got: " ++ show err)
+      Right result -> expectationFailure ("Expected JSDecimal 3.1415 for 3.14_15, got: " ++ show result)
     case parse "123_456n" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ 123456) _] _) -> pure ()
       Left err -> expectationFailure ("Expected parse to succeed for 123_456n, got: " ++ show err)
+      Right result -> expectationFailure ("Expected JSBigIntLiteral 123456 for 123_456n, got: " ++ show result)
     case testLiteral "077n" of
       Right (JSAstLiteral (JSBigIntLiteral _ 077) _) -> pure ()
       result -> expectationFailure ("Expected bigint 077n, got: " ++ show result)
@@ -247,5 +251,12 @@ mkTestStrings quote =
         then '\'' : (s ++ "'")
         else '"' : (s ++ ['"'])
 
+-- | Parse a string as a literal expression, unwrapping the program wrapper.
+-- Returns the expression wrapped in JSAstLiteral for pattern matching convenience.
 testLiteral :: String -> Either String JSAST
-testLiteral str = parseExpression str "src"
+testLiteral str =
+  case parse str "src" of
+    Right (JSAstProgram [JSExpressionStatement expr _] annot) ->
+      Right (JSAstLiteral expr annot)
+    Right other -> Right other
+    Left err -> Left err

@@ -5,32 +5,22 @@ module Unit.Language.Javascript.Parser.Parser.Expressions
   )
 where
 
-import qualified Data.ByteString.Char8 as BS8
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
-  ( JSAST (..),
-    JSAccessor (..),
-    JSAnnot,
+  ( JSAccessor (..),
     JSArrayElement (..),
     JSArrowParameterList (..),
-    JSAssignOp (..),
-    JSBinOp (..),
     JSClassHeritage (..),
     JSCommaList (..),
     JSCommaTrailingList (..),
     JSConciseBody (..),
-    JSExpression (..),
     JSIdent (..),
     JSMethodDefinition (..),
     JSObjectProperty (..),
     JSPropertyName (..),
-    JSSemi,
-    JSStatement (..),
     JSTemplatePart (..),
-    JSUnaryOp (..),
   )
-import Language.JavaScript.Parser.Parser
-import Language.JavaScript.Parser.Parser (parseUsing)
+import Language.JavaScript.Parser.Parser (parseExpression, parseUsing)
 import Test.Hspec
 
 testExpressionParser :: Spec
@@ -432,31 +422,31 @@ testExpressionParser = describe "Parse expressions:" $ do
       Right (JSAstExpression (JSUnaryExpression (JSUnaryOpVoid _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary void expression, got: " ++ show result)
     case testExpr "typeof y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpTypeof opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpTypeof _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary typeof expression, got: " ++ show result)
     case testExpr "++y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpIncr opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpIncr _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary increment expression, got: " ++ show result)
     case testExpr "--y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpDecr opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpDecr _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary decrement expression, got: " ++ show result)
     case testExpr "+y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpPlus opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpPlus _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary plus expression, got: " ++ show result)
     case testExpr "-y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpMinus opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpMinus _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary minus expression, got: " ++ show result)
     case testExpr "~y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpTilde opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpTilde _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary bitwise not expression, got: " ++ show result)
     case testExpr "!y" of
-      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpNot opAnnot) (JSIdentifier idAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSUnaryExpression (JSUnaryOpNot _opAnnot) (JSIdentifier _idAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unary logical not expression, got: " ++ show result)
     case testExpr "y++" of
-      Right (JSAstExpression (JSExpressionPostfix (JSIdentifier idAnnot "y") (JSUnaryOpIncr opAnnot)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionPostfix (JSIdentifier _idAnnot "y") (JSUnaryOpIncr _opAnnot)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected postfix increment expression, got: " ++ show result)
     case testExpr "y--" of
-      Right (JSAstExpression (JSExpressionPostfix (JSIdentifier idAnnot "y") (JSUnaryOpDecr opAnnot)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionPostfix (JSIdentifier _idAnnot "y") (JSUnaryOpDecr _opAnnot)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected postfix decrement expression, got: " ++ show result)
     case testExpr "...y" of
       Right (JSAstExpression (JSSpreadExpression _ (JSIdentifier _ "y")) _) -> pure ()
@@ -464,405 +454,405 @@ testExpressionParser = describe "Parse expressions:" $ do
 
   it "new expression" $ do
     case testExpr "new x()" of
-      Right (JSAstExpression (JSMemberNew newAnnot (JSIdentifier idAnnot "x") leftParen JSLNil rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberNew _newAnnot (JSIdentifier _idAnnot "x") _leftParen JSLNil _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected new expression with call, got: " ++ show result)
     case testExpr "new x.y" of
-      Right (JSAstExpression (JSNewExpression newAnnot (JSMemberDot (JSIdentifier idAnnot "x") dot (JSIdentifier memAnnot "y"))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSNewExpression _newAnnot (JSMemberDot (JSIdentifier _idAnnot "x") _dot (JSIdentifier _memAnnot "y"))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected new expression with member access, got: " ++ show result)
 
   it "binary expression" $ do
     case testExpr "x||y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpOr opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpOr _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary logical or expression, got: " ++ show result)
     case testExpr "x&&y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpAnd opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpAnd _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary logical and expression, got: " ++ show result)
     case testExpr "x??y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpNullishCoalescing opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpNullishCoalescing _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary nullish coalescing expression, got: " ++ show result)
     case testExpr "x|y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpBitOr opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpBitOr _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary bitwise or expression, got: " ++ show result)
     case testExpr "x^y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpBitXor opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpBitXor _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary bitwise xor expression, got: " ++ show result)
     case testExpr "x&y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpBitAnd opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpBitAnd _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary bitwise and expression, got: " ++ show result)
 
     case testExpr "x==y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpEq opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpEq _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary equality expression, got: " ++ show result)
     case testExpr "x!=y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpNeq opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpNeq _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary inequality expression, got: " ++ show result)
     case testExpr "x===y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpStrictEq opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpStrictEq _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary strict equality expression, got: " ++ show result)
     case testExpr "x!==y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpStrictNeq opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpStrictNeq _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary strict inequality expression, got: " ++ show result)
 
     case testExpr "x<y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpLt opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpLt _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary less than expression, got: " ++ show result)
     case testExpr "x>y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpGt opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpGt _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary greater than expression, got: " ++ show result)
     case testExpr "x<=y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpLe opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpLe _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary less than or equal expression, got: " ++ show result)
     case testExpr "x>=y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpGe opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpGe _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary greater than or equal expression, got: " ++ show result)
 
     case testExpr "x<<y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpLsh opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpLsh _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary left shift expression, got: " ++ show result)
     case testExpr "x>>y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpRsh opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpRsh _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary right shift expression, got: " ++ show result)
     case testExpr "x>>>y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpUrsh opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpUrsh _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary unsigned right shift expression, got: " ++ show result)
 
     case testExpr "x+y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpPlus opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpPlus _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary addition expression, got: " ++ show result)
     case testExpr "x-y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpMinus opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpMinus _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary subtraction expression, got: " ++ show result)
 
     case testExpr "x*y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpTimes opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpTimes _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary multiplication expression, got: " ++ show result)
     case testExpr "x**y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpExponentiation opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpExponentiation _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary exponentiation expression, got: " ++ show result)
     case testExpr "x**y**z" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier idAnnot "x") (JSBinOpExponentiation opAnnot1) (JSExpressionBinary (JSIdentifier leftIdAnnot "y") (JSBinOpExponentiation opAnnot2) (JSIdentifier rightIdAnnot "z"))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _idAnnot "x") (JSBinOpExponentiation _opAnnot1) (JSExpressionBinary (JSIdentifier _leftIdAnnot "y") (JSBinOpExponentiation _opAnnot2) (JSIdentifier _rightIdAnnot "z"))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nested exponentiation expression, got: " ++ show result)
     case testExpr "2**3**2" of
-      Right (JSAstExpression (JSExpressionBinary (JSDecimal numAnnot1 2) (JSBinOpExponentiation opAnnot1) (JSExpressionBinary (JSDecimal numAnnot2 3) (JSBinOpExponentiation opAnnot2) (JSDecimal numAnnot3 2))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSDecimal _numAnnot1 2) (JSBinOpExponentiation _opAnnot1) (JSExpressionBinary (JSDecimal _numAnnot2 3) (JSBinOpExponentiation _opAnnot2) (JSDecimal _numAnnot3 2))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected numeric exponentiation expression, got: " ++ show result)
     case testExpr "x/y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpDivide opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpDivide _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary division expression, got: " ++ show result)
     case testExpr "x%y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpMod opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpMod _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected binary modulo expression, got: " ++ show result)
     case testExpr "x instanceof y" of
-      Right (JSAstExpression (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpInstanceOf opAnnot) (JSIdentifier rightIdAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpInstanceOf _opAnnot) (JSIdentifier _rightIdAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected instanceof expression, got: " ++ show result)
 
   it "assign expression" $ do
     case testExpr "x=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected assignment expression x=1, got: " ++ show result)
     case testExpr "x*=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSTimesAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSTimesAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected multiply assignment expression, got: " ++ show result)
     case testExpr "x/=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSDivideAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSDivideAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected divide assignment expression, got: " ++ show result)
     case testExpr "x%=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSModAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSModAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected modulo assignment expression, got: " ++ show result)
     case testExpr "x+=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSPlusAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSPlusAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected add assignment expression, got: " ++ show result)
     case testExpr "x-=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSMinusAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSMinusAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected subtract assignment expression, got: " ++ show result)
     case testExpr "x<<=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSLshAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSLshAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected left shift assignment expression, got: " ++ show result)
     case testExpr "x>>=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSRshAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSRshAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected right shift assignment expression, got: " ++ show result)
     case testExpr "x>>>=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSUrshAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSUrshAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected unsigned right shift assignment expression, got: " ++ show result)
     case testExpr "x&=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSBwAndAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSBwAndAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected bitwise and assignment expression, got: " ++ show result)
 
   it "destructuring assignment expressions (ES2015) - supported features" $ do
     -- Array destructuring assignment
     case testExpr "[a, b] = arr" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "a"), JSArrayComma comma, JSArrayElement (JSIdentifier elem2Annot "b")] rightBracket) (JSAssign assignAnnot) (JSIdentifier idAnnot "arr")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "a"), JSArrayComma _comma, JSArrayElement (JSIdentifier _elem2Annot "b")] _rightBracket) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "arr")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected array destructuring assignment, got: " ++ show result)
     case testExpr "[x, y, z] = coordinates" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "x"), JSArrayComma comma1, JSArrayElement (JSIdentifier elem2Annot "y"), JSArrayComma comma2, JSArrayElement (JSIdentifier elem3Annot "z")] rightBracket) (JSAssign assignAnnot) (JSIdentifier idAnnot "coordinates")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "x"), JSArrayComma _comma1, JSArrayElement (JSIdentifier _elem2Annot "y"), JSArrayComma _comma2, JSArrayElement (JSIdentifier _elem3Annot "z")] _rightBracket) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "coordinates")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected array destructuring assignment, got: " ++ show result)
 
     -- Object destructuring assignment
     case testExpr "{a, b} = obj" of
-      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral leftBrace (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef prop1Annot "a")) comma (JSPropertyIdentRef prop2Annot "b"))) rightBrace) (JSAssign assignAnnot) (JSIdentifier idAnnot "obj")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral _leftBrace (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef _prop1Annot "a")) _comma (JSPropertyIdentRef _prop2Annot "b"))) _rightBrace) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "obj")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected object destructuring assignment, got: " ++ show result)
     case testExpr "{name, age} = person" of
-      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral leftBrace (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef prop1Annot "name")) comma (JSPropertyIdentRef prop2Annot "age"))) rightBrace) (JSAssign assignAnnot) (JSIdentifier idAnnot "person")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral _leftBrace (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef _prop1Annot "name")) _comma (JSPropertyIdentRef _prop2Annot "age"))) _rightBrace) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "person")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected object destructuring assignment, got: " ++ show result)
 
     -- Nested destructuring assignment
     case testExpr "[a, [b, c]] = nested" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket1 [JSArrayElement (JSIdentifier elem1Annot "a"), JSArrayComma comma1, JSArrayElement (JSArrayLiteral leftBracket2 [JSArrayElement (JSIdentifier elem2Annot "b"), JSArrayComma comma2, JSArrayElement (JSIdentifier elem3Annot "c")] rightBracket2)] rightBracket1) (JSAssign assignAnnot) (JSIdentifier idAnnot "nested")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket1 [JSArrayElement (JSIdentifier _elem1Annot "a"), JSArrayComma _comma1, JSArrayElement (JSArrayLiteral _leftBracket2 [JSArrayElement (JSIdentifier _elem2Annot "b"), JSArrayComma _comma2, JSArrayElement (JSIdentifier _elem3Annot "c")] _rightBracket2)] _rightBracket1) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "nested")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nested array destructuring assignment, got: " ++ show result)
     case testExpr "{a: {b}} = deep" of
-      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral leftBrace1 (JSCTLNone (JSLOne (JSPropertyNameandValue (JSPropertyIdent propAnnot "a") colon [JSObjectLiteral leftBrace2 (JSCTLNone (JSLOne (JSPropertyIdentRef prop2Annot "b"))) rightBrace2]))) rightBrace1) (JSAssign assignAnnot) (JSIdentifier idAnnot "deep")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral _leftBrace1 (JSCTLNone (JSLOne (JSPropertyNameandValue (JSPropertyIdent _propAnnot "a") _colon [JSObjectLiteral _leftBrace2 (JSCTLNone (JSLOne (JSPropertyIdentRef _prop2Annot "b"))) _rightBrace2]))) _rightBrace1) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "deep")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nested object destructuring assignment, got: " ++ show result)
 
     -- Rest pattern assignment
     case testExpr "[first, ...rest] = array" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "first"), JSArrayComma comma, JSArrayElement (JSSpreadExpression spreadAnnot (JSIdentifier elem2Annot "rest"))] rightBracket) (JSAssign assignAnnot) (JSIdentifier idAnnot "array")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "first"), JSArrayComma _comma, JSArrayElement (JSSpreadExpression _spreadAnnot (JSIdentifier _elem2Annot "rest"))] _rightBracket) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "array")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected rest pattern assignment, got: " ++ show result)
 
     -- Sparse array assignment
     case testExpr "[, , third] = sparse" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayComma comma1, JSArrayComma comma2, JSArrayElement (JSIdentifier elemAnnot "third")] rightBracket) (JSAssign assignAnnot) (JSIdentifier idAnnot "sparse")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayComma _comma1, JSArrayComma _comma2, JSArrayElement (JSIdentifier _elemAnnot "third")] _rightBracket) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "sparse")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected sparse array assignment, got: " ++ show result)
 
     -- Property renaming assignment
     case testExpr "{prop: newName} = obj" of
-      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral leftBrace (JSCTLNone (JSLOne (JSPropertyNameandValue (JSPropertyIdent propAnnot "prop") colon [JSIdentifier idAnnot "newName"]))) rightBrace) (JSAssign assignAnnot) (JSIdentifier idAnnot2 "obj")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSObjectLiteral _leftBrace (JSCTLNone (JSLOne (JSPropertyNameandValue (JSPropertyIdent _propAnnot "prop") _colon [JSIdentifier _idAnnot "newName"]))) _rightBrace) (JSAssign _assignAnnot) (JSIdentifier _idAnnot2 "obj")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected property renaming assignment, got: " ++ show result)
 
     -- Array destructuring with default values (parsed as assignment expressions)
     case testExpr "[a = 1, b = 2] = arr" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayElement (JSAssignExpression (JSIdentifier elem1Annot "a") (JSAssign assign1Annot) (JSDecimal num1Annot 1)), JSArrayComma comma, JSArrayElement (JSAssignExpression (JSIdentifier elem2Annot "b") (JSAssign assign2Annot) (JSDecimal num2Annot 2))] rightBracket) (JSAssign assignAnnot) (JSIdentifier idAnnot "arr")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayElement (JSAssignExpression (JSIdentifier _elem1Annot "a") (JSAssign _assign1Annot) (JSDecimal _num1Annot 1)), JSArrayComma _comma, JSArrayElement (JSAssignExpression (JSIdentifier _elem2Annot "b") (JSAssign _assign2Annot) (JSDecimal _num2Annot 2))] _rightBracket) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "arr")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected array destructuring with defaults, got: " ++ show result)
     case testExpr "[x = 'default', y] = values" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayElement (JSAssignExpression (JSIdentifier elem1Annot "x") (JSAssign assign1Annot) (JSStringLiteral strAnnot "'default'")), JSArrayComma comma, JSArrayElement (JSIdentifier elem2Annot "y")] rightBracket) (JSAssign assignAnnot) (JSIdentifier idAnnot "values")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayElement (JSAssignExpression (JSIdentifier _elem1Annot "x") (JSAssign _assign1Annot) (JSStringLiteral _strAnnot "'default'")), JSArrayComma _comma, JSArrayElement (JSIdentifier _elem2Annot "y")] _rightBracket) (JSAssign _assignAnnot) (JSIdentifier _idAnnot "values")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected array destructuring with default, got: " ++ show result)
 
     -- Mixed array destructuring with defaults and rest
     case testExpr "[first, second = 42, ...rest] = data" of
-      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "first"), JSArrayComma comma1, JSArrayElement (JSAssignExpression (JSIdentifier elem2Annot "second") (JSAssign assignAnnot) (JSDecimal numAnnot 42)), JSArrayComma comma2, JSArrayElement (JSSpreadExpression spreadAnnot (JSIdentifier elem3Annot "rest"))] rightBracket) (JSAssign assignAnnot2) (JSIdentifier idAnnot "data")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "first"), JSArrayComma _comma1, JSArrayElement (JSAssignExpression (JSIdentifier _elem2Annot "second") (JSAssign _assignAnnot) (JSDecimal _numAnnot 42)), JSArrayComma _comma2, JSArrayElement (JSSpreadExpression _spreadAnnot (JSIdentifier _elem3Annot "rest"))] _rightBracket) (JSAssign _assignAnnot2) (JSIdentifier _idAnnot "data")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected mixed array destructuring assignment, got: " ++ show result)
     case testExpr "x^=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSBwXorAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSBwXorAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected bitwise xor assignment expression, got: " ++ show result)
     case testExpr "x|=1" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSBwOrAssign assignAnnot) (JSDecimal numAnnot 1)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSBwOrAssign _assignAnnot) (JSDecimal _numAnnot 1)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected bitwise or assignment expression, got: " ++ show result)
 
   it "logical assignment operators" $ do
     case testExpr "x&&=true" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSLogicalAndAssign assignAnnot) (JSLiteral litAnnot "true")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSLogicalAndAssign _assignAnnot) (JSLiteral _litAnnot "true")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected logical and assignment expression, got: " ++ show result)
     case testExpr "x||=false" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSLogicalOrAssign assignAnnot) (JSLiteral litAnnot "false")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSLogicalOrAssign _assignAnnot) (JSLiteral _litAnnot "false")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected logical or assignment expression, got: " ++ show result)
     case testExpr "x??=null" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier idAnnot "x") (JSNullishAssign assignAnnot) (JSLiteral litAnnot "null")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSNullishAssign _assignAnnot) (JSLiteral _litAnnot "null")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nullish assignment expression, got: " ++ show result)
     case testExpr "obj.prop&&=value" of
-      Right (JSAstExpression (JSAssignExpression (JSMemberDot (JSIdentifier idAnnot "obj") dot (JSIdentifier memAnnot "prop")) (JSLogicalAndAssign assignAnnot) (JSIdentifier valAnnot "value")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSMemberDot (JSIdentifier _idAnnot "obj") _dot (JSIdentifier _memAnnot "prop")) (JSLogicalAndAssign _assignAnnot) (JSIdentifier _valAnnot "value")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member dot logical and assignment, got: " ++ show result)
     case testExpr "arr[0]||=defaultValue" of
-      Right (JSAstExpression (JSAssignExpression (JSMemberSquare (JSIdentifier idAnnot "arr") leftBracket (JSDecimal numAnnot 0) rightBracket) (JSLogicalOrAssign assignAnnot) (JSIdentifier valAnnot "defaultValue")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSMemberSquare (JSIdentifier _idAnnot "arr") _leftBracket (JSDecimal _numAnnot 0) _rightBracket) (JSLogicalOrAssign _assignAnnot) (JSIdentifier _valAnnot "defaultValue")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member square logical or assignment, got: " ++ show result)
     case testExpr "config.timeout??=5000" of
-      Right (JSAstExpression (JSAssignExpression (JSMemberDot (JSIdentifier idAnnot "config") dot (JSIdentifier memAnnot "timeout")) (JSNullishAssign assignAnnot) (JSDecimal numAnnot 5000)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSMemberDot (JSIdentifier _idAnnot "config") _dot (JSIdentifier _memAnnot "timeout")) (JSNullishAssign _assignAnnot) (JSDecimal _numAnnot 5000)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member dot nullish assignment, got: " ++ show result)
     case testExpr "a&&=b&&=c" of
-      Right (JSAstExpression (JSAssignExpression (JSIdentifier id1Annot "a") (JSLogicalAndAssign assign1Annot) (JSAssignExpression (JSIdentifier id2Annot "b") (JSLogicalAndAssign assign2Annot) (JSIdentifier id3Annot "c"))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _id1Annot "a") (JSLogicalAndAssign _assign1Annot) (JSAssignExpression (JSIdentifier _id2Annot "b") (JSLogicalAndAssign _assign2Annot) (JSIdentifier _id3Annot "c"))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nested logical and assignment, got: " ++ show result)
 
   it "function expression" $ do
     case testExpr "function(){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen JSLNil rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen JSLNil _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with no params, got: " ++ show result)
     case testExpr "function(a){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with one param, got: " ++ show result)
     case testExpr "function(a,b){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with two params, got: " ++ show result)
     case testExpr "function(...a){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSSpreadExpression spreadAnnot (JSIdentifier paramAnnot "a"))) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSSpreadExpression _spreadAnnot (JSIdentifier _paramAnnot "a"))) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with rest param, got: " ++ show result)
     case testExpr "function(a=1){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSAssignExpression (JSIdentifier paramAnnot "a") (JSAssign assignAnnot) (JSDecimal numAnnot 1))) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSAssignExpression (JSIdentifier _paramAnnot "a") (JSAssign _assignAnnot) (JSDecimal _numAnnot 1))) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with default param, got: " ++ show result)
     case testExpr "function([a,b]){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "a"), JSArrayComma comma, JSArrayElement (JSIdentifier elem2Annot "b")] rightBracket)) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "a"), JSArrayComma _comma, JSArrayElement (JSIdentifier _elem2Annot "b")] _rightBracket)) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with array destructuring, got: " ++ show result)
     case testExpr "function([a,...b]){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "a"), JSArrayComma comma, JSArrayElement (JSSpreadExpression spreadAnnot (JSIdentifier elem2Annot "b"))] rightBracket)) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "a"), JSArrayComma _comma, JSArrayElement (JSSpreadExpression _spreadAnnot (JSIdentifier _elem2Annot "b"))] _rightBracket)) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with array destructuring and rest, got: " ++ show result)
     case testExpr "function({a,b}){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSObjectLiteral leftBrace (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef prop1Annot "a")) comma (JSPropertyIdentRef prop2Annot "b"))) rightBrace)) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSObjectLiteral _leftBrace (JSCTLNone (JSLCons (JSLOne (JSPropertyIdentRef _prop1Annot "a")) _comma (JSPropertyIdentRef _prop2Annot "b"))) _rightBrace)) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with object destructuring, got: " ++ show result)
     case testExpr "a => {}" of
-      Right (JSAstExpression (JSArrowExpression (JSUnparenthesizedArrowParameter (JSIdentName paramAnnot "a")) arrow (JSConciseFunctionBody (JSBlock leftBrace [] rightBrace))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSUnparenthesizedArrowParameter (JSIdentName _paramAnnot "a")) _arrow (JSConciseFunctionBody (JSBlock _leftBrace [] _rightBrace))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with single param, got: " ++ show result)
     case testExpr "(a) => { a + 2 }" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen) arrow (JSConciseFunctionBody (JSBlock leftBrace body rightBrace))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen) _arrow (JSConciseFunctionBody (JSBlock _leftBrace _body _rightBrace))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with paren param, got: " ++ show result)
     case testExpr "(a, b) => {}" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen) arrow (JSConciseFunctionBody (JSBlock leftBrace [] rightBrace))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen) _arrow (JSConciseFunctionBody (JSBlock _leftBrace [] _rightBrace))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with two params, got: " ++ show result)
     case testExpr "(a, b) => a + b" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen) arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier id1Annot "a") (JSBinOpPlus plusAnnot) (JSIdentifier id2Annot "b")))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen) _arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier _id1Annot "a") (JSBinOpPlus _plusAnnot) (JSIdentifier _id2Annot "b")))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with expression body, got: " ++ show result)
     case testExpr "() => { 42 }" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen JSLNil rightParen) arrow (JSConciseFunctionBody (JSBlock leftBrace body rightBrace))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen JSLNil _rightParen) _arrow (JSConciseFunctionBody (JSBlock _leftBrace _body _rightBrace))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with no params, got: " ++ show result)
     case testExpr "(a, ...b) => b" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSSpreadExpression spreadAnnot (JSIdentifier param2Annot "b"))) rightParen) arrow (JSConciseExpressionBody (JSIdentifier idAnnot "b"))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSSpreadExpression _spreadAnnot (JSIdentifier _param2Annot "b"))) _rightParen) _arrow (JSConciseExpressionBody (JSIdentifier _idAnnot "b"))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with rest param, got: " ++ show result)
     case testExpr "(a,b=1) => a + b" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSAssignExpression (JSIdentifier param2Annot "b") (JSAssign assignAnnot) (JSDecimal numAnnot 1))) rightParen) arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier id1Annot "a") (JSBinOpPlus plusAnnot) (JSIdentifier id2Annot "b")))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSAssignExpression (JSIdentifier _param2Annot "b") (JSAssign _assignAnnot) (JSDecimal _numAnnot 1))) _rightParen) _arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier _id1Annot "a") (JSBinOpPlus _plusAnnot) (JSIdentifier _id2Annot "b")))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with default param, got: " ++ show result)
     case testExpr "([a,b]) => a + b" of
-      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList leftParen (JSLOne (JSArrayLiteral leftBracket [JSArrayElement (JSIdentifier elem1Annot "a"), JSArrayComma comma, JSArrayElement (JSIdentifier elem2Annot "b")] rightBracket)) rightParen) arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier id1Annot "a") (JSBinOpPlus plusAnnot) (JSIdentifier id2Annot "b")))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSArrowExpression (JSParenthesizedArrowParameterList _leftParen (JSLOne (JSArrayLiteral _leftBracket [JSArrayElement (JSIdentifier _elem1Annot "a"), JSArrayComma _comma, JSArrayElement (JSIdentifier _elem2Annot "b")] _rightBracket)) _rightParen) _arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier _id1Annot "a") (JSBinOpPlus _plusAnnot) (JSIdentifier _id2Annot "b")))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected arrow expression with destructuring param, got: " ++ show result)
 
-  it "trailing comma in function parameters" $ do
+  it "trailing _comma in function parameters" $ do
     -- Test trailing commas in function expressions
     case testExpr "function(a,){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with trailing comma, got: " ++ show result)
     case testExpr "function(a,b,){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot JSIdentNone leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot JSIdentNone _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected function expression with trailing comma, got: " ++ show result)
     -- Test named functions with trailing commas
     case testExpr "function foo(x,){}" of
-      Right (JSAstExpression (JSFunctionExpression funcAnnot (JSIdentName nameAnnot "foo") leftParen (JSLOne (JSIdentifier paramAnnot "x")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSFunctionExpression _funcAnnot (JSIdentName _nameAnnot "foo") _leftParen (JSLOne (JSIdentifier _paramAnnot "x")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named function expression with trailing comma, got: " ++ show result)
     -- Test generator functions with trailing commas
     case testExpr "function*(a,){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot JSIdentNone leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot JSIdentNone _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected generator expression with trailing comma, got: " ++ show result)
     case testExpr "function* gen(x,y,){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot (JSIdentName nameAnnot "gen") leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "x")) comma (JSIdentifier param2Annot "y")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot (JSIdentName _nameAnnot "gen") _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "x")) _comma (JSIdentifier _param2Annot "y")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named generator expression with trailing comma, got: " ++ show result)
 
   it "generator expression" $ do
     case testExpr "function*(){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot JSIdentNone leftParen JSLNil rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot JSIdentNone _leftParen JSLNil _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected generator expression with no params, got: " ++ show result)
     case testExpr "function*(a){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot JSIdentNone leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot JSIdentNone _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected generator expression with one param, got: " ++ show result)
     case testExpr "function*(a,b){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot JSIdentNone leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot JSIdentNone _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected generator expression with two params, got: " ++ show result)
     case testExpr "function*(a,...b){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot JSIdentNone leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSSpreadExpression spreadAnnot (JSIdentifier param2Annot "b"))) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot JSIdentNone _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSSpreadExpression _spreadAnnot (JSIdentifier _param2Annot "b"))) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected generator expression with rest param, got: " ++ show result)
     case testExpr "function*f(){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot (JSIdentName nameAnnot "f") leftParen JSLNil rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot (JSIdentName _nameAnnot "f") _leftParen JSLNil _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named generator expression with no params, got: " ++ show result)
     case testExpr "function*f(a){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot (JSIdentName nameAnnot "f") leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot (JSIdentName _nameAnnot "f") _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named generator expression with one param, got: " ++ show result)
     case testExpr "function*f(a,b){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot (JSIdentName nameAnnot "f") leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot (JSIdentName _nameAnnot "f") _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named generator expression with two params, got: " ++ show result)
     case testExpr "function*f(a,...b){}" of
-      Right (JSAstExpression (JSGeneratorExpression genAnnot starAnnot (JSIdentName nameAnnot "f") leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSSpreadExpression spreadAnnot (JSIdentifier param2Annot "b"))) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSGeneratorExpression _genAnnot _starAnnot (JSIdentName _nameAnnot "f") _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSSpreadExpression _spreadAnnot (JSIdentifier _param2Annot "b"))) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named generator expression with rest param, got: " ++ show result)
 
   it "await expression" $ do
     case testExpr "await fetch('/api')" of
-      Right (JSAstExpression (JSAwaitExpression awaitAnnot (JSMemberExpression (JSIdentifier idAnnot "fetch") leftParen (JSLOne (JSStringLiteral strAnnot "'/api'")) rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAwaitExpression _awaitAnnot (JSMemberExpression (JSIdentifier _idAnnot "fetch") _leftParen (JSLOne (JSStringLiteral _strAnnot "'/api'")) _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected await expression with function call, got: " ++ show result)
     case testExpr "await Promise.resolve(42)" of
-      Right (JSAstExpression (JSAwaitExpression awaitAnnot (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "Promise") dot (JSIdentifier memAnnot "resolve")) leftParen (JSLOne (JSDecimal numAnnot 42)) rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAwaitExpression _awaitAnnot (JSMemberExpression (JSMemberDot (JSIdentifier _idAnnot "Promise") _dot (JSIdentifier _memAnnot "resolve")) _leftParen (JSLOne (JSDecimal _numAnnot 42)) _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected await expression with method call, got: " ++ show result)
     case testExpr "await (x + y)" of
-      Right (JSAstExpression (JSAwaitExpression awaitAnnot (JSExpressionParen leftParen (JSExpressionBinary (JSIdentifier id1Annot "x") (JSBinOpPlus plusAnnot) (JSIdentifier id2Annot "y")) rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAwaitExpression _awaitAnnot (JSExpressionParen _leftParen (JSExpressionBinary (JSIdentifier _id1Annot "x") (JSBinOpPlus _plusAnnot) (JSIdentifier _id2Annot "y")) _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected await expression with parenthesized expression, got: " ++ show result)
     case testExpr "await x.then(y => y * 2)" of
-      Right (JSAstExpression (JSAwaitExpression awaitAnnot (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "x") dot (JSIdentifier memAnnot "then")) leftParen (JSLOne (JSArrowExpression (JSUnparenthesizedArrowParameter (JSIdentName paramAnnot "y")) arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier id1Annot "y") (JSBinOpTimes timesAnnot) (JSDecimal numAnnot 2))))) rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAwaitExpression _awaitAnnot (JSMemberExpression (JSMemberDot (JSIdentifier _idAnnot "x") _dot (JSIdentifier _memAnnot "then")) _leftParen (JSLOne (JSArrowExpression (JSUnparenthesizedArrowParameter (JSIdentName _paramAnnot "y")) _arrow (JSConciseExpressionBody (JSExpressionBinary (JSIdentifier _id1Annot "y") (JSBinOpTimes _timesAnnot) (JSDecimal _numAnnot 2))))) _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected await expression with method and arrow function, got: " ++ show result)
     case testExpr "await response.json()" of
-      Right (JSAstExpression (JSAwaitExpression awaitAnnot (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "response") dot (JSIdentifier memAnnot "json")) leftParen JSLNil rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAwaitExpression _awaitAnnot (JSMemberExpression (JSMemberDot (JSIdentifier _idAnnot "response") _dot (JSIdentifier _memAnnot "json")) _leftParen JSLNil _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected await expression with method call, got: " ++ show result)
     case testExpr "await new Promise(resolve => resolve(1))" of
-      Right (JSAstExpression (JSAwaitExpression awaitAnnot (JSMemberNew newAnnot (JSIdentifier idAnnot "Promise") leftParen (JSLOne (JSArrowExpression (JSUnparenthesizedArrowParameter (JSIdentName paramAnnot "resolve")) arrow (JSConciseExpressionBody (JSMemberExpression (JSIdentifier callAnnot "resolve") leftParen2 (JSLOne (JSDecimal numAnnot 1)) rightParen2)))) rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAwaitExpression _awaitAnnot (JSMemberNew _newAnnot (JSIdentifier _idAnnot "Promise") _leftParen (JSLOne (JSArrowExpression (JSUnparenthesizedArrowParameter (JSIdentName _paramAnnot "resolve")) _arrow (JSConciseExpressionBody (JSMemberExpression (JSIdentifier _callAnnot "resolve") _leftParen2 (JSLOne (JSDecimal _numAnnot 1)) _rightParen2)))) _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected await expression with constructor and arrow function, got: " ++ show result)
 
   it "async function expression" $ do
     case testExpr "async function foo() {}" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot (JSIdentName nameAnnot "foo") leftParen JSLNil rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot (JSIdentName _nameAnnot "foo") _leftParen JSLNil _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named async function expression with no params, got: " ++ show result)
     case testExpr "async function foo(a) {}" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot (JSIdentName nameAnnot "foo") leftParen (JSLOne (JSIdentifier paramAnnot "a")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot (JSIdentName _nameAnnot "foo") _leftParen (JSLOne (JSIdentifier _paramAnnot "a")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named async function expression with one param, got: " ++ show result)
     case testExpr "async function foo(a, b) {}" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot (JSIdentName nameAnnot "foo") leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "a")) comma (JSIdentifier param2Annot "b")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot (JSIdentName _nameAnnot "foo") _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "a")) _comma (JSIdentifier _param2Annot "b")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named async function expression with two params, got: " ++ show result)
     case testExpr "async function() {}" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot JSIdentNone leftParen JSLNil rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot JSIdentNone _leftParen JSLNil _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous async function expression with no params, got: " ++ show result)
     case testExpr "async function(x) { return await x; }" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot JSIdentNone leftParen (JSLOne (JSIdentifier paramAnnot "x")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot JSIdentNone _leftParen (JSLOne (JSIdentifier _paramAnnot "x")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous async function expression with return await, got: " ++ show result)
     case testExpr "async function fetch() { return await response.json(); }" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot (JSIdentName nameAnnot "fetch") leftParen JSLNil rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot (JSIdentName _nameAnnot "fetch") _leftParen JSLNil _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named async function expression with await method call, got: " ++ show result)
     case testExpr "async function handler(req, res) { const data = await db.query(); res.send(data); }" of
-      Right (JSAstExpression (JSAsyncFunctionExpression asyncAnnot funcAnnot (JSIdentName nameAnnot "handler") leftParen (JSLCons (JSLOne (JSIdentifier param1Annot "req")) comma (JSIdentifier param2Annot "res")) rightParen body) astAnnot) -> pure ()
+      Right (JSAstExpression (JSAsyncFunctionExpression _asyncAnnot _funcAnnot (JSIdentName _nameAnnot "handler") _leftParen (JSLCons (JSLOne (JSIdentifier _param1Annot "req")) _comma (JSIdentifier _param2Annot "res")) _rightParen _body) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named async function expression with complex body, got: " ++ show result)
 
   it "member expression" $ do
     case testExpr "x[y]" of
-      Right (JSAstExpression (JSMemberSquare (JSIdentifier idAnnot "x") leftBracket (JSIdentifier indexAnnot "y") rightBracket) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberSquare (JSIdentifier _idAnnot "x") _leftBracket (JSIdentifier _indexAnnot "y") _rightBracket) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member square expression, got: " ++ show result)
     case testExpr "x[y][z]" of
-      Right (JSAstExpression (JSMemberSquare (JSMemberSquare (JSIdentifier idAnnot "x") leftBracket1 (JSIdentifier index1Annot "y") rightBracket1) leftBracket2 (JSIdentifier index2Annot "z") rightBracket2) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberSquare (JSMemberSquare (JSIdentifier _idAnnot "x") _leftBracket1 (JSIdentifier _index1Annot "y") _rightBracket1) _leftBracket2 (JSIdentifier _index2Annot "z") _rightBracket2) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nested member square expression, got: " ++ show result)
     case testExpr "x.y" of
-      Right (JSAstExpression (JSMemberDot (JSIdentifier idAnnot "x") dot (JSIdentifier memAnnot "y")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberDot (JSIdentifier _idAnnot "x") _dot (JSIdentifier _memAnnot "y")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member dot expression, got: " ++ show result)
     case testExpr "x.y.z" of
-      Right (JSAstExpression (JSMemberDot (JSMemberDot (JSIdentifier idAnnot "x") dot1 (JSIdentifier mem1Annot "y")) dot2 (JSIdentifier mem2Annot "z")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberDot (JSMemberDot (JSIdentifier _idAnnot "x") _dot1 (JSIdentifier _mem1Annot "y")) _dot2 (JSIdentifier _mem2Annot "z")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected nested member dot expression, got: " ++ show result)
 
   it "call expression" $ do
     case testExpr "x()" of
-      Right (JSAstExpression (JSMemberExpression (JSIdentifier idAnnot "x") leftParen JSLNil rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSIdentifier _idAnnot "x") _leftParen JSLNil _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member expression call, got: " ++ show result)
     case testExpr "x()()" of
-      Right (JSAstExpression (JSCallExpression (JSMemberExpression (JSIdentifier idAnnot "x") leftParen1 JSLNil rightParen1) leftParen2 JSLNil rightParen2) astAnnot) -> pure ()
+      Right (JSAstExpression (JSCallExpression (JSMemberExpression (JSIdentifier _idAnnot "x") _leftParen1 JSLNil _rightParen1) _leftParen2 JSLNil _rightParen2) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected call expression, got: " ++ show result)
     case testExpr "x()[4]" of
-      Right (JSAstExpression (JSCallExpressionSquare (JSMemberExpression (JSIdentifier idAnnot "x") leftParen JSLNil rightParen) leftBracket (JSDecimal numAnnot 4) rightBracket) astAnnot) -> pure ()
+      Right (JSAstExpression (JSCallExpressionSquare (JSMemberExpression (JSIdentifier _idAnnot "x") _leftParen JSLNil _rightParen) _leftBracket (JSDecimal _numAnnot 4) _rightBracket) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected call expression with square access, got: " ++ show result)
     case testExpr "x().x" of
-      Right (JSAstExpression (JSCallExpressionDot (JSMemberExpression (JSIdentifier idAnnot "x") leftParen JSLNil rightParen) dot (JSIdentifier memAnnot "x")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSCallExpressionDot (JSMemberExpression (JSIdentifier _idAnnot "x") _leftParen JSLNil _rightParen) _dot (JSIdentifier _memAnnot "x")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected call expression with dot access, got: " ++ show result)
     case testExpr "x(a,b=2).x" of
-      Right (JSAstExpression (JSCallExpressionDot (JSMemberExpression (JSIdentifier idAnnot "x") leftParen (JSLCons (JSLOne (JSIdentifier arg1Annot "a")) comma (JSAssignExpression (JSIdentifier arg2Annot "b") (JSAssign assignAnnot) (JSDecimal numAnnot 2))) rightParen) dot (JSIdentifier memAnnot "x")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSCallExpressionDot (JSMemberExpression (JSIdentifier _idAnnot "x") _leftParen (JSLCons (JSLOne (JSIdentifier _arg1Annot "a")) _comma (JSAssignExpression (JSIdentifier _arg2Annot "b") (JSAssign _assignAnnot) (JSDecimal _numAnnot 2))) _rightParen) _dot (JSIdentifier _memAnnot "x")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected call expression with args and dot access, got: " ++ show result)
     case testExpr "foo (56.8379100, 60.5806664)" of
-      Right (JSAstExpression (JSMemberExpression (JSIdentifier idAnnot "foo") leftParen (JSLCons (JSLOne (JSDecimal num1Annot 56.8379100)) comma (JSDecimal num2Annot 60.5806664)) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSIdentifier _idAnnot "foo") _leftParen (JSLCons (JSLOne (JSDecimal _num1Annot 56.8379100)) _comma (JSDecimal _num2Annot 60.5806664)) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member expression with decimal args, got: " ++ show result)
 
-  it "trailing comma in function calls" $ do
+  it "trailing _comma in function calls" $ do
     case testExpr "f(x,)" of
-      Right (JSAstExpression (JSMemberExpression (JSIdentifier idAnnot "f") leftParen (JSLOne (JSIdentifier argAnnot "x")) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSIdentifier _idAnnot "f") _leftParen (JSLOne (JSIdentifier _argAnnot "x")) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member expression with trailing comma, got: " ++ show result)
     case testExpr "f(a,b,)" of
-      Right (JSAstExpression (JSMemberExpression (JSIdentifier idAnnot "f") leftParen (JSLCons (JSLOne (JSIdentifier arg1Annot "a")) comma (JSIdentifier arg2Annot "b")) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSIdentifier _idAnnot "f") _leftParen (JSLCons (JSLOne (JSIdentifier _arg1Annot "a")) _comma (JSIdentifier _arg2Annot "b")) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member expression with multiple args and trailing comma, got: " ++ show result)
     case testExpr "Math.max(10, 20,)" of
-      Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "Math") dot (JSIdentifier memAnnot "max")) leftParen (JSLCons (JSLOne (JSDecimal num1Annot 10)) comma (JSDecimal num2Annot 20)) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier _idAnnot "Math") _dot (JSIdentifier _memAnnot "max")) _leftParen (JSLCons (JSLOne (JSDecimal _num1Annot 10)) _comma (JSDecimal _num2Annot 20)) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected method call with trailing comma, got: " ++ show result)
     -- Chained function calls with trailing commas
     case testExpr "f(x,)(y,)" of
-      Right (JSAstExpression (JSCallExpression (JSMemberExpression (JSIdentifier idAnnot "f") leftParen1 (JSLOne (JSIdentifier arg1Annot "x")) rightParen1) leftParen2 (JSLOne (JSIdentifier arg2Annot "y")) rightParen2) astAnnot) -> pure ()
+      Right (JSAstExpression (JSCallExpression (JSMemberExpression (JSIdentifier _idAnnot "f") _leftParen1 (JSLOne (JSIdentifier _arg1Annot "x")) _rightParen1) _leftParen2 (JSLOne (JSIdentifier _arg2Annot "y")) _rightParen2) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected chained call expression with trailing commas, got: " ++ show result)
     -- Complex expressions with trailing commas
     case testExpr "obj.method(a + b, c * d,)" of
-      Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "obj") dot (JSIdentifier memAnnot "method")) leftParen (JSLCons (JSLOne (JSExpressionBinary (JSIdentifier id1Annot "a") (JSBinOpPlus plus1Annot) (JSIdentifier id2Annot "b"))) comma (JSExpressionBinary (JSIdentifier id3Annot "c") (JSBinOpTimes timesAnnot) (JSIdentifier id4Annot "d"))) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier _idAnnot "obj") _dot (JSIdentifier _memAnnot "method")) _leftParen (JSLCons (JSLOne (JSExpressionBinary (JSIdentifier _id1Annot "a") (JSBinOpPlus _plus1Annot) (JSIdentifier _id2Annot "b"))) _comma (JSExpressionBinary (JSIdentifier _id3Annot "c") (JSBinOpTimes _timesAnnot) (JSIdentifier _id4Annot "d"))) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected method call with binary expressions and trailing comma, got: " ++ show result)
-    -- Single argument with trailing comma
+    -- Single argument with trailing _comma
     case testExpr "console.log('hello',)" of
-      Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier idAnnot "console") dot (JSIdentifier memAnnot "log")) leftParen (JSLOne (JSStringLiteral strAnnot "'hello'")) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSMemberDot (JSIdentifier _idAnnot "console") _dot (JSIdentifier _memAnnot "log")) _leftParen (JSLOne (JSStringLiteral _strAnnot "'hello'")) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected console.log call with trailing comma, got: " ++ show result)
 
   it "dynamic imports (ES2020) - current parser support" $ do
@@ -881,78 +871,78 @@ testExpressionParser = describe "Parse expressions:" $ do
 
   it "template literal" $ do
     case testExpr "``" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "``" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "``" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected empty template literal, got: " ++ show result)
     case testExpr "`$`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`$`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`$`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected template literal with dollar sign, got: " ++ show result)
     case testExpr "`$\\n`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`$\\n`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`$\\n`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected template literal with escape sequence, got: " ++ show result)
     case testExpr "`\\${x}`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`\\${x}`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`\\${x}`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected template literal with escaped interpolation, got: " ++ show result)
     case testExpr "`$ {x}`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`$ {x}`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`$ {x}`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected template literal with space before brace, got: " ++ show result)
     case testExpr "`\n\n`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`\n\n`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`\n\n`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected template literal with newlines, got: " ++ show result)
     case testExpr "`${x+y} ${z}`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`${" [JSTemplatePart (JSExpressionBinary (JSIdentifier id1Annot "x") (JSBinOpPlus plusAnnot) (JSIdentifier id2Annot "y")) rightBrace "} ${", JSTemplatePart (JSIdentifier idAnnot "z") rightBrace2 "}`"]) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`${" [JSTemplatePart (JSExpressionBinary (JSIdentifier _id1Annot "x") (JSBinOpPlus _plusAnnot) (JSIdentifier _id2Annot "y")) _rightBrace "} ${", JSTemplatePart (JSIdentifier _idAnnot "z") _rightBrace2 "}`"]) _astAnnot) -> pure ()
       Right other -> expectationFailure ("Expected template literal with interpolations, got: " ++ show other)
       result -> expectationFailure ("Expected successful parse for template literal, got: " ++ show result)
     case testExpr "`<${x} ${y}>`" of
-      Right (JSAstExpression (JSTemplateLiteral Nothing backquote "`<${" [JSTemplatePart (JSIdentifier id1Annot "x") rightBrace1 "} ${", JSTemplatePart (JSIdentifier id2Annot "y") rightBrace2 "}>`"]) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral Nothing _backquote "`<${" [JSTemplatePart (JSIdentifier _id1Annot "x") _rightBrace1 "} ${", JSTemplatePart (JSIdentifier _id2Annot "y") _rightBrace2 "}>`"]) _astAnnot) -> pure ()
       Right other -> expectationFailure ("Expected template literal with HTML-like interpolations, got: " ++ show other)
       result -> expectationFailure ("Expected successful parse for template literal, got: " ++ show result)
     case testExpr "tag `xyz`" of
-      Right (JSAstExpression (JSTemplateLiteral (Just (JSIdentifier tagAnnot "tag")) backquote "`xyz`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral (Just (JSIdentifier _tagAnnot "tag")) _backquote "`xyz`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected tagged template literal, got: " ++ show result)
     case testExpr "tag()`xyz`" of
-      Right (JSAstExpression (JSTemplateLiteral (Just (JSMemberExpression (JSIdentifier tagAnnot "tag") leftParen JSLNil rightParen)) backquote "`xyz`" []) astAnnot) -> pure ()
+      Right (JSAstExpression (JSTemplateLiteral (Just (JSMemberExpression (JSIdentifier _tagAnnot "tag") _leftParen JSLNil _rightParen)) _backquote "`xyz`" []) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected template literal with function call tag, got: " ++ show result)
 
   it "yield" $ do
     case testExpr "yield" of
-      Right (JSAstExpression (JSYieldExpression yieldAnnot Nothing) astAnnot) -> pure ()
+      Right (JSAstExpression (JSYieldExpression _yieldAnnot Nothing) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected yield expression without value, got: " ++ show result)
     case testExpr "yield a + b" of
-      Right (JSAstExpression (JSYieldExpression yieldAnnot (Just (JSExpressionBinary (JSIdentifier id1Annot "a") (JSBinOpPlus plusAnnot) (JSIdentifier id2Annot "b")))) astAnnot) -> pure ()
+      Right (JSAstExpression (JSYieldExpression _yieldAnnot (Just (JSExpressionBinary (JSIdentifier _id1Annot "a") (JSBinOpPlus _plusAnnot) (JSIdentifier _id2Annot "b")))) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected yield expression with binary operation, got: " ++ show result)
     case testExpr "yield* g()" of
-      Right (JSAstExpression (JSYieldFromExpression yieldAnnot starAnnot (JSMemberExpression (JSIdentifier idAnnot "g") leftParen JSLNil rightParen)) astAnnot) -> pure ()
+      Right (JSAstExpression (JSYieldFromExpression _yieldAnnot _starAnnot (JSMemberExpression (JSIdentifier _idAnnot "g") _leftParen JSLNil _rightParen)) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected yield from expression with function call, got: " ++ show result)
 
   it "class expression" $ do
     case testExpr "class Foo extends Bar { a(x,y) {} *b() {} }" of
-      Right (JSAstExpression (JSClassExpression classAnnot (JSIdentName nameAnnot "Foo") (JSExtends extendsAnnot (JSIdentifier heritageAnnot "Bar")) leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot (JSIdentName _nameAnnot "Foo") (JSExtends _extendsAnnot (JSIdentifier _heritageAnnot "Bar")) _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected class expression with inheritance and methods, got: " ++ show result)
     case testExpr "class { static get [a]() {}; }" of
-      Right (JSAstExpression (JSClassExpression classAnnot JSIdentNone JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot JSIdentNone JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous class expression with static getter, got: " ++ show result)
     case testExpr "class Foo extends Bar { a(x,y) { super(x); } }" of
-      Right (JSAstExpression (JSClassExpression classAnnot (JSIdentName nameAnnot "Foo") (JSExtends extendsAnnot (JSIdentifier heritageAnnot "Bar")) leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot (JSIdentName _nameAnnot "Foo") (JSExtends _extendsAnnot (JSIdentifier _heritageAnnot "Bar")) _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected class expression with super call, got: " ++ show result)
 
   it "optional chaining" $ do
     case testExpr "obj?.prop" of
-      Right (JSAstExpression (JSOptionalMemberDot (JSIdentifier idAnnot "obj") optionalDot (JSIdentifier memAnnot "prop")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSOptionalMemberDot (JSIdentifier _idAnnot "obj") _optionalDot (JSIdentifier _memAnnot "prop")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected optional member dot access, got: " ++ show result)
     case testExpr "obj?.[key]" of
-      Right (JSAstExpression (JSOptionalMemberSquare (JSIdentifier idAnnot "obj") optionalBracket (JSIdentifier keyAnnot "key") rightBracket) astAnnot) -> pure ()
+      Right (JSAstExpression (JSOptionalMemberSquare (JSIdentifier _idAnnot "obj") _optionalBracket (JSIdentifier _keyAnnot "key") _rightBracket) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected optional member square access, got: " ++ show result)
     case testExpr "obj?.method()" of
-      Right (JSAstExpression (JSMemberExpression (JSOptionalMemberDot (JSIdentifier idAnnot "obj") optionalDot (JSIdentifier memAnnot "method")) leftParen JSLNil rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSMemberExpression (JSOptionalMemberDot (JSIdentifier _idAnnot "obj") _optionalDot (JSIdentifier _memAnnot "method")) _leftParen JSLNil _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected member expression with optional method call, got: " ++ show result)
     case testExpr "obj?.prop?.deep" of
-      Right (JSAstExpression (JSOptionalMemberDot (JSOptionalMemberDot (JSIdentifier idAnnot "obj") optionalDot1 (JSIdentifier mem1Annot "prop")) optionalDot2 (JSIdentifier mem2Annot "deep")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSOptionalMemberDot (JSOptionalMemberDot (JSIdentifier _idAnnot "obj") _optionalDot1 (JSIdentifier _mem1Annot "prop")) _optionalDot2 (JSIdentifier _mem2Annot "deep")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected chained optional member dot access, got: " ++ show result)
     case testExpr "obj?.method?.(args)" of
-      Right (JSAstExpression (JSOptionalCallExpression (JSOptionalMemberDot (JSIdentifier idAnnot "obj") optionalDot (JSIdentifier memAnnot "method")) optionalParen (JSLOne (JSIdentifier argAnnot "args")) rightParen) astAnnot) -> pure ()
+      Right (JSAstExpression (JSOptionalCallExpression (JSOptionalMemberDot (JSIdentifier _idAnnot "obj") _optionalDot (JSIdentifier _memAnnot "method")) _optionalParen (JSLOne (JSIdentifier _argAnnot "args")) _rightParen) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected optional call expression, got: " ++ show result)
     case testExpr "arr?.[0]?.value" of
-      Right (JSAstExpression (JSOptionalMemberDot (JSOptionalMemberSquare (JSIdentifier idAnnot "arr") optionalBracket (JSDecimal numAnnot 0) rightBracket) optionalDot (JSIdentifier memAnnot "value")) astAnnot) -> pure ()
+      Right (JSAstExpression (JSOptionalMemberDot (JSOptionalMemberSquare (JSIdentifier _idAnnot "arr") _optionalBracket (JSDecimal _numAnnot 0) _rightBracket) _optionalDot (JSIdentifier _memAnnot "value")) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected chained optional access with square and dot, got: " ++ show result)
 
   it "nullish coalescing precedence" $ do
@@ -960,82 +950,82 @@ testExpressionParser = describe "Parse expressions:" $ do
       Right
         ( JSAstExpression
             ( JSExpressionBinary
-                (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpNullishCoalescing opAnnot1) (JSIdentifier rightIdAnnot "y"))
-                (JSBinOpOr opAnnot2)
-                (JSIdentifier idAnnot "z")
+                (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpNullishCoalescing _opAnnot1) (JSIdentifier _rightIdAnnot "y"))
+                (JSBinOpOr _opAnnot2)
+                (JSIdentifier _idAnnot "z")
               )
-            astAnnot
+            _astAnnot
           ) -> pure ()
       result -> expectationFailure ("Expected nullish coalescing with lower precedence than OR, got: " ++ show result)
     case testExpr "x || y ?? z" of
       Right
         ( JSAstExpression
             ( JSExpressionBinary
-                (JSIdentifier idAnnot "x")
-                (JSBinOpOr opAnnot1)
-                (JSExpressionBinary (JSIdentifier leftIdAnnot "y") (JSBinOpNullishCoalescing opAnnot2) (JSIdentifier rightIdAnnot "z"))
+                (JSIdentifier _idAnnot "x")
+                (JSBinOpOr _opAnnot1)
+                (JSExpressionBinary (JSIdentifier _leftIdAnnot "y") (JSBinOpNullishCoalescing _opAnnot2) (JSIdentifier _rightIdAnnot "z"))
               )
-            astAnnot
+            _astAnnot
           ) -> pure ()
       result -> expectationFailure ("Expected OR with higher precedence than nullish coalescing, got: " ++ show result)
     case testExpr "null ?? 'default'" of
       Right
         ( JSAstExpression
             ( JSExpressionBinary
-                (JSLiteral litAnnot "null")
-                (JSBinOpNullishCoalescing opAnnot)
-                (JSStringLiteral strAnnot "'default'")
+                (JSLiteral _litAnnot "null")
+                (JSBinOpNullishCoalescing _opAnnot)
+                (JSStringLiteral _strAnnot "'default'")
               )
-            astAnnot
+            _astAnnot
           ) -> pure ()
       result -> expectationFailure ("Expected nullish coalescing with null and string, got: " ++ show result)
     case testExpr "undefined ?? 0" of
       Right
         ( JSAstExpression
             ( JSExpressionBinary
-                (JSIdentifier idAnnot "undefined")
-                (JSBinOpNullishCoalescing opAnnot)
-                (JSDecimal numAnnot 0)
+                (JSIdentifier _idAnnot "undefined")
+                (JSBinOpNullishCoalescing _opAnnot)
+                (JSDecimal _numAnnot 0)
               )
-            astAnnot
+            _astAnnot
           ) -> pure ()
       result -> expectationFailure ("Expected nullish coalescing with undefined and number, got: " ++ show result)
     case testExpr "x ?? y ?? z" of
       Right
         ( JSAstExpression
             ( JSExpressionBinary
-                (JSExpressionBinary (JSIdentifier leftIdAnnot "x") (JSBinOpNullishCoalescing opAnnot1) (JSIdentifier rightIdAnnot "y"))
-                (JSBinOpNullishCoalescing opAnnot2)
-                (JSIdentifier idAnnot "z")
+                (JSExpressionBinary (JSIdentifier _leftIdAnnot "x") (JSBinOpNullishCoalescing _opAnnot1) (JSIdentifier _rightIdAnnot "y"))
+                (JSBinOpNullishCoalescing _opAnnot2)
+                (JSIdentifier _idAnnot "z")
               )
-            astAnnot
+            _astAnnot
           ) -> pure ()
       result -> expectationFailure ("Expected left-associative nullish coalescing, got: " ++ show result)
 
   it "static class expressions (ES2015) - supported features" $ do
     -- Basic static method in class expression
     case testExpr "class { static method() {} }" of
-      Right (JSAstExpression (JSClassExpression classAnnot JSIdentNone JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot JSIdentNone JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous class expression with static method, got: " ++ show result)
     -- Named class expression with static methods
     case testExpr "class Calculator { static add(a, b) { return a + b; } }" of
-      Right (JSAstExpression (JSClassExpression classAnnot (JSIdentName nameAnnot "Calculator") JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot (JSIdentName _nameAnnot "Calculator") JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named class expression with static method, got: " ++ show result)
     -- Static getter in class expression
     case testExpr "class { static get version() { return '2.0'; } }" of
-      Right (JSAstExpression (JSClassExpression classAnnot JSIdentNone JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot JSIdentNone JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous class expression with static getter, got: " ++ show result)
     -- Static setter in class expression
     case testExpr "class { static set config(val) { this._config = val; } }" of
-      Right (JSAstExpression (JSClassExpression classAnnot JSIdentNone JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot JSIdentNone JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous class expression with static setter, got: " ++ show result)
     -- Static computed property
     case testExpr "class { static [Symbol.iterator]() {} }" of
-      Right (JSAstExpression (JSClassExpression classAnnot JSIdentNone JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot JSIdentNone JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected anonymous class expression with static computed property, got: " ++ show result)
     -- Multiple static features
     case testExpr "class Util { static method() {} static get prop() {} }" of
-      Right (JSAstExpression (JSClassExpression classAnnot (JSIdentName nameAnnot "Util") JSExtendsNone leftBrace body rightBrace) astAnnot) -> pure ()
+      Right (JSAstExpression (JSClassExpression _classAnnot (JSIdentName _nameAnnot "Util") JSExtendsNone _leftBrace _body _rightBrace) _astAnnot) -> pure ()
       result -> expectationFailure ("Expected named class expression with multiple static features, got: " ++ show result)
 
 testExpr :: String -> Either String JSAST

@@ -126,31 +126,21 @@ testRoundTripSemanticEquivalence :: Spec
 testRoundTripSemanticEquivalence = describe "Semantic equivalence" $ do
   it "maintains expression evaluation semantics" $ do
     let expr = "1 + 2"
-    case parseExpression expr of
-      Right parsed ->
-        case parseExpression expr of
-          Right reparsed -> expressionStructurallyEqual parsed reparsed `shouldBe` True
-          Left _ -> expectationFailure "Re-parsing failed"
-      Left _ -> expectationFailure "Initial parsing failed"
+    parsed <- either (\e -> expectationFailure ("Initial parsing failed: " ++ e) >> fail "") pure (parseExpression expr)
+    reparsed <- either (\e -> expectationFailure ("Re-parsing failed: " ++ e) >> fail "") pure (parseExpression expr)
+    expressionStructurallyEqual parsed reparsed `shouldBe` True
 
   it "preserves statement execution semantics" $ do
     let stmt = "var x = 1;"
-    case parseStatement stmt of
-      Right parsed ->
-        case parseStatement stmt of
-          Right reparsed -> statementStructurallyEqual parsed reparsed `shouldBe` True
-          Left _ -> expectationFailure "Re-parsing failed"
-      Left _ -> expectationFailure "Initial parsing failed"
+    parsed <- either (\e -> expectationFailure ("Initial parsing failed: " ++ e) >> fail "") pure (parseStatement stmt)
+    reparsed <- either (\e -> expectationFailure ("Re-parsing failed: " ++ e) >> fail "") pure (parseStatement stmt)
+    statementStructurallyEqual parsed reparsed `shouldBe` True
 
   it "preserves program execution order" $ do
     let prog = "var x = 1; var y = 2;"
-    case Parser.parse prog "test" of
-      Right (AST.JSAstProgram stmts _) ->
-        case Parser.parse prog "test" of
-          Right (AST.JSAstProgram stmts' _) ->
-            length stmts `shouldBe` length stmts'
-          _ -> expectationFailure "Re-parsing failed"
-      _ -> expectationFailure "Initial parsing failed"
+    stmts <- extractProgramStmts prog "Initial parsing failed"
+    stmts' <- extractProgramStmts prog "Re-parsing failed"
+    length stmts `shouldBe` length stmts'
 
 -- | Test comment preservation through round-trip
 testRoundTripCommentsPreservation :: Spec
@@ -294,14 +284,10 @@ testPositionPreservation = describe "Position preservation" $ do
 
   it "preserves statement count through parsing" $ do
     let original = "var x = 1; var y = 2; function f() {}"
-    case Parser.parse original "test" of
-      Right (AST.JSAstProgram stmts _) -> do
-        let reparsed = renderToString (AST.JSAstProgram stmts AST.JSNoAnnot)
-        case Parser.parse reparsed "test" of
-          Right (AST.JSAstProgram stmts2 _) ->
-            length stmts `shouldBe` length stmts2
-          Left err -> expectationFailure ("Reparse failed: " ++ show err)
-      Left err -> expectationFailure ("Parse failed: " ++ show err)
+    stmts <- extractProgramStmts original "Parse failed"
+    let reparsed = renderToString (AST.JSAstProgram stmts AST.JSNoAnnot)
+    stmts2 <- extractProgramStmts reparsed "Reparse failed"
+    length stmts `shouldBe` length stmts2
 
   it "maintains AST node types through parsing" $ do
     let original = "42 + 'hello'"
@@ -333,13 +319,10 @@ testTokenToASTPositionMapping = describe "Token to AST position mapping" $ do
 testSourceLocationInvariants :: Spec
 testSourceLocationInvariants = describe "Source location invariants" $ do
   it "AST maintains logical structure ordering" $ do
-    let program =
-          AST.JSAstProgram
+    let stmts =
             [ AST.JSExpressionStatement (literalNumber 1) (AST.JSSemi AST.JSNoAnnot),
               AST.JSExpressionStatement (literalNumber 2) (AST.JSSemi AST.JSNoAnnot)
             ]
-            AST.JSNoAnnot
-        AST.JSAstProgram stmts _ = program
     all isValidStatement stmts `shouldBe` True
 
   it "block statements contain their child statements" $ do
@@ -640,6 +623,7 @@ genVariableDeclaration = do
 -- | Check if AST is valid by verifying all contained nodes are well-formed
 isValidAST :: AST.JSAST -> Bool
 isValidAST (AST.JSAstProgram stmts _) = all isValidStatement stmts
+isValidAST (AST.JSAstModule _ _) = True
 isValidAST (AST.JSAstStatement stmt _) = isValidStatement stmt
 isValidAST (AST.JSAstExpression expr _) = isValidExpression expr
 isValidAST (AST.JSAstLiteral _ _) = True
@@ -838,6 +822,14 @@ parseStatement input =
     Right (AST.JSAstProgram [stmt] _) -> Right stmt
     Right _ -> Left "Not a single statement"
     Left err -> Left err
+
+-- | Extract program statements from source, failing with a message on error
+extractProgramStmts :: String -> String -> IO [AST.JSStatement]
+extractProgramStmts input errPrefix =
+  case Parser.parse input "test" of
+    Right (AST.JSAstProgram stmts _) -> pure stmts
+    Right _ -> expectationFailure (errPrefix ++ ": not a program") >> fail ""
+    Left err -> expectationFailure (errPrefix ++ ": " ++ err) >> fail ""
 
 -- | Construct a simple expression statement with explicit semicolon
 simpleExprStmt :: AST.JSExpression -> AST.JSStatement

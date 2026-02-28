@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-}
 
 -- | Comprehensive fuzzing test suite with integration tests.
 --
@@ -72,21 +72,18 @@ module Properties.Language.Javascript.Parser.Fuzz.FuzzTest
 where
 
 import Control.Exception (SomeException, catch)
-import Control.Monad (forM_, unless, when)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad (forM_, when)
 import Data.List (sortBy)
 import Data.Ord (Down (..), comparing)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Data.Time (diffUTCTime, getCurrentTime)
 import Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
-  ( CoverageData (..),
-    generateCoverageReport,
+  ( generateCoverageReport,
     measureCoverage,
   )
 import Properties.Language.Javascript.Parser.Fuzz.DifferentialTesting
   ( ComparisonReport (..),
-    generateComparisonReport,
     runDifferentialSuite,
   )
 import Properties.Language.Javascript.Parser.Fuzz.FuzzHarness
@@ -98,7 +95,6 @@ import Properties.Language.Javascript.Parser.Fuzz.FuzzHarness
     defaultFuzzConfig,
     runCoverageGuidedFuzzing,
     runCrashFuzzing,
-    runDifferentialFuzzing,
     runFuzzingCampaign,
     runPropertyFuzzing,
   )
@@ -106,7 +102,6 @@ import qualified Properties.Language.Javascript.Parser.Fuzz.FuzzHarness as FuzzH
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.IO (hPutStrLn, stderr)
 import Test.Hspec
-import Test.QuickCheck
 
 -- ---------------------------------------------------------------------
 -- Test Configuration
@@ -304,11 +299,11 @@ runRegressionSuite = do
 
 -- | Update regression corpus with new failures
 updateRegressionCorpus :: [FuzzFailure] -> IO ()
-updateRegressionCorpus failures = do
+updateRegressionCorpus newFailures = do
   createDirectoryIfMissing True "test/fuzz/corpus"
 
   -- Save new crashes
-  let crashes = filter ((== ParserCrash) . failureType) failures
+  let crashes = filter ((== ParserCrash) . failureType) newFailures
   forM_ (zip [1 ..] crashes) $ \(i, failure) -> do
     let filename = "test/fuzz/corpus/crash_" ++ show i ++ ".js"
     Text.writeFile filename (failureInput failure)
@@ -421,7 +416,7 @@ coverageGuidedTests config = do
   it "should improve coverage over random testing" $ do
     let iterations = testIterations config `div` 4
 
-    randomResults <- runCrashFuzzing defaultFuzzConfig {fuzzIterations = iterations}
+    _randomResults <- runCrashFuzzing defaultFuzzConfig {fuzzIterations = iterations}
     guidedResults <- runCoverageGuidedFuzzing defaultFuzzConfig {fuzzIterations = iterations}
 
     newCoveragePaths guidedResults `shouldSatisfy` (>= 0)
@@ -444,7 +439,7 @@ coverageGuidedTests config = do
 
 -- | Differential testing suite
 differentialTests :: FuzzTestConfig -> Spec
-differentialTests config = do
+differentialTests _config = do
   it "should compare against reference parsers" $ do
     let testInputs =
           [ "var x = 42;",
@@ -471,23 +466,23 @@ differentialTests config = do
 
 -- | Analyze fuzzing failures systematically
 analyzeFailures :: [FuzzFailure] -> IO String
-analyzeFailures failures = do
-  let categorized = categorizeFailures failures
+analyzeFailures fuzzFailures = do
+  let categorized = categorizeFailures fuzzFailures
   let prioritized = prioritizeIssues categorized
   return $ formatFailureAnalysis prioritized
 
 -- | Categorize failures by type and characteristics
 categorizeFailures :: [FuzzFailure] -> [(FailureType, [FuzzFailure])]
-categorizeFailures failures =
-  let sorted = sortBy (comparing failureType) failures
+categorizeFailures fuzzFailures =
+  let sorted = sortBy (comparing failureType) fuzzFailures
       grouped = groupByType sorted
    in grouped
 
 -- | Generate comprehensive failure report
 generateFailureReport :: [FuzzFailure] -> IO String
-generateFailureReport failures = do
-  analysis <- analyzeFailures failures
-  let summary = generateFailureSummary failures
+generateFailureReport fuzzFailures = do
+  analysis <- analyzeFailures fuzzFailures
+  let summary = generateFailureSummary fuzzFailures
   return $ summary ++ "\n\n" ++ analysis
 
 -- | Prioritize issues based on severity and frequency
@@ -604,18 +599,18 @@ groupByType (f : fs) =
 
 -- | Generate failure summary
 generateFailureSummary :: [FuzzFailure] -> String
-generateFailureSummary failures =
+generateFailureSummary fuzzFailures =
   unlines $
     [ "=== Failure Summary ===",
-      "Total failures: " ++ show (length failures),
+      "Total failures: " ++ show (length fuzzFailures),
       "By type:"
     ]
-      ++ map formatTypeCount (countByType failures)
+      ++ map formatTypeCount (countByType fuzzFailures)
 
 -- | Count failures by type
 countByType :: [FuzzFailure] -> [(FailureType, Int)]
-countByType failures =
-  let categorized = categorizeFailures failures
+countByType fuzzFailures =
+  let categorized = categorizeFailures fuzzFailures
    in map (\(ftype, fs) -> (ftype, length fs)) categorized
 
 -- | Format type count
@@ -642,7 +637,7 @@ formatFailureAnalysis prioritized =
 
 -- | Format priority group
 formatPriorityGroup :: (FailureType, [FuzzFailure], Int) -> String
-formatPriorityGroup (ftype, failures, priority) =
+formatPriorityGroup (ftype, fuzzFailures, priority) =
   show ftype ++ " (priority " ++ show priority ++ "): "
-    ++ show (length failures)
+    ++ show (length fuzzFailures)
     ++ " failures"

@@ -99,11 +99,10 @@ module Language.JavaScript.Parser.Flatparse.Grammar
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import Data.List (foldl', filter)
+import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Text.Read (readMaybe)
 import qualified FlatParse.Basic as FP
-import Control.Applicative (pure, (*>), (<*>), (<$>))
 
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(TokenPn))
@@ -114,9 +113,7 @@ import Language.JavaScript.Parser.Flatparse.Lexer
   , identifier
   , keyword
   , rawIdentifier
-  , isKeyword
   )
-import qualified Language.JavaScript.Parser.Flatparse.Pos as JSPos
 import Language.JavaScript.Parser.Flatparse.Primitives
 
 -- =====================================================================
@@ -381,9 +378,9 @@ functionParam = restParam FP.<|> destructuringDefaultParam FP.<|> defaultParam F
 
 -- | Parse property name (identifier, string, number, or computed).
 propertyName :: JSParser JSPropertyName
-propertyName = computedProp FP.<|> stringProp FP.<|> numericProp FP.<|> identProp
+propertyName = computedPropertyName FP.<|> stringProp FP.<|> numericProp FP.<|> identProp
   where
-    computedProp = do
+    computedPropertyName = do
       pos <- FP.getPos
       parseChar '['
       whitespace
@@ -2748,7 +2745,7 @@ importAttributes = FP.optional parseAttrs
   where
     parseAttrs = do
       whitespace
-      withPos <- FP.getPos
+      _withPos <- FP.getPos
       contextualKeyword "with"
       whitespace
       lbA <- parseCharAnnot '{'

@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 -- | Two-pass comment scanner for restoring comments to the AST.
 --

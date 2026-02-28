@@ -22,7 +22,6 @@ module Unit.Language.Javascript.Parser.Pretty.JSONTest
 where
 
 import qualified Data.Aeson as JSON
-import qualified Data.Aeson.Types as JSON
 import qualified Data.ByteString.Lazy.Char8 as BSL
 import Data.Text (Text)
 import qualified Data.Text as Text

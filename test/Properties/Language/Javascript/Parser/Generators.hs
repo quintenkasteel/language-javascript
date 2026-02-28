@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-orphans #-}
 
 -- | Comprehensive QuickCheck generators for JavaScript AST nodes.
 --
@@ -89,9 +89,8 @@ import Control.Monad (replicateM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.List as List
-import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.SrcLocation (TokenPosn (..), tokenPosnEmpty)
+import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import qualified Language.JavaScript.Parser.Token as Token
 import Test.QuickCheck
 
@@ -755,15 +754,15 @@ genMemberExpression n =
 
 -- | Generate array literals with size control.
 genArrayLiteral :: Int -> Gen JSExpression
-genArrayLiteral n = do
+genArrayLiteral size = do
   lbracket <- genJSAnnot
-  elements <- genArrayElementList (n `div` 2)
+  elems <- genArrayElementList (size `div` 2)
   rbracket <- genJSAnnot
-  return (JSArrayLiteral lbracket elements rbracket)
+  return (JSArrayLiteral lbracket elems rbracket)
 
 -- | Generate object literals with size control.
 genObjectLiteral :: Int -> Gen JSExpression
-genObjectLiteral n = do
+genObjectLiteral _n = do
   lbrace <- genJSAnnot
   props <- genJSObjectPropertyList
   rbrace <- genJSAnnot
@@ -843,14 +842,14 @@ genForStatement :: Int -> Gen JSStatement
 genForStatement n = do
   forAnnot <- genJSAnnot
   lparen <- genJSAnnot
-  init <- genCommaList (genSizedExpression (n `div` 4))
+  forInit <- genCommaList (genSizedExpression (n `div` 4))
   semi1 <- genJSAnnot
   cond <- genCommaList (genSizedExpression (n `div` 4))
   semi2 <- genJSAnnot
   update <- genCommaList (genSizedExpression (n `div` 4))
   rparen <- genJSAnnot
   stmt <- genSizedStatement (n `div` 2)
-  return (JSFor forAnnot lparen init semi1 cond semi2 update rparen stmt)
+  return (JSFor forAnnot lparen forInit semi1 cond semi2 update rparen stmt)
 
 -- | Generate do-while statements with size control.
 genDoWhileStatement :: Int -> Gen JSStatement
@@ -1481,18 +1480,18 @@ shrinkJSExpression expr = case expr of
   JSCallExpression func _ args _ -> [func] ++ shrink func ++ concatMap shrink (jsCommaListToList args)
   JSMemberDot obj _ prop -> [obj, prop] ++ shrink obj ++ shrink prop
   JSMemberSquare obj _ prop _ -> [obj, prop] ++ shrink obj ++ shrink prop
-  JSArrayLiteral _ elements _ -> concatMap shrinkJSArrayElement elements
+  JSArrayLiteral _ elems _ -> concatMap shrinkJSArrayElement elems
   _ -> []
 
 -- | Shrink JavaScript statements for QuickCheck.
 shrinkJSStatement :: JSStatement -> [JSStatement]
 shrinkJSStatement stmt = case stmt of
   JSStatementBlock _ stmts _ _ -> stmts ++ concatMap shrinkJSStatement stmts
-  JSIf _ _ cond _ thenStmt -> [thenStmt] ++ shrinkJSStatement thenStmt
-  JSIfElse _ _ cond _ thenStmt _ elseStmt ->
+  JSIf _ _ _cond _ thenStmt -> [thenStmt] ++ shrinkJSStatement thenStmt
+  JSIfElse _ _ _cond _ thenStmt _ elseStmt ->
     [thenStmt, elseStmt] ++ shrinkJSStatement thenStmt ++ shrinkJSStatement elseStmt
-  JSExpressionStatement expr _ -> [] -- Cannot shrink expression to statement
-  JSReturn _ (Just expr) _ -> [] -- Cannot shrink expression to statement
+  JSExpressionStatement _expr _ -> [] -- Cannot shrink expression to statement
+  JSReturn _ (Just _expr) _ -> [] -- Cannot shrink expression to statement
   _ -> []
 
 -- | Shrink JavaScript AST for QuickCheck.
@@ -1566,9 +1565,9 @@ genJSClassElement =
       hash <- genJSAnnot
       name <- genValidIdentifier
       eq <- genJSAnnot
-      init <- oneof [return Nothing, Just <$> genJSExpression]
+      fieldInit <- oneof [return Nothing, Just <$> genJSExpression]
       semi <- genJSSemi
-      return (JSPrivateField hash name eq init semi)
+      return (JSPrivateField hash name eq fieldInit semi)
     genJSPrivateMethod = do
       hash <- genJSAnnot
       name <- genValidIdentifier

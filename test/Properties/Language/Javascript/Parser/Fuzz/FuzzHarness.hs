@@ -68,12 +68,10 @@ module Properties.Language.Javascript.Parser.Fuzz.FuzzHarness
 where
 
 import Control.Exception (SomeException, catch, evaluate)
-import Control.Monad (forM, forM_, when)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad (forM, when)
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import Language.JavaScript.Parser (readJs, renderToString)
 import qualified Language.JavaScript.Parser.AST as AST
@@ -90,8 +88,6 @@ import Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
     generateRandomJS,
     mutateFuzzInput,
   )
-import System.Exit (ExitCode (..))
-import System.Process (readProcessWithExitCode)
 import System.Timeout (timeout)
 
 -- ---------------------------------------------------------------------
@@ -334,18 +330,18 @@ fuzzWithInputs ::
   IO FuzzResults
 fuzzWithInputs config inputs testFunc = do
   results <- forM inputs (testWithTimeout config testFunc)
-  let failures = [f | Just f <- results]
+  let foundFailures = [f | Just f <- results]
   return $
     FuzzResults
       { totalIterations = length inputs,
-        crashCount = countFailureType ParserCrash failures,
-        timeoutCount = countFailureType ParserTimeout failures,
-        memoryExhaustionCount = countFailureType MemoryExhaustion failures,
+        crashCount = countFailureType ParserCrash foundFailures,
+        timeoutCount = countFailureType ParserTimeout foundFailures,
+        memoryExhaustionCount = countFailureType MemoryExhaustion foundFailures,
         newCoveragePaths = 0, -- Set by coverage-guided fuzzing
-        propertyViolations = countFailureType PropertyViolation failures,
-        differentialFailures = countFailureType DifferentialMismatch failures,
+        propertyViolations = countFailureType PropertyViolation foundFailures,
+        differentialFailures = countFailureType DifferentialMismatch foundFailures,
         executionTime = 0, -- Set by main function
-        failures = failures
+        failures = foundFailures
       }
 
 -- | Test single input with timeout protection
@@ -376,7 +372,7 @@ testWithTimeout config testFunc input = do
 
 -- | Detect parser crashes and exceptions
 detectCrashes :: FuzzConfig -> Text.Text -> IO (Maybe FuzzFailure)
-detectCrashes config input = do
+detectCrashes _config input = do
   result <- catch (testParseStrictly input) handleException
   case result of
     Left errMsg -> do
@@ -443,27 +439,27 @@ guidedFuzzingLoop :: FuzzConfig -> CoverageData -> IO FuzzResults
 guidedFuzzingLoop config initialCoverage = do
   guidedFuzzingLoop' config initialCoverage 0 []
   where
-    guidedFuzzingLoop' cfg coverage iteration failures
-      | iteration >= fuzzIterations cfg = return $ createResults failures iteration
+    guidedFuzzingLoop' cfg coverage iteration accFailures
+      | iteration >= fuzzIterations cfg = return $ createResults accFailures iteration
       | otherwise = do
         newInput <- guidedGeneration coverage
         failure <- testWithTimeout cfg validateProperties newInput
         newCoverage <- measureCoverage (Text.unpack newInput)
         let updatedCoverage = updateCoverage coverage newCoverage
-        let updatedFailures = maybe failures (: failures) failure
+        let updatedFailures = maybe accFailures (: accFailures) failure
         guidedFuzzingLoop' cfg updatedCoverage (iteration + 1) updatedFailures
 
-    createResults failures iter =
+    createResults accFailures iter =
       FuzzResults
         { totalIterations = iter,
           crashCount = 0,
           timeoutCount = 0,
           memoryExhaustionCount = 0,
           newCoveragePaths = 0, -- Would be calculated from coverage diff
-          propertyViolations = length failures,
+          propertyViolations = length accFailures,
           differentialFailures = 0,
           executionTime = 0,
-          failures = failures
+          failures = accFailures
         }
 
 -- ---------------------------------------------------------------------
@@ -503,8 +499,8 @@ analyzeFuzzResults results =
 
 -- | Generate detailed failure report
 generateFailureReport :: [FuzzFailure] -> IO String
-generateFailureReport failures = do
-  let groupedFailures = groupFailuresByType failures
+generateFailureReport inputFailures = do
+  let groupedFailures = groupFailuresByType inputFailures
   return $ unlines $ map formatFailureGroup groupedFailures
 
 -- ---------------------------------------------------------------------
@@ -584,10 +580,10 @@ analyzeFailure failure =
 
 -- | Group failures by type for analysis
 groupFailuresByType :: [FuzzFailure] -> [(FailureType, [FuzzFailure])]
-groupFailuresByType failures =
-  let sorted = sortBy (comparing failureType) failures
+groupFailuresByType inputFailures =
+  let sorted = sortBy (comparing failureType) inputFailures
       grouped = groupByType sorted
-   in map (\fs@(f : _) -> (failureType f, fs)) grouped
+   in concatMap (\fs -> case fs of { (f : _) -> [(failureType f, fs)]; [] -> [] }) grouped
   where
     groupByType [] = []
     groupByType (x : xs) =

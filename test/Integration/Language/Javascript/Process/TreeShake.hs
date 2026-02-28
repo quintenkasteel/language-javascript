@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-}
 
 -- | Integration tests for JavaScript tree shaking functionality.
 --
@@ -20,9 +20,7 @@ module Integration.Language.Javascript.Process.TreeShake
   )
 where
 
-import Control.Lens ((^.), (.~), (&))
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Parser (parse, parseModule)
 import Language.JavaScript.Pretty.Printer (renderToString)

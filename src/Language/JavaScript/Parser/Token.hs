@@ -55,14 +55,12 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
 import Data.Data
 import GHC.Generics (Generic)
 import Language.Haskell.TH.Syntax (Lift)
 import Language.JavaScript.Parser.SrcLocation
 import qualified Data.Text as Text
 import Data.Text (Text)
-import Data.String (fromString)
 import qualified Data.Char as Char
 import qualified Data.List
 
@@ -764,8 +762,8 @@ parseJSDocContent pos content =
       in JSDocComment position description tags
 
     splitDescriptionAndTags :: String -> (Maybe Text, String)
-    splitDescriptionAndTags content =
-      let textContent = Text.pack content
+    splitDescriptionAndTags docContent =
+      let textContent = Text.pack docContent
           lines' = Text.lines textContent
           cleanLines = map (Text.stripStart . Text.dropWhile (== '*') . Text.stripStart) lines'
           nonEmptyLines = filter (not . Text.null) cleanLines
@@ -934,8 +932,8 @@ parseJSDocContent pos content =
 
     parseObjectType :: Text -> Maybe JSDocType
     parseObjectType text =
-      let content = Text.drop 1 (Text.dropEnd 1 text)
-          fields = parseObjectFields content
+      let objContent = Text.drop 1 (Text.dropEnd 1 text)
+          fields = parseObjectFields objContent
       in fmap JSDocObjectType fields
 
     parseObjectFields :: Text -> Maybe [JSDocObjectField]
@@ -978,7 +976,7 @@ parseJSDocContent pos content =
 
     -- | Parse tag-specific information based on tag name
     parseTagSpecific :: Text -> Maybe JSDocType -> Maybe Text -> Maybe Text -> [Text] -> Maybe JSDocTagSpecific
-    parseTagSpecific tagName jsDocType paramName description remaining =
+    parseTagSpecific tagName jsDocType paramName description _remaining =
       case Text.toLower tagName of
         "param" -> parseParamTag paramName description
         "parameter" -> parseParamTag paramName description
@@ -1435,9 +1433,9 @@ parseJSDocContent pos content =
         parseEnumValueLine :: Text -> JSDocEnumValue
         parseEnumValueLine line =
           let trimmedLine = Text.stripStart (Text.drop 1 (Text.stripStart line))
-              (nameAndValue, description) = Text.breakOn " - " trimmedLine
+              (nameAndValue, fieldDescription) = Text.breakOn " - " trimmedLine
               (valueName, literal) = parseNameAndLiteral nameAndValue
-              enumDesc = if Text.null description then Nothing else Just (Text.drop 3 description)
+              enumDesc = if Text.null fieldDescription then Nothing else Just (Text.drop 3 fieldDescription)
           in JSDocEnumValue valueName literal enumDesc
 
         parseNameAndLiteral :: Text -> (Text, Maybe Text)
@@ -1637,7 +1635,7 @@ validateParameters jsDoc functionParams =
 
 -- | Find duplicate values in a list
 findDuplicates :: (Eq a, Ord a) => [a] -> [a]
-findDuplicates xs = [x | (x:y:_) <- group (sort xs)]
+findDuplicates xs = [x | (x:_:_) <- group (sort xs)]
   where
     sort = Data.List.sort
     group = Data.List.group
@@ -1714,7 +1712,7 @@ validateConsistency jsDoc =
 validateParamConsistency :: JSDocTag -> [JSDocValidationError]
 validateParamConsistency tag =
   case (jsDocTagParamName tag, jsDocTagType tag, jsDocTagDescription tag) of
-    (Just paramName, Just jsDocType, Just desc) ->
+    (Just paramName, Just _jsDocType, Just desc) ->
       -- Check if parameter name appears in description
       if Text.isInfixOf paramName desc
         then []

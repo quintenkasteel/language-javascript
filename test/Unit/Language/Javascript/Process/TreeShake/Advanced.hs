@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 -- | Advanced comprehensive tests for JavaScript tree shaking functionality.
 --
@@ -27,13 +28,9 @@ where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
-import qualified Data.Text as Text
-import Control.Lens ((^.), (.~), (&))
+import Control.Lens ((.~), (&))
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Parser (parse, parseModule)
-import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Process.TreeShake
 import Language.JavaScript.Process.TreeShake.Types
 import Test.Hspec
@@ -1105,6 +1102,10 @@ objectPropertyContainsIdentifier identifier prop = case prop of
     propertyNameContainsIdentifier identifier propName ||
     any (expressionContainsIdentifier identifier) (fromCommaList params) ||
     blockContainsIdentifier identifier body
+  JSObjectMethod (JSAsyncMethodDefinition _ propName _ params _ body) ->
+    propertyNameContainsIdentifier identifier propName ||
+    any (expressionContainsIdentifier identifier) (fromCommaList params) ||
+    blockContainsIdentifier identifier body
   JSObjectSpread _ expr -> expressionContainsIdentifier identifier expr
 
 -- | Check if property name contains identifier.
@@ -1148,7 +1149,6 @@ importSpecContainsIdentifier :: ByteString -> JSImportSpecifier -> Bool
 importSpecContainsIdentifier identifier spec = case spec of
   JSImportSpecifier ident -> identifierMatches identifier ident
   JSImportSpecifierAs _ _ localIdent -> identifierMatches identifier localIdent
-  _ -> False
 
 -- | Check if export declaration contains identifier.
 exportContainsIdentifier :: ByteString -> JSExportDeclaration -> Bool
@@ -1170,7 +1170,6 @@ exportSpecContainsIdentifier :: ByteString -> JSExportSpecifier -> Bool
 exportSpecContainsIdentifier identifier spec = case spec of
   JSExportSpecifier ident -> identifierMatches identifier ident
   JSExportSpecifierAs ident _ _ -> identifierMatches identifier ident
-  _ -> False
 
 -- | Check if JSIdent matches identifier.
 identifierMatches :: ByteString -> JSIdent -> Bool

@@ -5,13 +5,6 @@ module Unit.Language.Javascript.Parser.Lexer.ASIHandling
   )
 where
 
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.List as List
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text.Encoding.Error as Text
-import Language.JavaScript.Parser.Parser
 import Test.Hspec
 
 -- | Comprehensive test suite for automatic semicolon insertion edge cases - needs flatparse test helpers

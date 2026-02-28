@@ -160,13 +160,15 @@ testRoundTrip = describe "Roundtrip:" $ do
     testRTModule "export   class Foo\nextends Bar\n{ get a () { return 1 ; }  static b ( x,y ) {} ; }   ; "
 
 testRT :: String -> Expectation
-testRT = testRTWith readJs
+testRT = testRTWith readJsSafe
 
 testRTModule :: String -> Expectation
-testRTModule = testRTWith readJsModule
+testRTModule = testRTWith readJsModuleSafe
 
-testRTWith :: (String -> AST.JSAST) -> String -> Expectation
-testRTWith f str = renderToString (f str) `shouldBe` str
+testRTWith :: (String -> Either String AST.JSAST) -> String -> Expectation
+testRTWith f str = case f str of
+  Right ast -> renderToString ast `shouldBe` str
+  Left err -> expectationFailure ("Parse failed: " ++ err)
 
 -- Additional supported round-trip tests for comprehensive coverage
 testES6RoundTrip :: Spec

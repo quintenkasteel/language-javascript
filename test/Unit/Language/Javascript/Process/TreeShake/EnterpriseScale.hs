@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-}
 
 -- | Comprehensive tests for enterprise-scale tree shaking scenarios.
 --
@@ -750,7 +750,7 @@ generateVeryLargeCodeBase moduleCount = unlines $
 
 -- | Generate massive codebase for scalability testing.
 generateMassiveCodeBase :: Int -> String
-generateMassiveCodeBase moduleCount = unlines $
+generateMassiveCodeBase _moduleCount = unlines $
   take 10000 $ cycle  -- Limit output to prevent memory issues in tests
   [ "function massiveFunc() { return 'massive'; }"
   , "const massiveConst = 'massive';"
@@ -791,12 +791,12 @@ isValidAST :: JSAST -> Bool
 isValidAST = isValidLargeAST
 
 -- Property tests for enterprise scenarios
-prop_largeCodebasePreservesSemantics :: Int -> Property
-prop_largeCodebasePreservesSemantics moduleCount =
+_prop_largeCodebasePreservesSemantics :: Int -> Property
+_prop_largeCodebasePreservesSemantics moduleCount =
   moduleCount > 0 && moduleCount < 100 ==>
   True  -- Placeholder for large codebase semantics preservation test
 
-prop_scalabilityPerformance :: Int -> Property
-prop_scalabilityPerformance codeSize =
+_prop_scalabilityPerformance :: Int -> Property
+_prop_scalabilityPerformance codeSize =
   codeSize > 0 && codeSize < 1000 ==>
   True  -- Placeholder for scalability performance test

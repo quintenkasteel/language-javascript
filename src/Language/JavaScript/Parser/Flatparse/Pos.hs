@@ -57,8 +57,6 @@ import GHC.Generics (Generic)
 -- Imports for conversion to original AST
 import Language.JavaScript.Parser.AST (JSAnnot(..))
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..))
-import Language.JavaScript.Parser.Token (CommentAnnotation)
-
 -- | Compact source position representation.
 --
 -- Encodes line and column information in a single Word64 value for

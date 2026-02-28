@@ -14,7 +14,6 @@ module Unit.Language.Javascript.Parser.Validation.ES6Features
   )
 where
 
-import Data.Either (isLeft, isRight)
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Validator
@@ -27,8 +26,8 @@ noAnnot = JSNoAnnot
 auto :: JSSemi
 auto = JSSemiAuto
 
-noPos :: TokenPosn
-noPos = TokenPn 0 0 0
+_noPos :: TokenPosn
+_noPos = TokenPn 0 0 0
 
 -- | Main test suite for ES6+ validation features
 testES6ValidationSimple :: Spec

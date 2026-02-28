@@ -21,7 +21,6 @@ module Unit.Language.Javascript.Parser.Pretty.SExprTest
   )
 where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))

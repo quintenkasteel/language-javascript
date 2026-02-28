@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wall -Wno-type-defaults #-}
 
 -- | Comprehensive real-world compatibility testing module for JavaScript Parser
 --
@@ -51,28 +51,15 @@ module Integration.Language.Javascript.Parser.Compatibility
 where
 
 import Control.Exception (SomeException, evaluate, try)
-import Control.Monad (forM, forM_, when)
-import Data.List (isInfixOf, isPrefixOf, sortOn)
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
+import Control.Monad (forM)
+import Data.List (isInfixOf, isPrefixOf)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Data.Time (diffUTCTime, getCurrentTime)
 import Language.JavaScript.Parser
 import qualified Language.JavaScript.Parser.AST as AST
-import Language.JavaScript.Parser.SrcLocation
-  ( TokenPosn (..),
-    tokenPosnEmpty,
-  )
-import Language.JavaScript.Pretty.Printer
-  ( renderToString,
-    renderToText,
-  )
-import System.Directory (doesFileExist, listDirectory)
-import System.FilePath (takeExtension, (</>))
-import System.IO (hPutStrLn, stderr)
+import System.Directory (doesFileExist)
 import Test.Hspec
-import Test.QuickCheck
 
 -- | Comprehensive real-world compatibility testing
 testRealWorldCompatibility :: Spec
@@ -573,7 +560,7 @@ compareToBabelParser :: FilePath -> IO Double
 compareToBabelParser filePath = do
   content <- Text.readFile filePath
   case parse (Text.unpack content) "babel-comparison" of
-    Right ourAST -> do
+    Right _ourAST -> do
       -- In real implementation, would call Babel parser via external process
       -- For now, return high equivalence for valid parses
       return 95.0
@@ -812,10 +799,6 @@ calculateErrorHelpfulness scores = if null scores then 0 else average scores
 calculateErrorConsistencyRate :: [Double] -> Double
 calculateErrorConsistencyRate = calculateErrorHelpfulness
 
--- | Check if compatibility test succeeded (meaningful threshold)
-isCompatibilitySuccess :: CompatibilityResult -> Bool
-isCompatibilitySuccess result = compatibilityScore result >= 85.0
-
 -- | Get throughput value from performance result (extract actual throughput)
 getThroughputValue :: Double -> Double
 getThroughputValue throughput = max 0 throughput -- Ensure non-negative throughput
@@ -908,12 +891,14 @@ preservesExecutionOrder :: AST.JSAST -> Bool
 preservesExecutionOrder (AST.JSAstProgram stmts _) =
   -- Basic check: ensure statements exist in order
   not (null stmts)
+preservesExecutionOrder _ = False
 
 -- | Check if scope structure is preserved
 preservesScopeStructure :: AST.JSAST -> Bool
 preservesScopeStructure (AST.JSAstProgram stmts _) =
   -- Basic check: ensure no empty program unless intended
-  not (null stmts) || length stmts >= 0 -- Always true but prevents trivial mock
+  not (null stmts)
+preservesScopeStructure _ = False
 
 -- | Check if error is well-formed
 isWellFormedError :: String -> Bool
@@ -932,8 +917,6 @@ assessErrorQuality err =
           20 -- Base score
         ]
    in sum qualityFactors
-  where
-    isInfixOf x y = x `elem` [y] -- Simplified
 
 -- | Check if error has actionable advice
 hasActionableAdvice :: String -> Bool

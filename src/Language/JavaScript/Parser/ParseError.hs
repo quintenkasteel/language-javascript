@@ -30,7 +30,6 @@ where
 --import Language.JavaScript.Parser.Pretty
 -- import Control.Monad.Error.Class -- Control.Monad.Trans.Except
 import Control.DeepSeq (NFData)
-import qualified Data.Text as Text
 import GHC.Generics (Generic)
 -- import Language.JavaScript.Parser.Lexer  -- No longer needed with flatparse
 import Language.JavaScript.Parser.Token (Token, tokenSpan)
@@ -228,14 +227,14 @@ renderParseError err = case err of
      in severityStr ++ " Unexpected character '" ++ [char] ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
-  SyntaxError msg pos ctx severity suggestions ->
+  SyntaxError msg pos ctx severity errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
         severityStr = "[" ++ show severity ++ "]"
         suggestStr =
-          if null suggestions
+          if null errSuggestions
             then ""
-            else "\n  Suggestions: " ++ unlines (map ("    - " ++) suggestions)
+            else "\n  Suggestions: " ++ unlines (map ("    - " ++) errSuggestions)
      in severityStr ++ " Syntax error at " ++ posStr ++ ": " ++ msg
           ++ "\n  Context: "
           ++ contextStr
@@ -248,82 +247,82 @@ renderParseError err = case err of
           ++ contextStr
           ++ "\n  Details: "
           ++ details
-  InvalidNumericLiteral literal pos ctx suggestions ->
+  InvalidNumericLiteral literal pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid numeric literal '" ++ literal ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidPropertyAccess prop pos ctx suggestions ->
+  InvalidPropertyAccess prop pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid property access '." ++ prop ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidAssignmentTarget target pos ctx suggestions ->
+  InvalidAssignmentTarget target pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid assignment target '" ++ target ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidControlFlowLabel label pos ctx suggestions ->
+  InvalidControlFlowLabel label pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid control flow label '" ++ label ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  MissingConstInitializer ident pos ctx suggestions ->
+  MissingConstInitializer ident pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Missing const initializer for '" ++ ident ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidIdentifier ident pos ctx suggestions ->
+  InvalidIdentifier ident pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid identifier '" ++ ident ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidArrowParameter param pos ctx suggestions ->
+  InvalidArrowParameter param pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid arrow function parameter '" ++ param ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidEscapeSequence seq pos ctx suggestions ->
+  InvalidEscapeSequence seq pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid escape sequence '" ++ seq ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidRegexPattern pattern pos ctx suggestions ->
+  InvalidRegexPattern pattern pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid regex pattern '" ++ pattern ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidUnicodeSequence seq pos ctx suggestions ->
+  InvalidUnicodeSequence seq pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
-        suggestStr = renderSuggestions suggestions
+        suggestStr = renderSuggestions errSuggestions
      in "[Validation Error] Invalid unicode sequence '" ++ seq ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
@@ -333,8 +332,8 @@ renderParseError err = case err of
 -- | Helper function to render suggestions
 renderSuggestions :: [String] -> String
 renderSuggestions [] = ""
-renderSuggestions suggestions =
-  "\n  Suggestions: " ++ unlines (map ("    - " ++) suggestions)
+renderSuggestions errSuggestions =
+  "\n  Suggestions: " ++ unlines (map ("    - " ++) errSuggestions)
 
 -- | Render parse context to human-readable string
 renderContext :: ParseContext -> String

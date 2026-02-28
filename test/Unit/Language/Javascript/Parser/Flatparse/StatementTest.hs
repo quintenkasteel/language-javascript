@@ -21,12 +21,8 @@ module Unit.Language.Javascript.Parser.Flatparse.StatementTest
 where
 
 import Data.Text (Text)
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.Flatparse.Lexer
-import Language.JavaScript.Parser.Flatparse.Pos
-import Language.JavaScript.Parser.Flatparse.Primitives
 import Language.JavaScript.Parser.Flatparse.Statement
 import Test.Hspec
 import FlatParse.Basic
@@ -41,8 +37,8 @@ parseStatement input =
     Err e -> Left ("Parse error: " <> show e)
 
 -- | Test helper to parse statement lists
-parseStatements :: Text -> Either String [JSStatement]
-parseStatements input =
+_parseStatements :: Text -> Either String [JSStatement]
+_parseStatements input =
   case runParser statementList (Text.encodeUtf8 input) of
     OK result _ -> Right result
     Fail -> Left "Parse failed"

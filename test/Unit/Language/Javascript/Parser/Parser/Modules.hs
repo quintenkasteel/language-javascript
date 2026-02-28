@@ -5,11 +5,9 @@ module Unit.Language.Javascript.Parser.Parser.Modules
   )
 where
 
-import Data.List (isInfixOf)
 import Language.JavaScript.Parser (parse, parseModule)
 import Language.JavaScript.Parser.AST
   ( JSAST (..),
-    JSAnnot,
     JSBlock (..),
     JSCommaList (..),
     JSExportClause (..),
@@ -24,7 +22,6 @@ import Language.JavaScript.Parser.AST
     JSImportSpecifier (..),
     JSImportsNamed (..),
     JSModuleItem (..),
-    JSSemi,
     JSStatement (..),
     JSVarInitializer (..),
   )
@@ -150,20 +147,25 @@ testModuleParser = describe "Parse modules:" $ do
     case parseModule "export * as ns from 'module';" "test" of
       Right (JSAstModule [JSModuleExportDeclaration _ (JSExportAllAsFrom _ _ (JSIdentName _ "ns") (JSFromClause _ _ "'module'") _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse export * as: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
     case parseModule "export * as namespace from './utils';" "test" of
       Right (JSAstModule [JSModuleExportDeclaration _ (JSExportAllAsFrom _ _ (JSIdentName _ "namespace") (JSFromClause _ _ "'./utils'") _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse export * as: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- Note: import.meta is now supported for property access
     case parse "import.meta.url" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "url")) _] _) -> pure ()
       Left err -> expectationFailure ("Should parse import.meta.url: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
     case parse "import.meta.resolve('./module')" "test" of
       Right (JSAstProgram [JSMethodCall (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "resolve")) _ (JSLOne (JSStringLiteral _ "'./module'")) _ _] _) -> pure ()
       Left err -> expectationFailure ("Should parse import.meta.resolve: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
     case parse "console.log(import.meta)" "test" of
       Right (JSAstProgram [JSMethodCall (JSMemberDot (JSIdentifier _ "console") _ (JSIdentifier _ "log")) _ (JSLOne (JSImportMeta _ _)) _ _] _) -> pure ()
       Left err -> expectationFailure ("Should parse console.log(import.meta): " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- Note: Dynamic import() expressions are now supported
     case parse "import('./module.js')" "test" of
@@ -181,31 +183,37 @@ testModuleParser = describe "Parse modules:" $ do
     case parse "import.meta;" "test" of
       Right (JSAstProgram [JSExpressionStatement (JSImportMeta _ _) _] _) -> pure ()
       Left err -> expectationFailure ("Should parse import.meta: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- import.meta.url property access
     case parseModule "const url = import.meta.url;" "test" of
       Right (JSAstModule [JSModuleStatementListItem (JSConstant _ (JSLOne (JSVarInitExpression (JSIdentifier _ "url") (JSVarInit _ (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "url"))))) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse const url = import.meta.url: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- import.meta.resolve() method calls
     case parseModule "const resolved = import.meta.resolve('./module.js');" "test" of
       Right (JSAstModule [JSModuleStatementListItem (JSConstant _ (JSLOne (JSVarInitExpression (JSIdentifier _ "resolved") (JSVarInit _ (JSMemberExpression (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "resolve")) _ (JSLOne (JSStringLiteral _ "'./module.js'")) _)))) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse const resolved = import.meta.resolve: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- import.meta in function calls - preserve console, log, url, import.meta identifiers
     case parseModule "console.log(import.meta.url, import.meta);" "test" of
       Right (JSAstModule [JSModuleStatementListItem (JSMethodCall (JSMemberDot (JSIdentifier _ "console") _ (JSIdentifier _ "log")) _ (JSLCons (JSLOne (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "url"))) _ (JSImportMeta _ _)) _ _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse console.log(import.meta.url, import.meta): " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- import.meta in conditional expressions - preserve hasUrl variable, url property
     case parseModule "const hasUrl = import.meta.url ? true : false;" "test" of
       Right (JSAstModule [JSModuleStatementListItem (JSConstant _ (JSLOne (JSVarInitExpression (JSIdentifier _ "hasUrl") (JSVarInit _ (JSExpressionTernary (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "url")) _ (JSLiteral _ "true") _ (JSLiteral _ "false"))))) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse conditional with import.meta.url: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- import.meta property access variations - preserve env property
     case parseModule "import.meta.env;" "test" of
       Right (JSAstModule [JSModuleStatementListItem (JSExpressionStatement (JSMemberDot (JSImportMeta _ _) _ (JSIdentifier _ "env")) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse import.meta.env: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- Basic import.meta access statement
     case parseModule "import.meta;" "test" of
@@ -217,34 +225,42 @@ testModuleParser = describe "Parse modules:" $ do
     case parseModule "import data from './data.json' with { type: 'json' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseDefault (JSIdentName _ "data")) (JSFromClause _ _ "'./data.json'") (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse import with type attribute: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- Test that various import attributes parse successfully - preserve styles, css identifiers
     case parseModule "import * as styles from './styles.css' with { type: 'css' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseNameSpace (JSImportNameSpace _ _ (JSIdentName _ "styles"))) (JSFromClause _ _ "'./styles.css'") (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse namespace import with type attribute: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     case parseModule "import { config, settings } from './config.json' with { type: 'json' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseNamed (JSImportsNamed _ (JSLCons (JSLOne (JSImportSpecifier (JSIdentName _ "config"))) _ (JSImportSpecifier (JSIdentName _ "settings"))) _)) (JSFromClause _ _ "'./config.json'") (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse named import with type attribute: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     case parseModule "import secure from './secure.json' with { type: 'json', integrity: 'sha256-abc123' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseDefault (JSIdentName _ "secure")) (JSFromClause _ _ "'./secure.json'") (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse import with multiple attributes: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     case parseModule "import defaultExport, { namedExport } from './module.js' with { type: 'module' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseDefaultNamed (JSIdentName _ "defaultExport") _ (JSImportsNamed _ (JSLOne (JSImportSpecifier (JSIdentName _ "namedExport"))) _)) (JSFromClause _ _ "'./module.js'") (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse mixed import with type attribute: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     case parseModule "import './polyfill.js' with { type: 'module' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclarationBare _ "'./polyfill.js'" (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse side-effect import with type attribute: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- Import without attributes (backwards compatibility) - preserve regular identifier
     case parseModule "import regular from './regular.js';" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseDefault (JSIdentName _ "regular")) (JSFromClause _ _ "'./regular.js'") Nothing _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse regular import without attributes: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)
 
     -- Multiple attributes with various attribute types - preserve wasm identifier
     case parseModule "import wasm from './module.wasm' with { type: 'webassembly', encoding: 'binary' };" "test" of
       Right (JSAstModule [JSModuleImportDeclaration _ (JSImportDeclaration (JSImportClauseDefault (JSIdentName _ "wasm")) (JSFromClause _ _ "'./module.wasm'") (Just _) _)] _) -> pure ()
       Left err -> expectationFailure ("Should parse import with webassembly attributes: " ++ show err)
+      Right result -> expectationFailure ("Unexpected AST shape: " ++ show result)

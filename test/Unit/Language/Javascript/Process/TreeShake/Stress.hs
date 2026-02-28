@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 -- | Stress and performance tests for JavaScript tree shaking functionality.
 --

@@ -11,28 +11,18 @@ import Control.Applicative ((<$>))
 #endif
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
-import Data.List (isPrefixOf)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
-  ( JSAST (..),
-    JSAnnot,
-    JSBinOp (..),
-    JSBlock (..),
-    JSCommaList (..),
+  ( JSCommaList (..),
     JSCommaTrailingList (..),
-    JSExpression (..),
     JSIdent (..),
     JSObjectProperty (..),
     JSPropertyName (..),
-    JSSemi,
-    JSStatement (..),
     JSVarInitializer (..),
   )
-import Language.JavaScript.Parser.Parser
-import Language.JavaScript.Parser.Parser (parseUsing, showStrippedMaybeString, showStrippedString)
+import Language.JavaScript.Parser.Parser (parseProgram, parseUsing, showStrippedMaybeString, showStrippedString)
 import Test.Hspec
 
 testProgramParser :: Spec

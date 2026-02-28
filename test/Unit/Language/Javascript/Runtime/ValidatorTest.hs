@@ -23,14 +23,13 @@ where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Language.JavaScript.Parser.SrcLocation (TokenPosn (..), tokenPosnEmpty)
+import Language.JavaScript.Parser.SrcLocation (tokenPosnEmpty)
 import Language.JavaScript.Parser.Validator
   ( ValidationError(..)
   , RuntimeValue(..)
   , RuntimeValidationConfig(..)
   , validateRuntimeCall
   , validateRuntimeReturn
-  , validateRuntimeParameters
   , validateRuntimeValue
   , formatValidationError
   , defaultValidationConfig
@@ -304,7 +303,7 @@ errorFormattingTests = describe "Error Formatting" $ do
       Text.unpack formatted `shouldContain` "Array"
 
     it "formats union type validation errors" $ do
-      let unionType = JSDocUnionType [JSDocBasicType "string", JSDocBasicType "number"]
+      let _unionType = JSDocUnionType [JSDocBasicType "string", JSDocBasicType "number"]
           error' = RuntimeTypeError "string | number" "JSBoolean True" tokenPosnEmpty
           formatted = formatValidationError error'
       Text.unpack formatted `shouldContain` "value"
@@ -515,7 +514,7 @@ formatValidationErrors errors =
   Text.intercalate "\n" $ zipWith formatErrorWithNumber [1..] errors
   where
     formatErrorWithNumber :: Int -> ValidationError -> Text
-    formatErrorWithNumber n (RuntimeTypeError expected actual pos) =
+    formatErrorWithNumber n (RuntimeTypeError expected actual _pos) =
       let paramName = "param" <> Text.pack (show n)
           contextualMessage = addContextualKeywords expected actual paramName
       in contextualMessage

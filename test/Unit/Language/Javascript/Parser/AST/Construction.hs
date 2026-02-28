@@ -30,8 +30,8 @@ import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Test.Hspec
 
 -- | Test annotation for constructor testing
-noAnnot :: AST.JSAnnot
-noAnnot = AST.JSNoAnnot
+_noAnnot :: AST.JSAnnot
+_noAnnot = AST.JSNoAnnot
 
 testAnnot :: AST.JSAnnot
 testAnnot = AST.JSAnnot (TokenPn 0 1 1) []
@@ -276,8 +276,8 @@ testNonTerminalExpressions = describe "Non-terminal expressions" $ do
 
   it "constructs JSVarInitExpression correctly" $ do
     let ident = AST.JSIdentifier testAnnot "x"
-    let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
-    let expr = AST.JSVarInitExpression ident init
+    let varInit = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
+    let expr = AST.JSVarInitExpression ident varInit
     expr `shouldSatisfy` isJSVarInitExpression
 
   it "constructs JSYieldExpression correctly" $ do
@@ -331,11 +331,11 @@ testStatementConstructors = describe "Statement constructors" $ do
     stmt `shouldSatisfy` isJSDoWhile
 
   it "constructs JSFor correctly" $ do
-    let init = AST.JSLNil
-    let test = AST.JSLNil
+    let forInit = AST.JSLNil
+    let forTest = AST.JSLNil
     let update = AST.JSLNil
     let body = AST.JSEmptyStatement testAnnot
-    let stmt = AST.JSFor testAnnot testAnnot init testAnnot test testAnnot update testAnnot body
+    let stmt = AST.JSFor testAnnot testAnnot forInit testAnnot forTest testAnnot update testAnnot body
     stmt `shouldSatisfy` isJSFor
 
   it "constructs JSFunction correctly" $ do
@@ -1195,6 +1195,9 @@ isValidExpression expr =
     AST.JSYieldExpression {} -> True
     AST.JSYieldFromExpression {} -> True
     AST.JSImportMeta {} -> True
+    AST.JSAsyncArrowExpression {} -> True
+    AST.JSAsyncGeneratorExpression {} -> True
+    AST.JSImportCall {} -> True
 
 isValidStatement :: AST.JSStatement -> Bool
 isValidStatement stmt =
@@ -1235,3 +1238,9 @@ isValidStatement stmt =
     AST.JSVariable {} -> True
     AST.JSWhile {} -> True
     AST.JSWith {} -> True
+    AST.JSDebugger {} -> True
+    AST.JSAsyncGenerator {} -> True
+    AST.JSForAwaitOf {} -> True
+    AST.JSForAwaitVarOf {} -> True
+    AST.JSForAwaitLetOf {} -> True
+    AST.JSForAwaitConstOf {} -> True

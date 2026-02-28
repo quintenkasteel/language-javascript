@@ -81,7 +81,7 @@ Library
                        Language.JavaScript.Parser.Flatparse.Parser
   Other-modules:       Language.JavaScript.Process.TreeShake.Analysis
                      , Language.JavaScript.Process.TreeShake.Elimination
-  ghc-options:         -Wall -fwarn-tabs -O2 -funbox-strict-fields -fspec-constr-count=6 -fno-state-hack -Wno-unused-imports -Wno-unused-top-binds -Wno-unused-matches -Wno-name-shadowing
+  ghc-options:         -Wall -fwarn-tabs -O2 -funbox-strict-fields -fspec-constr-count=6 -fno-state-hack
 
 Test-Suite testsuite
   Type: exitcode-stdio-1.0
@@ -90,7 +90,7 @@ Test-Suite testsuite
   hs-source-dirs: test
   other-modules:
     Test.Language.Javascript.JSDocTest
-  ghc-options:   -Wall -fwarn-tabs -Wno-unused-imports -Wno-unused-top-binds -Wno-unused-matches -Wno-name-shadowing
+  ghc-options:   -Wall -fwarn-tabs
   build-depends: base             >= 4       && < 5
                  , Cabal           >= 1.9.2   && < 3.12
                  , QuickCheck      >= 2       && < 2.16

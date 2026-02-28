@@ -26,7 +26,6 @@ where
 import Control.Lens ((^.), (&), (.~))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Parser (parse, parseModule)
 import Language.JavaScript.Pretty.Printer (renderToString)
 import Language.JavaScript.Process.TreeShake
@@ -609,13 +608,13 @@ testFrameworkOptimizations = describe "Framework Optimizations" $ do
       Left err -> expectationFailure $ "Parse failed: " ++ err
 
 -- Property tests for framework patterns
-prop_frameworkComponentsPreserveExports :: [Text.Text] -> Property
-prop_frameworkComponentsPreserveExports exportNames =
+_prop_frameworkComponentsPreserveExports :: [Text.Text] -> Property
+_prop_frameworkComponentsPreserveExports exportNames =
   not (null exportNames) ==>
-  let opts = defaultTreeShakeOptions & preserveExports .~ Set.fromList exportNames
+  let _opts = defaultTreeShakeOptions & preserveExports .~ Set.fromList exportNames
   in True  -- Placeholder for actual property test logic
 
-prop_hocPatternsPreserveDependencies :: Text.Text -> Property
-prop_hocPatternsPreserveDependencies componentName =
+_prop_hocPatternsPreserveDependencies :: Text.Text -> Property
+_prop_hocPatternsPreserveDependencies componentName =
   not (Text.null componentName) ==>
   True  -- Placeholder for actual HOC dependency preservation test

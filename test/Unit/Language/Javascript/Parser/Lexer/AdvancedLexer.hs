@@ -25,12 +25,6 @@ module Unit.Language.Javascript.Parser.Lexer.AdvancedLexer
   )
 where
 
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
-import Data.List (intercalate)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text.Encoding.Error as Text
 import Test.Hspec
 import qualified Test.Hspec as Hspec
 

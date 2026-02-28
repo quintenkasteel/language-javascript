@@ -25,12 +25,6 @@ module Unit.Language.Javascript.Parser.Lexer.StringLiterals
   )
 where
 
-import Control.Monad (forM_)
-import qualified Data.ByteString.Char8 as BS8
-import Data.List (isInfixOf)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Text.Encoding.Error as Text
 import Test.Hspec
 
 -- | Main test suite for string literal complexity - needs flatparse test helpers

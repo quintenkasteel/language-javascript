@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -----------------------------------------------------------------------------
 
@@ -29,20 +30,15 @@ module Test.Language.Javascript.JSDocTest (tests) where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Maybe (isJust, isNothing, catMaybes)
+import Data.Maybe (isJust)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..), tokenPosnEmpty)
 import Language.JavaScript.Parser.Token
   ( JSDocComment(..)
   , JSDocTag(..)
   , JSDocType(..)
-  , JSDocTagSpecific(..)
-  , JSDocAccess(..)
-  , JSDocProperty(..)
-  , JSDocEnumValue(..)
   , JSDocInlineTag(..)
   , JSDocRichText(..)
   , JSDocValidationError(..)
-  , JSDocValidationResult
   , isJSDocComment
   , parseJSDocFromComment
   , parseInlineTags
@@ -354,19 +350,19 @@ propertyTests = describe "Property Tests" $ do
 -- | Helper functions for testing
 
 -- | Create a test JSDoc comment with given tags
-createTestJSDoc :: [JSDocTag] -> JSDocComment
-createTestJSDoc tags = JSDocComment tokenPosnEmpty (Just "Test description") tags
+_createTestJSDoc :: [JSDocTag] -> JSDocComment
+_createTestJSDoc tags = JSDocComment tokenPosnEmpty (Just "Test description") tags
 
 -- | Create a simple JSDoc tag for testing
-createTestTag :: Text -> Text -> JSDocTag
-createTestTag name desc = JSDocTag name Nothing Nothing (Just desc) tokenPosnEmpty Nothing
+_createTestTag :: Text -> Text -> JSDocTag
+_createTestTag name desc = JSDocTag name Nothing Nothing (Just desc) tokenPosnEmpty Nothing
 
 -- | Test utilities for checking tag properties
-hasTagWithName :: Text -> JSDocComment -> Bool
-hasTagWithName name jsDoc = any (\tag -> jsDocTagName tag == name) (jsDocTags jsDoc)
+_hasTagWithName :: Text -> JSDocComment -> Bool
+_hasTagWithName name jsDoc = any (\tag -> jsDocTagName tag == name) (jsDocTags jsDoc)
 
-getTagsWithName :: Text -> JSDocComment -> [JSDocTag]
-getTagsWithName name jsDoc = filter (\tag -> jsDocTagName tag == name) (jsDocTags jsDoc)
+_getTagsWithName :: Text -> JSDocComment -> [JSDocTag]
+_getTagsWithName name jsDoc = filter (\tag -> jsDocTagName tag == name) (jsDocTags jsDoc)
 
 -- | QuickCheck generators for JSDoc testing
 instance Arbitrary Text where

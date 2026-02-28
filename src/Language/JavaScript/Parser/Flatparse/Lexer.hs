@@ -78,8 +78,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import FlatParse.Basic (Pos, (<|>), many, some, satisfy, anyChar, optional, skipMany, empty)
-import Control.Applicative (pure, (*>))
-import Control.Monad (mapM_)
 import qualified FlatParse.Basic as FP
 import qualified Language.JavaScript.Parser.Flatparse.Pos as JSPos
 import Language.JavaScript.Parser.Flatparse.Primitives (JSParser, isIdentifierStart, isIdentifierContinue, isWhitespace, isDecimalDigit, isBinaryDigit, isOctalDigit, isHexDigit)
@@ -266,80 +264,6 @@ skipSome p = p *> skipMany p *> pure ()
 -- | Skip zero or more occurrences (discarding results).
 skipMany_ :: JSParser a -> JSParser ()
 skipMany_ p = skipMany p *> pure ()
-
--- | Parse decimal literal with optional fractional and exponent parts.
--- Supports ES2021 numeric separators (underscores) - preserves original format.
--- The first character must be an actual digit (not a separator).
-decimalLiteral :: JSParser Text
-decimalLiteral = do
-  first <- digitChar
-  rest <- many digitCharWithSeparator
-  let integer = Text.pack (first : rest)
-  fractional <- optional (parseChar '.' *> (Text.pack <$> many digitCharWithSeparator))
-  exponent <- optional exponentPart
-  pure (integer <> maybe "" ("." <>) fractional <> maybe "" id exponent)
-
--- | Parse decimal literal starting with @.@ (e.g., @.5@, @.123@).
--- Uses lookahead to only consume @.@ when followed by a digit,
--- preventing ambiguity with member access operator.
-dotDecimalLiteral :: JSParser Text
-dotDecimalLiteral = do
-  parseChar '.'
-  _ <- FP.lookahead digitChar
-  digits <- some digitCharWithSeparator
-  exponent <- optional exponentPart
-  pure ("." <> Text.pack digits <> maybe "" id exponent)
-
--- | Parse scientific notation (e.g., 1.5e-10).
-scientificNotation :: JSParser Text
-scientificNotation = do
-  base <- decimalLiteral
-  eChar <- (parseChar 'e' *> pure 'e') <|> (parseChar 'E' *> pure 'E')
-  sign <- optional ((satisfy (== '+') *> pure '+') <|> (satisfy (== '-') *> pure '-'))
-  exponent <- Text.pack <$> some digitChar
-  pure (base <> Text.singleton eChar <> maybe "" Text.singleton sign <> exponent)
-
--- | Parse exponent part of scientific notation.
-exponentPart :: JSParser Text
-exponentPart = do
-  eChar <- (parseChar 'e' *> pure 'e') <|> (parseChar 'E' *> pure 'E')
-  sign <- optional ((satisfy (== '+') *> pure '+') <|> (satisfy (== '-') *> pure '-'))
-  digits <- Text.pack <$> some digitChar
-  pure (Text.singleton eChar <> maybe "" Text.singleton sign <> digits)
-
--- | Parse hexadecimal literal (0x...) with optional separators.
-hexLiteral :: JSParser Text
-hexLiteral = do
-  prefix1 <- parseChar '0' *> pure '0'
-  prefix2 <- (parseChar 'x' *> pure 'x') <|> (parseChar 'X' *> pure 'X')
-  digits <- Text.pack <$> some hexDigitWithSeparator
-  -- Preserve original format including separators
-  pure (Text.pack [prefix1, prefix2] <> digits)
-
--- | Parse binary literal (0b...) with optional separators.
-binaryLiteral :: JSParser Text
-binaryLiteral = do
-  prefix1 <- parseChar '0' *> pure '0'
-  prefix2 <- (parseChar 'b' *> pure 'b') <|> (parseChar 'B' *> pure 'B')
-  digits <- Text.pack <$> some binaryDigitWithSeparator
-  -- Preserve original format including separators
-  pure (Text.pack [prefix1, prefix2] <> digits)
-
--- | Parse octal literal (0o...) with optional separators.
-octalLiteral :: JSParser Text
-octalLiteral = do
-  prefix1 <- parseChar '0' *> pure '0'
-  prefix2 <- (parseChar 'o' *> pure 'o') <|> (parseChar 'O' *> pure 'O')
-  digits <- Text.pack <$> some octalDigitWithSeparator
-  -- Preserve original format including separators
-  pure (Text.pack [prefix1, prefix2] <> digits)
-
--- | Parse BigInt literal (ends with 'n').
-bigIntLiteral :: JSParser Text
-bigIntLiteral = do
-  base <- hexLiteral <|> binaryLiteral <|> octalLiteral <|> decimalLiteral
-  _ <- parseChar 'n'
-  pure (base <> "n")
 
 -- | Parse decimal digit.
 digitChar :: JSParser Char

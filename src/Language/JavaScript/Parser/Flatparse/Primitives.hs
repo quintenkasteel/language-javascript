@@ -58,8 +58,6 @@ module Language.JavaScript.Parser.Flatparse.Primitives
   )
 where
 
-import qualified Control.Applicative as Applicative
-import Control.Monad (mapM_)
 import Data.ByteString (ByteString)
 import Data.Char (GeneralCategory(..), generalCategory, isLetter, toLower)
 import Data.Text (Text)

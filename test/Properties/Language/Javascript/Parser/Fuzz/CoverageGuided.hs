@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 -- | Coverage-guided fuzzing implementation for JavaScript parser.
 --
@@ -80,21 +81,18 @@ module Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
 where
 
 import Control.Exception (SomeException, catch)
-import Control.Monad (forM, forM_, replicateM)
+import Control.Monad (forM, replicateM)
 import Data.List (nub, sortBy, (\\))
-import qualified Data.Map.Strict as Map
 import Data.Ord (Down (..), comparing)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Language.JavaScript.Parser (readJs, renderToString)
+import Language.JavaScript.Parser (readJs)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
   ( applyRandomMutations,
     generateRandomJS,
-    mutateFuzzInput,
   )
-import System.Process (readProcessWithExitCode)
-import System.Random (randomIO, randomRIO)
+import System.Random (randomRIO)
 
 -- ---------------------------------------------------------------------
 -- Coverage Data Types
@@ -167,8 +165,8 @@ data Individual = Individual
 type Population = [Individual]
 
 -- | Default genetic algorithm configuration
-defaultGeneticConfig :: GeneticConfig
-defaultGeneticConfig =
+_defaultGeneticConfig :: GeneticConfig
+_defaultGeneticConfig =
   GeneticConfig
     { populationSize = 50,
       generations = 100,
@@ -265,15 +263,15 @@ combineCoverageData coverages =
 
 -- | Calculate coverage metrics from measurements
 calculateMetrics :: [Int] -> [BranchCoverage] -> [CoveragePath] -> CoverageMetrics
-calculateMetrics lines branches paths =
+calculateMetrics covLines branches paths =
   CoverageMetrics
-    { linesCovered = length lines,
+    { linesCovered = length covLines,
       totalLines = estimateTotalLines,
       branchesCovered = length $ filter branchTaken branches,
       totalBranches = length branches,
       pathsCovered = length paths,
       totalPaths = estimateTotalPaths,
-      coveragePercentage = calculatePercentage lines branches paths
+      coveragePercentage = calculatePercentage covLines branches paths
     }
   where
     estimateTotalLines = 1000 -- Estimate based on parser size
@@ -281,8 +279,8 @@ calculateMetrics lines branches paths =
 
 -- | Calculate overall coverage percentage
 calculatePercentage :: [Int] -> [BranchCoverage] -> [CoveragePath] -> Double
-calculatePercentage lines branches paths =
-  let linePercent = fromIntegral (length lines) / 1000.0
+calculatePercentage covLines branches paths =
+  let linePercent = fromIntegral (length covLines) / 1000.0
       branchPercent =
         fromIntegral (length $ filter branchTaken branches)
           / max 1 (fromIntegral $ length branches)
@@ -497,10 +495,10 @@ identifyPathGaps coverage =
 
 -- | Generate input targeting specific lines
 generateInputForLines :: [Int] -> IO Text.Text
-generateInputForLines lines = do
+generateInputForLines targetLines = do
   -- Generate input likely to cover specific lines
   -- This is simplified - real implementation would be more sophisticated
-  let complexity = length lines
+  let complexity = length targetLines
   if complexity > 50
     then return "function complex() { var x = {}; for(var i = 0; i < 100; i++) x[i] = i; return x; }"
     else return "var simple = 42;"

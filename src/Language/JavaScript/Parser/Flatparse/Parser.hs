@@ -104,7 +104,6 @@ import qualified Language.JavaScript.Parser.Flatparse.Lexer as Lexer
 import qualified Language.JavaScript.Parser.Flatparse.Pos as JSPos
 import Language.JavaScript.Parser.Flatparse.Primitives
 import Language.JavaScript.Parser.Flatparse.Statement (statementList, moduleItemList)
-import qualified Language.JavaScript.Parser.Flatparse.Statement as Statement
 
 -- ---------------------------------------------------------------------
 -- Parse Result Types
@@ -129,7 +128,7 @@ data ParseSuccess a = ParseSuccess
   } deriving (Eq, Show)
 
 instance NFData a => NFData (ParseSuccess a) where
-  rnf (ParseSuccess r rem con) = rnf r `seq` rnf rem `seq` rnf con
+  rnf (ParseSuccess r remaining con) = rnf r `seq` rnf remaining `seq` rnf con
 
 -- | Parse failure with error information.
 data ParseFailure = ParseFailure
@@ -172,8 +171,8 @@ parseProgramText = parseProgram
 parseProgramByteString :: ByteString -> ParseResult JSAST
 parseProgramByteString input =
   case runJSParser (Lexer.whitespace *> program) input of
-    Right (result, remaining, consumed) ->
-      ParseOK (ParseSuccess (postProcessAST input result) remaining consumed)
+    Right (result, rest, consumed) ->
+      ParseOK (ParseSuccess (postProcessAST input result) rest consumed)
     Left err ->
       ParseError (ParseFailure err input 0)
 
@@ -204,8 +203,8 @@ parseModuleProgramText = parseModuleProgram
 parseModuleProgramByteString :: ByteString -> ParseResult JSAST
 parseModuleProgramByteString input =
   case runJSParser (Lexer.whitespace *> moduleProgram) input of
-    Right (result, remaining, consumed) ->
-      ParseOK (ParseSuccess (postProcessAST input result) remaining consumed)
+    Right (result, rest, consumed) ->
+      ParseOK (ParseSuccess (postProcessAST input result) rest consumed)
     Left err ->
       ParseError (ParseFailure err input 0)
 
@@ -220,8 +219,8 @@ parseExpressionText = parseExpression
 parseExpressionByteString :: ByteString -> ParseResult JSExpression
 parseExpressionByteString input =
   case runJSParser (Lexer.whitespace *> expression) input of
-    Right (result, remaining, consumed) ->
-      ParseOK (ParseSuccess (postProcessAST input result) remaining consumed)
+    Right (result, rest, consumed) ->
+      ParseOK (ParseSuccess (postProcessAST input result) rest consumed)
     Left err ->
       ParseError (ParseFailure err input 0)
 
@@ -231,8 +230,8 @@ parseExpressionByteString input =
 
 -- | Format parse error for human-readable display.
 formatParseError :: ParseFailure -> Text
-formatParseError (ParseFailure err input offset) =
-  case err of
+formatParseError (ParseFailure pErr _pInput _pOffset) =
+  case pErr of
     SyntaxError pos msg suggestions ->
       Text.unlines $
         [ "Syntax Error at " <> Text.pack (JSPos.showPos pos)

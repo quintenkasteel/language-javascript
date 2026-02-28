@@ -65,9 +65,8 @@ module Properties.Language.Javascript.Parser.Fuzzing
 where
 
 import Control.Exception (SomeException, catch)
-import Control.Monad (unless, when)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
-import Data.List (intercalate)
 import qualified Data.Text as Text
 import qualified Data.Time as Data.Time
 -- Import our fuzzing infrastructure
@@ -132,7 +131,7 @@ getFuzzTestConfig = do
 -- | Main fuzzing test suite - adapts based on environment
 testFuzzingSuite :: Spec
 testFuzzingSuite = describe "Comprehensive Fuzzing Suite" $ do
-  runIO $ do
+  _ <- runIO $ do
     (env, config) <- getFuzzTestConfig
     putStrLn $ "Running fuzzing tests in " ++ show env ++ " mode"
     return (env, config)
@@ -259,8 +258,7 @@ testPropertyBasedFuzzing config = describe "Property-Based Fuzzing" $ do
   it "should validate parse-print round-trip properties" $
     property $
       \(ValidJSInput input) ->
-        let jsText = Text.pack input
-         in case parse input "test" of
+        case parse input "test" of
               Right ast@(AST.JSAstProgram _ _) ->
                 let rendered = renderToString ast
                     reparsed = parse rendered "test"
@@ -272,7 +270,7 @@ testPropertyBasedFuzzing config = describe "Property-Based Fuzzing" $ do
     property $
       \(ValidJSInput input) ->
         case parse input "test" of
-          Right ast@(AST.JSAstProgram stmts _) ->
+          Right ast@(AST.JSAstProgram _stmts _) ->
             validateASTInvariants ast
           _ -> True
 
@@ -458,8 +456,8 @@ updateFuzzingCorpus = describe "Corpus Updates" $ do
       UpdateFailure msg -> expectationFailure $ "Corpus update failed: " ++ msg
 
   it "should maintain corpus size limits" $ do
-    corpusSize <- liftIO getCorpusSize
-    corpusSize `shouldSatisfy` (< 10000) -- Keep corpus manageable
+    currentCorpusSize <- liftIO getCorpusSize
+    currentCorpusSize `shouldSatisfy` (< 10000) -- Keep corpus manageable
 
 -- ---------------------------------------------------------------------
 -- Helper Functions and Utilities
@@ -487,7 +485,7 @@ testInputSafety input = do
       Right _ -> return (ParseError "Unrecognized AST structure")
 
     handleException :: SomeException -> IO SafetyTestResult
-    handleException ex = return CrashDetected
+    handleException _ex = return CrashDetected
 
 -- | Validate AST structural invariants
 validateASTInvariants :: AST.JSAST -> Bool
@@ -507,7 +505,7 @@ validateASTInvariants (AST.JSAstProgram stmts _) =
       AST.JSFunction _ _ _ _ _ _ _ -> True
       AST.JSIf _ _ _ _ _ -> True
       AST.JSIfElse _ _ _ _ _ _ _ -> True
-      AST.JSLabelled _ _ stmt -> validateStatement stmt
+      AST.JSLabelled _ _ innerStmt -> validateStatement innerStmt
       AST.JSEmptyStatement _ -> True
       AST.JSExpressionStatement _ _ -> True
       AST.JSAssignStatement _ _ _ _ -> True
@@ -520,16 +518,17 @@ validateASTInvariants (AST.JSAstProgram stmts _) =
       AST.JSWhile _ _ _ _ _ -> True
       AST.JSWith _ _ _ _ _ _ -> True
       _ -> False -- Unknown statement type
+validateASTInvariants _ = False
 
 -- | Time a parsing operation
 timeParsingOperation :: String -> Int -> IO Double
 timeParsingOperation input iterations = do
-  startTime <- getCurrentTime
+  startTime <- getSimpleTime
   mapM_ (\_ -> case parse input "test" of Right (AST.JSAstProgram _ _) -> return (); _ -> return ()) [1 .. iterations]
-  endTime <- getCurrentTime
+  endTime <- getSimpleTime
   return $ realToFrac (diffUTCTime endTime startTime)
   where
-    getCurrentTime = return $ toEnum 0 -- Simplified timing
+    getSimpleTime = return $ toEnum 0 -- Simplified timing
 
 -- | Load known edge cases from corpus
 loadKnownEdgeCases :: IO [Text.Text]
@@ -579,7 +578,7 @@ getCorpusSize = return 100 -- Simplified corpus size
 
 -- | Validate performance baseline
 validatePerformanceBaseline :: FuzzTestConfig -> IO ()
-validatePerformanceBaseline config = do
+validatePerformanceBaseline _config = do
   let testInput = "var x = 42; function f() { return x * 2; }"
   duration <- timeParsingOperation testInput 10
   when (duration > 0.1) $ do
@@ -608,6 +607,7 @@ instance Arbitrary ValidJSInput where
 -- | Validate that an AST structure is well-formed
 isValidAST :: AST.JSAST -> Bool
 isValidAST (AST.JSAstProgram stmts _) = all isValidStatement stmts
+isValidAST (AST.JSAstModule _ _) = True
 isValidAST (AST.JSAstStatement stmt _) = isValidStatement stmt
 isValidAST (AST.JSAstExpression expr _) = isValidExpression expr
 isValidAST (AST.JSAstLiteral lit _) = isValidLiteral lit
@@ -669,8 +669,8 @@ isValidLiteral expr = case expr of
 diffUTCTime :: Int -> Int -> Double
 diffUTCTime end start = fromIntegral (end - start)
 
-getCurrentTime :: IO Int
-getCurrentTime = return 0
+_getCurrentTime :: IO Int
+_getCurrentTime = return 0
 
 -- | Handle fuzzing exceptions by creating a dummy result
 handleFuzzingException :: SomeException -> IO FuzzResults

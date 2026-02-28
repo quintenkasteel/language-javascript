@@ -8,19 +8,12 @@ where
 import Data.List (isInfixOf)
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
-  ( JSAST (..),
-    JSAnnot,
-    JSArrayElement (..),
-    JSAssignOp (..),
-    JSBlock (..),
+  ( JSArrayElement (..),
     JSCommaList (..),
     JSCommaTrailingList (..),
-    JSExpression (..),
     JSIdent (..),
     JSObjectProperty (..),
     JSPropertyName (..),
-    JSSemi (..),
-    JSStatement (..),
     JSVarInitializer (..),
   )
 import Language.JavaScript.Parser.Parser

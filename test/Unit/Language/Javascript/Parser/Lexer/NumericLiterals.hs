@@ -45,9 +45,7 @@ import qualified Data.List as List
 
 import Language.JavaScript.Parser.AST
   ( JSAST (..),
-    JSAnnot,
     JSExpression (..),
-    JSSemi,
     JSStatement (..),
     JSUnaryOp (..),
   )

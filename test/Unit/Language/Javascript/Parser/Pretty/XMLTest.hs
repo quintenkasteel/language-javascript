@@ -21,7 +21,6 @@ module Unit.Language.Javascript.Parser.Pretty.XMLTest
   )
 where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Language.JavaScript.Parser.AST as AST
@@ -33,8 +32,8 @@ import Test.Hspec
 noPos :: TokenPosn
 noPos = TokenPn 0 0 0
 
-noAnnot :: AST.JSAnnot
-noAnnot = AST.JSNoAnnot
+_noAnnot :: AST.JSAnnot
+_noAnnot = AST.JSNoAnnot
 
 testAnnot :: AST.JSAnnot
 testAnnot = AST.JSAnnot noPos []
@@ -288,8 +287,8 @@ testStatementSerialization = describe "Statement Serialization" $ do
   describe "variable declarations" $ do
     it "serializes var declarations" $ do
       let ident = AST.JSIdentifier testAnnot "x"
-      let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
-      let varInit = AST.JSVarInitExpression ident init
+      let varInitializer = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
+      let varInit = AST.JSVarInitExpression ident varInitializer
       let stmt = AST.JSVariable testAnnot (AST.JSLOne varInit) AST.JSSemiAuto
       let xml = PXML.renderStatementToXML stmt
       xml `shouldSatisfy` Text.isInfixOf "<JSVariable>"
@@ -303,8 +302,8 @@ testStatementSerialization = describe "Statement Serialization" $ do
 
     it "serializes const declarations" $ do
       let ident = AST.JSIdentifier testAnnot "x"
-      let init = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
-      let varInit = AST.JSVarInitExpression ident init
+      let constInitializer = AST.JSVarInit testAnnot (AST.JSDecimal testAnnot 42)
+      let varInit = AST.JSVarInitExpression ident constInitializer
       let stmt = AST.JSConstant testAnnot (AST.JSLOne varInit) AST.JSSemiAuto
       let xml = PXML.renderStatementToXML stmt
       xml `shouldSatisfy` Text.isInfixOf "<JSConstant>"

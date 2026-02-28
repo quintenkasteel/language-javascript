@@ -14,8 +14,6 @@ module Unit.Language.Javascript.Parser.Validation.ControlFlow
   )
 where
 
-import Data.Either (isLeft, isRight)
-import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Validator
@@ -28,8 +26,8 @@ noAnnot = JSNoAnnot
 auto :: JSSemi
 auto = JSSemiAuto
 
-noPos :: TokenPosn
-noPos = TokenPn 0 0 0
+_noPos :: TokenPosn
+_noPos = TokenPn 0 0 0
 
 testControlFlowValidation :: Spec
 testControlFlowValidation = describe "Control Flow Validation Edge Cases" $ do

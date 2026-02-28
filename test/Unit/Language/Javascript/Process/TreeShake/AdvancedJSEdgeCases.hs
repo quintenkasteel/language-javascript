@@ -23,16 +23,14 @@ module Unit.Language.Javascript.Process.TreeShake.AdvancedJSEdgeCases
   )
 where
 
-import Control.Lens ((^.), (&), (.~))
+import Control.Lens ((&), (.~))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.Parser (parse, parseModule)
+import Language.JavaScript.Parser.Parser (parse)
 import Language.JavaScript.Pretty.Printer (renderToString)
 import Language.JavaScript.Process.TreeShake
 import Language.JavaScript.Process.TreeShake.Types
-  ( _dynamicAccessObjects, _hasEvalCall, _evalCallCount, defaultTreeShakeOptions
-  , preserveSideEffects, TreeShakeOptions )
+  ( defaultTreeShakeOptions, preserveSideEffects )
 import Test.Hspec
 import Test.QuickCheck
 
@@ -82,12 +80,12 @@ testProxyReflectPatterns = describe "Proxy/Reflect Dynamic Access" $ do
 
     case parse source "proxy-patterns" of
       Right ast -> do
-        let analysis = analyzeUsage ast
+        let _analysis = analyzeUsage ast
         let optimized = treeShake defaultOptions ast
         let optimizedSource = renderToString optimized
 
         -- Conservative tree shaking may not detect complex proxy patterns
-        -- "usedObject" `shouldSatisfy` (`Set.member` (_dynamicAccessObjects analysis))  -- May not be detected yet
+        -- "usedObject" `shouldSatisfy` (`Set.member` (_dynamicAccessObjects _analysis))  -- May not be detected yet
 
         -- Proxy handler and Reflect usage should be preserved
         optimizedSource `shouldContain` "Proxy"
@@ -695,13 +693,13 @@ testMetaprogrammingPatterns = describe "Metaprogramming Patterns" $ do
 
     case parse source "property-descriptors" of
       Right ast -> do
-        let analysis = analyzeUsage ast
+        let _analysis = analyzeUsage ast
         let optimized = treeShake defaultOptions ast
         let optimizedSource = renderToString optimized
 
         -- Object with dynamic property detection (conservative behavior)
         -- Note: Current implementation may not detect all dynamic access patterns
-        -- "usedObject" `shouldSatisfy` (`Set.member` (_dynamicAccessObjects analysis))
+        -- "usedObject" `shouldSatisfy` (`Set.member` (_dynamicAccessObjects _analysis))
 
         -- Used object and its property definition should be preserved
         optimizedSource `shouldContain` "usedObject"
