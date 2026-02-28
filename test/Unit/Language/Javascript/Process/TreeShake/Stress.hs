@@ -15,7 +15,6 @@ where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text as Text
 import Control.Lens ((.~), (&))
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Parser (parse)
@@ -178,8 +177,6 @@ testPathologicalCases = describe "Pathological Cases" $ do
         astShouldNotContainIdentifier optimized "Component1"
       Left err -> expectationFailure $ "Parse failed: " ++ err
 
--- Helper functions (simplified versions)
-
 -- | Check if AST contains specific identifier in its structure.
 astShouldContainIdentifier :: JSAST -> ByteString -> Expectation
 astShouldContainIdentifier ast identifier =
@@ -199,7 +196,7 @@ astContainsIdentifier :: JSAST -> ByteString -> Bool
 astContainsIdentifier ast identifier = case ast of
   JSAstProgram statements _ ->
     any (statementContainsIdentifier identifier) statements
-  _ -> False  -- Simplified for stress tests
+  _ -> False
 
 -- | Check if statement contains identifier.
 statementContainsIdentifier :: ByteString -> JSStatement -> Bool
@@ -214,7 +211,7 @@ statementContainsIdentifier identifier stmt = case stmt of
     expressionContainsIdentifier identifier expr
   JSStatementBlock _ stmts _ _ ->
     any (statementContainsIdentifier identifier) stmts
-  _ -> False  -- Simplified
+  _ -> False
 
 -- | Check if statement block contains identifier.
 blockContainsIdentifier :: ByteString -> JSBlock -> Bool
@@ -239,7 +236,7 @@ expressionContainsIdentifier identifier expr = case expr of
   JSAssignExpression lhs _ rhs ->
     expressionContainsIdentifier identifier lhs ||
     expressionContainsIdentifier identifier rhs
-  _ -> False  -- Simplified
+  _ -> False
 
 -- | Check if variable initializer contains identifier.
 initializerContainsIdentifier :: ByteString -> JSVarInitializer -> Bool
