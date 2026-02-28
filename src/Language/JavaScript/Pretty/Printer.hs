@@ -42,7 +42,7 @@ import Data.Semigroup ((<>))
 import qualified Blaze.ByteString.Builder.Char.Utf8 as BS
 import qualified Codec.Binary.UTF8.String as US
 import qualified Data.ByteString.Lazy as LB
-import Data.List
+import Data.List (foldl')
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Text.Lazy (Text)
