@@ -45,12 +45,15 @@ where
 import Control.DeepSeq (NFData (..), deepseq, force)
 import Control.Exception (bracket, evaluate)
 import Control.Monad (forM_, replicateM, when)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import qualified Data.Text as Text
-import Data.Time.Clock (diffUTCTime, getCurrentTime)
+import qualified Data.Text.Encoding as Text
+import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
 import Data.Word (Word64)
 import qualified GHC.Stats as Stats
 import qualified Language.JavaScript.Parser.AST as AST
-import Language.JavaScript.Parser.Parser (parseProgram, parseUsing)
+import Language.JavaScript.Parser.Parser (parseBS)
 import System.Mem (performGC)
 import Test.Hspec
 
@@ -213,7 +216,7 @@ linearMemoryGrowthTests = describe "Linear memory growth validation" $ do
     metrics <- mapM measureMemoryForSize sizes
     metrics `shouldSatisfy` validateLinearScaling
 
-  it "prevents quadratic memory growth O(n²)" $ do
+  it "prevents quadratic memory growth O(n^2)" $ do
     let sizes = [100 * 1024, 400 * 1024, 900 * 1024] -- Square relationships
     metrics <- mapM measureMemoryForSize sizes
     metrics `shouldSatisfy` validateNotQuadratic
@@ -237,52 +240,59 @@ safeGetRTSStats = do
     else return Nothing
 
 -- | Measure memory usage during JavaScript parsing
-measureParseMemory :: Text.Text -> IO MemoryMetrics
+measureParseMemory :: ByteString -> IO MemoryMetrics
 measureParseMemory source = do
-  performGC -- Baseline GC
+  performGC
   initialStats <- safeGetRTSStats
   startTime <- getCurrentTime
 
-  let sourceStr = Text.unpack source
-  result <- evaluate $ force (parseUsing parseProgram sourceStr "memory-test")
+  result <- evaluate $ force (parseBS source)
   result `deepseq` return ()
 
   endTime <- getCurrentTime
   finalStats <- safeGetRTSStats
 
-  let parseTimeMs = fromRational (toRational (diffUTCTime endTime startTime)) * 1000
-  let inputSize = Text.length source
+  buildMemoryMetrics initialStats finalStats startTime endTime (BS.length source)
 
-  case (initialStats, finalStats) of
-    (Just initial, Just final) -> do
-      let bytesAllocated = Stats.max_live_bytes final
-      let bytesUsed = Stats.allocated_bytes final - Stats.allocated_bytes initial
-      let gcCount = fromIntegral $ Stats.gcs final - Stats.gcs initial
-      let overheadRatio = fromIntegral bytesUsed / fromIntegral inputSize
+-- | Build 'MemoryMetrics' from RTS stats captured before and after a parse
+buildMemoryMetrics
+  :: Maybe Stats.RTSStats
+  -> Maybe Stats.RTSStats
+  -> UTCTime
+  -> UTCTime
+  -> Int
+  -> IO MemoryMetrics
+buildMemoryMetrics (Just initial) (Just final) startTime endTime inputSize =
+  return
+    MemoryMetrics
+      { memoryBytesAllocated = Stats.max_live_bytes final,
+        memoryBytesUsed = Stats.allocated_bytes final - Stats.allocated_bytes initial,
+        memoryGCCollections = fromIntegral $ Stats.gcs final - Stats.gcs initial,
+        memoryMaxResidency = Stats.max_live_bytes final,
+        memoryParseTime = parseTimeMs startTime endTime,
+        memoryInputSize = inputSize,
+        memoryOverheadRatio = overheadRatio
+      }
+  where
+    overheadRatio = fromIntegral (Stats.allocated_bytes final - Stats.allocated_bytes initial) / fromIntegral inputSize
+buildMemoryMetrics _ _ startTime endTime inputSize =
+  return
+    MemoryMetrics
+      { memoryBytesAllocated = estimatedMemory,
+        memoryBytesUsed = estimatedMemory,
+        memoryGCCollections = 0,
+        memoryMaxResidency = estimatedMemory,
+        memoryParseTime = parseTimeMs startTime endTime,
+        memoryInputSize = inputSize,
+        memoryOverheadRatio = 10.0
+      }
+  where
+    estimatedMemory = fromIntegral inputSize * 10
 
-      return
-        MemoryMetrics
-          { memoryBytesAllocated = bytesAllocated,
-            memoryBytesUsed = bytesUsed,
-            memoryGCCollections = gcCount,
-            memoryMaxResidency = Stats.max_live_bytes final,
-            memoryParseTime = parseTimeMs,
-            memoryInputSize = inputSize,
-            memoryOverheadRatio = overheadRatio
-          }
-    _ -> do
-      -- RTS stats not available, provide reasonable defaults
-      let estimatedMemory = fromIntegral inputSize * 10 -- Rough estimate
-      return
-        MemoryMetrics
-          { memoryBytesAllocated = estimatedMemory,
-            memoryBytesUsed = estimatedMemory,
-            memoryGCCollections = 0,
-            memoryMaxResidency = estimatedMemory,
-            memoryParseTime = parseTimeMs,
-            memoryInputSize = inputSize,
-            memoryOverheadRatio = 10.0 -- Conservative estimate
-          }
+-- | Calculate parse time in milliseconds from start and end timestamps
+parseTimeMs :: UTCTime -> UTCTime -> Double
+parseTimeMs startTime endTime =
+  fromRational (toRational (diffUTCTime endTime startTime)) * 1000
 
 -- | Memory leak detection across multiple iterations
 data LeakDetectionResult = NoMemoryLeaks | MemoryLeakDetected Word64
@@ -293,42 +303,44 @@ detectMemoryLeaks :: MemoryTestConfig -> IO LeakDetectionResult
 detectMemoryLeaks config = do
   performGC
   initialMemory <- getCurrentMemoryUsage
-
-  let iterations = configIterations config
   testCode <- generateTestJavaScript (configFileSize config)
 
-  -- Run multiple parsing iterations
-  forM_ [1 .. iterations] $ \_ -> do
-    _ <- evaluate $ force (parseUsing parseProgram (Text.unpack testCode) "leak-test")
+  forM_ [1 .. configIterations config] $ \_ -> do
+    _ <- evaluate $ force (parseBS testCode)
     when (configGCBetweenTests config) performGC
 
   performGC
   finalMemory <- getCurrentMemoryUsage
 
-  let memoryGrowth = finalMemory - initialMemory
-  let leakThreshold = 100 * 1024 * 1024 -- 100MB threshold
-  if memoryGrowth > leakThreshold
-    then return (MemoryLeakDetected memoryGrowth)
-    else return NoMemoryLeaks
+  return (classifyLeakResult initialMemory finalMemory)
+
+-- | Classify whether memory growth indicates a leak
+classifyLeakResult :: Word64 -> Word64 -> LeakDetectionResult
+classifyLeakResult initialMemory finalMemory
+  | memoryGrowth > leakThreshold = MemoryLeakDetected memoryGrowth
+  | otherwise = NoMemoryLeaks
+  where
+    memoryGrowth = finalMemory - initialMemory
+    leakThreshold = 100 * 1024 * 1024
 
 -- | Validate linear memory growth pattern
 validateLinearGrowth :: [MemoryMetrics] -> Bool
-validateLinearGrowth metrics =
-  case metrics of
-    [] -> True
-    [_] -> True
-    (_ : m2 : rest) ->
-      let ratios = zipWith calculateGrowthRatio (m2 : rest) rest
-          avgRatio = sum ratios / fromIntegral (length ratios)
-          variance = sum (map (\r -> (r - avgRatio) ** 2) ratios) / fromIntegral (length ratios)
-       in variance < 0.5 -- Low variance indicates linear growth
+validateLinearGrowth [] = True
+validateLinearGrowth [_] = True
+validateLinearGrowth (_ : m2 : rest) =
+  variance < 0.5
+  where
+    ratios = zipWith calculateGrowthRatio (m2 : rest) rest
+    avgRatio = sum ratios / fromIntegral (length ratios)
+    variance = sum (map (\r -> (r - avgRatio) ** 2) ratios) / fromIntegral (length ratios)
 
 -- | Calculate growth ratio between memory metrics
 calculateGrowthRatio :: MemoryMetrics -> MemoryMetrics -> Double
 calculateGrowthRatio m1 m2 =
-  let sizeRatio = fromIntegral (memoryInputSize m2) / fromIntegral (memoryInputSize m1)
-      memoryRatio = fromIntegral (memoryBytesUsed m2) / fromIntegral (memoryBytesUsed m1)
-   in memoryRatio / sizeRatio
+  memoryRatio / sizeRatio
+  where
+    sizeRatio = fromIntegral (memoryInputSize m2) / fromIntegral (memoryInputSize m1)
+    memoryRatio = fromIntegral (memoryBytesUsed m2) / fromIntegral (memoryBytesUsed m1)
 
 -- | Current memory usage in bytes
 getCurrentMemoryUsage :: IO Word64
@@ -341,25 +353,25 @@ getCurrentMemoryUsage = do
     else return 1000000 -- Return 1MB as reasonable default when stats not available
 
 -- | Evaluate parse with cleanup
-evaluateWithCleanup :: Text.Text -> IO (Either String AST.JSAST)
+evaluateWithCleanup :: ByteString -> IO (Either String AST.JSAST)
 evaluateWithCleanup source =
   bracket
     (return ())
     (\_ -> performGC)
     ( \_ -> do
-        let sourceStr = Text.unpack source
-        result <- evaluate $ force (parseUsing parseProgram sourceStr "cleanup-test")
+        result <- evaluate $ force (parseBS source)
         result `deepseq` return result
     )
 
 -- | Calculate memory variance across metrics
 calculateMemoryVariance :: [MemoryMetrics] -> Double
 calculateMemoryVariance metrics =
-  let memories = map (fromIntegral . memoryBytesUsed) metrics
-      avgMemory = sum memories / fromIntegral (length memories)
-      variances = map (\m -> (m - avgMemory) ** 2) memories
-      variance = sum variances / fromIntegral (length variances)
-   in sqrt variance / avgMemory
+  sqrt variance / avgMemory
+  where
+    memories = map (fromIntegral . memoryBytesUsed) metrics
+    avgMemory = sum memories / fromIntegral (length memories)
+    variances = map (\m -> (m - avgMemory) ** 2) memories
+    variance = sum variances / fromIntegral (length variances)
 
 -- | Check if result is within memory limit
 isWithinMemoryLimit :: Bool -> Bool
@@ -368,17 +380,16 @@ isWithinMemoryLimit = id
 -- | Run parsing with memory limit enforcement
 runWithMemoryLimit :: MemoryTestConfig -> IO Bool
 runWithMemoryLimit config = do
-  let limitBytes = fromIntegral (configMaxMemoryMB config) * 1024 * 1024
   testCode <- generateTestJavaScript (configFileSize config)
-
   initialMemory <- getCurrentMemoryUsage
-  _ <- evaluate $ force (parseUsing parseProgram (Text.unpack testCode) "limit-test")
+  _ <- evaluate $ force (parseBS testCode)
   finalMemory <- getCurrentMemoryUsage
-
   return ((finalMemory - initialMemory) <= limitBytes)
+  where
+    limitBytes = fromIntegral (configMaxMemoryMB config) * 1024 * 1024
 
 -- | Measure and cleanup memory after parsing
-measureAndCleanup :: Text.Text -> IO Word64
+measureAndCleanup :: ByteString -> IO Word64
 measureAndCleanup source = do
   _ <- evaluateWithCleanup source
   getCurrentMemoryUsage
@@ -386,15 +397,15 @@ measureAndCleanup source = do
 -- | Calculate memory trend across measurements
 calculateMemoryTrend :: [Word64] -> Double
 calculateMemoryTrend measurements =
-  let indices = map fromIntegral [0 .. length measurements - 1]
-      values = map fromIntegral measurements
-      n = fromIntegral (length measurements)
-      sumX = sum indices
-      sumY = sum values
-      sumXY = sum (zipWith (*) indices values)
-      sumX2 = sum (map (** 2) indices)
-      slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX ** 2)
-   in slope
+  (n * sumXY - sumX * sumY) / (n * sumX2 - sumX ** 2)
+  where
+    indices = map fromIntegral [0 .. length measurements - 1]
+    values = map fromIntegral measurements
+    n = fromIntegral (length measurements)
+    sumX = sum indices
+    sumY = sum values
+    sumXY = sum (zipWith (*) indices values)
+    sumX2 = sum (map (** 2) indices)
 
 -- | Check if memory pattern is stable
 isStableMemoryPattern :: Double -> Bool
@@ -403,26 +414,26 @@ isStableMemoryPattern trend = abs trend < 1000000 -- <1MB growth per iteration
 -- | Measure streaming memory usage
 measureStreamingMemory :: MemoryTestConfig -> IO [MemoryMetrics]
 measureStreamingMemory config = do
-  let chunkSize = configStreamChunkSize config
-  chunks <- createStreamingTestData chunkSize 10 -- 10 chunks
+  chunks <- createStreamingTestData (configStreamChunkSize config) 10
   mapM processStreamChunk chunks
 
 -- | Validate constant memory for streaming
 validateConstantMemoryStreaming :: [MemoryMetrics] -> Bool
 validateConstantMemoryStreaming metrics =
-  let memories = map memoryBytesUsed metrics
-      maxMemory = maximum memories
-      minMemory = minimum memories
-      ratio = fromIntegral maxMemory / fromIntegral minMemory
-   in ratio < (1.5 :: Double) -- Memory should stay within 50% range
+  ratio < (1.5 :: Double)
+  where
+    memories = map memoryBytesUsed metrics
+    maxMemory = maximum memories
+    minMemory = minimum memories
+    ratio = fromIntegral maxMemory / fromIntegral minMemory
 
 -- | Process streaming chunk and measure memory
-processStreamChunk :: Text.Text -> IO MemoryMetrics
-processStreamChunk chunk = measureParseMemory chunk
+processStreamChunk :: ByteString -> IO MemoryMetrics
+processStreamChunk = measureParseMemory
 
 -- | Create streaming test data chunks
-createStreamingTestData :: Int -> Int -> IO [Text.Text]
-createStreamingTestData chunkSize numChunks = do
+createStreamingTestData :: Int -> Int -> IO [ByteString]
+createStreamingTestData chunkSize numChunks =
   replicateM numChunks (generateTestJavaScript chunkSize)
 
 -- | Measure streaming memory for large file
@@ -432,33 +443,30 @@ measureStreamingForFile config = do
   measureParseMemory testCode
 
 -- | Create incremental test data
-createIncrementalTestData :: Int -> IO [Text.Text]
+createIncrementalTestData :: Int -> IO [ByteString]
 createIncrementalTestData chunkSize = do
   baseCode <- generateTestJavaScript chunkSize
-  let chunks = map (\i -> Text.take (i * chunkSize `div` 10) baseCode) [1 .. 10]
+  let chunks = map (\i -> BS.take (i * chunkSize `div` 10) baseCode) [1 .. 10]
   return chunks
 
 -- | Measure incremental parsing memory
-measureIncrementalParsing :: [Text.Text] -> IO [MemoryMetrics]
-measureIncrementalParsing chunks = mapM measureParseMemory chunks
+measureIncrementalParsing :: [ByteString] -> IO [MemoryMetrics]
+measureIncrementalParsing = mapM measureParseMemory
 
 -- | Validate incremental memory usage
 validateIncrementalMemoryUsage :: [MemoryMetrics] -> Bool
-validateIncrementalMemoryUsage metrics = validateLinearGrowth metrics
+validateIncrementalMemoryUsage = validateLinearGrowth
 
 -- | Simulate memory pressure conditions
 simulateMemoryPressure :: MemoryTestConfig -> IO Bool
 simulateMemoryPressure config = do
-  -- Create memory pressure by allocating large structures
-  let pressureSize = configMaxMemoryMB config * 1024 * 1024 `div` 2
   pressureData <- evaluate $ force $ replicate pressureSize (42 :: Int)
-
   testCode <- generateTestJavaScript (configFileSize config)
-  result <- evaluate $ force (parseUsing parseProgram (Text.unpack testCode) "pressure-test")
-
-  -- Cleanup pressure data
+  result <- evaluate $ force (parseBS testCode)
   pressureData `deepseq` return ()
   result `deepseq` return True
+  where
+    pressureSize = configMaxMemoryMB config * 1024 * 1024 `div` 2
 
 -- | Check if handles memory pressure gracefully
 handlesMemoryPressureGracefully :: Bool -> Bool
@@ -478,9 +486,10 @@ validateGracefulDegradation metrics =
 -- | Apply memory pressure and measure impact
 applyMemoryPressure :: MemoryTestConfig -> IO ()
 applyMemoryPressure config = do
-  let pressureSize = configMaxMemoryMB config * 1024 * 1024 `div` 4
   pressureData <- evaluate $ force $ replicate pressureSize (1 :: Int)
   pressureData `deepseq` return ()
+  where
+    pressureSize = configMaxMemoryMB config * 1024 * 1024 `div` 4
 
 -- | Validate linear scaling characteristics
 validateLinearScaling :: [MemoryMetrics] -> Bool
@@ -488,39 +497,39 @@ validateLinearScaling = validateLinearGrowth
 
 -- | Validate that growth is not quadratic
 validateNotQuadratic :: [MemoryMetrics] -> Bool
-validateNotQuadratic metrics =
-  case metrics of
-    (m1 : m2 : m3 : _) ->
-      let ratio1 = calculateGrowthRatio m1 m2
-          ratio2 = calculateGrowthRatio m2 m3
-          -- If quadratic, second ratio would be much larger
-          quadraticFactor = ratio2 / ratio1
-       in quadraticFactor < 2.0 -- Not growing quadratically
-    _ -> True
+validateNotQuadratic (m1 : m2 : m3 : _) =
+  quadraticFactor < 2.0
+  where
+    ratio1 = calculateGrowthRatio m1 m2
+    ratio2 = calculateGrowthRatio m2 m3
+    quadraticFactor = ratio2 / ratio1
+validateNotQuadratic _ = True
 
--- | Generate test JavaScript code of specific size
-generateTestJavaScript :: Int -> IO Text.Text
-generateTestJavaScript targetSize = do
-  let basePattern =
-        Text.unlines
-          [ "function processData(data, config) {",
-            "  var result = [];",
-            "  var options = config || {};",
-            "  for (var i = 0; i < data.length; i++) {",
-            "    var item = data[i];",
-            "    if (item && typeof item === 'object') {",
-            "      var processed = transform(item, options);",
-            "      if (validate(processed)) {",
-            "        result.push(processed);",
-            "      }",
-            "    }",
-            "  }",
-            "  return result;",
-            "}"
-          ]
-  let patternSize = Text.length basePattern
-  let repetitions = max 1 (targetSize `div` patternSize)
-  return $ Text.concat $ replicate repetitions basePattern
+-- | Generate test JavaScript code of specific size as UTF-8 'ByteString'
+generateTestJavaScript :: Int -> IO ByteString
+generateTestJavaScript targetSize =
+  return $ BS.concat $ replicate repetitions encodedPattern
+  where
+    basePattern =
+      Text.unlines
+        [ "function processData(data, config) {",
+          "  var result = [];",
+          "  var options = config || {};",
+          "  for (var i = 0; i < data.length; i++) {",
+          "    var item = data[i];",
+          "    if (item && typeof item === 'object') {",
+          "      var processed = transform(item, options);",
+          "      if (validate(processed)) {",
+          "        result.push(processed);",
+          "      }",
+          "    }",
+          "  }",
+          "  return result;",
+          "}"
+        ]
+    encodedPattern = Text.encodeUtf8 basePattern
+    patternSize = BS.length encodedPattern
+    repetitions = max 1 (targetSize `div` patternSize)
 
 -- | Memory profiler for detailed analysis
 runMemoryProfiler :: IO [MemoryMetrics]
