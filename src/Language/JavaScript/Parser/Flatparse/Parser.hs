@@ -403,8 +403,8 @@ buildCommentMap entries offsets = IntMap.map reverse (go entries IntMap.empty)
 
 -- | Calculate the end byte offset of a comment annotation.
 commentEndOffset :: Int -> CommentAnnotation -> Int
-commentEndOffset start (CommentA _ s) = start + length s
-commentEndOffset start (WhiteSpace _ s) = start + length s
+commentEndOffset start (CommentA _ s) = start + BS.length s
+commentEndOffset start (WhiteSpace _ s) = start + BS.length s
 commentEndOffset start NoComment = start
 
 -- | Binary search for the smallest offset >= target.

@@ -54,6 +54,7 @@ where
 
 import Control.DeepSeq (deepseq)
 import Control.Monad (forM_)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Data (dataTypeOf, toConstr)
 import Data.List (nub, sort)
@@ -679,13 +680,13 @@ instance Arbitrary ValidJSPositionPair where
   arbitrary = ValidJSPositionPair <$> genValidPositionPair
 
 -- Alpha equivalence generators
-newtype ValidJSFunctionWithVars = ValidJSFunctionWithVars (AST.JSStatement, String, String)
+newtype ValidJSFunctionWithVars = ValidJSFunctionWithVars (AST.JSStatement, ByteString, ByteString)
   deriving (Show)
 
 instance Arbitrary ValidJSFunctionWithVars where
   arbitrary = ValidJSFunctionWithVars <$> genFunctionWithVars
 
-newtype ValidJSFunctionWithBoundAndFree = ValidJSFunctionWithBoundAndFree (AST.JSStatement, String, String, String)
+newtype ValidJSFunctionWithBoundAndFree = ValidJSFunctionWithBoundAndFree (AST.JSStatement, ByteString, ByteString, ByteString)
   deriving (Show)
 
 instance Arbitrary ValidJSFunctionWithBoundAndFree where
@@ -711,19 +712,19 @@ instance Arbitrary EquivalentASTs where
   arbitrary = EquivalentASTs <$> genEquivalentASTs
 
 -- Variable renaming generators
-newtype ValidJSFunctionWithVariables = ValidJSFunctionWithVariables (AST.JSStatement, String, String)
+newtype ValidJSFunctionWithVariables = ValidJSFunctionWithVariables (AST.JSStatement, ByteString, ByteString)
   deriving (Show)
 
 instance Arbitrary ValidJSFunctionWithVariables where
   arbitrary = ValidJSFunctionWithVariables <$> genFunctionWithVariables
 
-newtype ValidJSFunctionWithNoCapture = ValidJSFunctionWithNoCapture (AST.JSStatement, String, String)
+newtype ValidJSFunctionWithNoCapture = ValidJSFunctionWithNoCapture (AST.JSStatement, ByteString, ByteString)
   deriving (Show)
 
 instance Arbitrary ValidJSFunctionWithNoCapture where
   arbitrary = ValidJSFunctionWithNoCapture <$> genFunctionWithNoCapture
 
-newtype ValidJSProgramWithRenamingMap = ValidJSProgramWithRenamingMap (AST.JSAST, [(String, String)])
+newtype ValidJSProgramWithRenamingMap = ValidJSProgramWithRenamingMap (AST.JSAST, [(ByteString, ByteString)])
   deriving (Show)
 
 instance Arbitrary ValidJSProgramWithRenamingMap where
@@ -752,19 +753,19 @@ genValidExpression =
     ]
 
 -- | Generate ByteString numbers
-genNumber :: Gen String
-genNumber = show <$> (arbitrary :: Gen Int)
+genNumber :: Gen ByteString
+genNumber = BS8.pack . show <$> (arbitrary :: Gen Int)
 
 -- | Generate ByteString quoted strings
-genQuotedString :: Gen String
+genQuotedString :: Gen ByteString
 genQuotedString = elements ["\"test\"", "\"hello\"", "'world'", "'value'"]
 
 -- | Generate ByteString boolean literals
-genBoolean :: Gen String
+genBoolean :: Gen ByteString
 genBoolean = elements ["true", "false"]
 
 -- | Generate valid ByteString identifiers
-genValidIdentifier :: Gen String
+genValidIdentifier :: Gen ByteString
 genValidIdentifier = elements ["x", "y", "value", "result", "temp", "item"]
 
 -- | Generate literal expressions
@@ -935,12 +936,12 @@ genSemanticStatement =
 -- | Generate assignment statements
 genAssignmentStatement :: Gen AST.JSStatement
 genAssignmentStatement = do
-  var <- genValidIdentifier
+  varName <- genValidIdentifier
   value <- genValidExpression
   semi <- genSemicolon
   let assignment =
         AST.JSAssignExpression
-          (AST.JSIdentifier AST.JSNoAnnot var)
+          (AST.JSIdentifier AST.JSNoAnnot varName)
           (AST.JSAssign AST.JSNoAnnot)
           value
   return (AST.JSExpressionStatement assignment semi)
@@ -1046,7 +1047,7 @@ genValidPositionPair = do
   return (pos1, pos2)
 
 -- | Generate function with variables for renaming
-genFunctionWithVars :: Gen (AST.JSStatement, String, String)
+genFunctionWithVars :: Gen (AST.JSStatement, ByteString, ByteString)
 genFunctionWithVars = do
   func <- genValidFunction
   oldVar <- genValidIdentifier
@@ -1054,7 +1055,7 @@ genFunctionWithVars = do
   return (func, oldVar, newVar)
 
 -- | Generate function with bound and free variables
-genFunctionWithBoundAndFree :: Gen (AST.JSStatement, String, String, String)
+genFunctionWithBoundAndFree :: Gen (AST.JSStatement, ByteString, ByteString, ByteString)
 genFunctionWithBoundAndFree = do
   func <- genValidFunction
   boundVar <- genValidIdentifier
@@ -1084,11 +1085,11 @@ genEquivalentASTs = do
   return (ast1, ast2)
 
 -- | Generate function with variables for renaming
-genFunctionWithVariables :: Gen (AST.JSStatement, String, String)
+genFunctionWithVariables :: Gen (AST.JSStatement, ByteString, ByteString)
 genFunctionWithVariables = genFunctionWithVars
 
 -- | Generate function with no variable capture
-genFunctionWithNoCapture :: Gen (AST.JSStatement, String, String)
+genFunctionWithNoCapture :: Gen (AST.JSStatement, ByteString, ByteString)
 genFunctionWithNoCapture = do
   func <- genValidFunction
   oldName <- genValidIdentifier
@@ -1096,7 +1097,7 @@ genFunctionWithNoCapture = do
   return (func, oldName, newName)
 
 -- | Generate program with renaming map
-genProgramWithRenamingMap :: Gen (AST.JSAST, [(String, String)])
+genProgramWithRenamingMap :: Gen (AST.JSAST, [(ByteString, ByteString)])
 genProgramWithRenamingMap = do
   prog <- genValidProgram
   renamingMap <- listOf genRenamePair
@@ -1166,8 +1167,8 @@ genSemicolon = return (AST.JSSemi AST.JSNoAnnot)
 -- | Generate variable declaration
 genVariableDeclaration :: Gen (AST.JSCommaList AST.JSExpression)
 genVariableDeclaration = do
-  ident <- genValidIdentifier
-  let varIdent = AST.JSIdentifier AST.JSNoAnnot ident
+  identName <- genValidIdentifier
+  let varIdent = AST.JSIdentifier AST.JSNoAnnot identName
   return (AST.JSLOne varIdent)
 
 -- | Generate parameter list
@@ -1176,21 +1177,21 @@ genParameterList =
   oneof
     [ return AST.JSLNil,
       do
-        ident <- genValidIdentifier
-        return (AST.JSLOne (AST.JSIdentifier AST.JSNoAnnot ident))
+        identName <- genValidIdentifier
+        return (AST.JSLOne (AST.JSIdentifier AST.JSNoAnnot identName))
     ]
 
 -- | Generate numeric literal
 genNumericLiteral :: Gen AST.JSExpression
 genNumericLiteral = do
-  num <- genNumber
-  return (AST.JSDecimal AST.JSNoAnnot num)
+  numVal <- genNumber
+  return (AST.JSDecimal AST.JSNoAnnot numVal)
 
 -- | Generate boolean literal
 genBooleanLiteral :: Gen AST.JSExpression
 genBooleanLiteral = do
-  bool <- genBoolean
-  return (AST.JSLiteral AST.JSNoAnnot bool)
+  boolVal <- genBoolean
+  return (AST.JSLiteral AST.JSNoAnnot boolVal)
 
 -- | Generate binary operator from string
 genBinOpFromString :: String -> AST.JSBinOp
@@ -1217,7 +1218,7 @@ genValidPosition = do
   return (TokenPn addr line col)
 
 -- | Generate rename pair
-genRenamePair :: Gen (String, String)
+genRenamePair :: Gen (ByteString, ByteString)
 genRenamePair = do
   oldName <- genValidIdentifier
   newName <- genValidIdentifier
@@ -1226,8 +1227,8 @@ genRenamePair = do
 -- | Generate valid JSIdent
 genValidIdent :: Gen AST.JSIdent
 genValidIdent = do
-  name <- genValidIdentifier
-  return (AST.JSIdentName AST.JSNoAnnot name)
+  identName <- genValidIdentifier
+  return (AST.JSIdentName AST.JSNoAnnot identName)
 
 -- | Generate JSBlock
 genBlock :: Gen AST.JSBlock
@@ -1653,7 +1654,7 @@ applyPositionOffset :: TokenPosn -> Int -> TokenPosn
 applyPositionOffset (TokenPn addr line col) offset = TokenPn (addr + offset) line col
 
 -- | Rename variable in function
-renameVariable :: AST.JSStatement -> String -> String -> AST.JSStatement
+renameVariable :: AST.JSStatement -> ByteString -> ByteString -> AST.JSStatement
 renameVariable stmt _ _ = stmt -- Simplified for now
 
 -- | Check alpha equivalence
@@ -1661,7 +1662,7 @@ alphaEquivalent :: AST.JSStatement -> AST.JSStatement -> Bool
 alphaEquivalent _ _ = True -- Simplified for now
 
 -- | Extract free variables
-extractFreeVariables :: AST.JSStatement -> [String]
+extractFreeVariables :: AST.JSStatement -> [ByteString]
 extractFreeVariables _ = [] -- Simplified for now
 
 -- | Check semantic equivalence between functions
@@ -1678,11 +1679,11 @@ canonicalizeAST :: AST.JSAST -> AST.JSAST
 canonicalizeAST = id -- Simplified for now
 
 -- | Extract binding structure
-extractBindingStructure :: AST.JSStatement -> String
+extractBindingStructure :: AST.JSStatement -> ByteString
 extractBindingStructure _ = "bindings" -- Simplified for now
 
 -- | Check binding structures equivalence
-bindingStructuresEquivalent :: String -> String -> Bool
+bindingStructuresEquivalent :: ByteString -> ByteString -> Bool
 bindingStructuresEquivalent s1 s2 = s1 == s2
 
 -- | Check for variable capture
@@ -1690,7 +1691,7 @@ hasVariableCapture :: AST.JSStatement -> Bool
 hasVariableCapture _ = False -- Simplified for now
 
 -- | Apply renaming map
-applyRenamingMap :: AST.JSAST -> [(String, String)] -> AST.JSAST
+applyRenamingMap :: AST.JSAST -> [(ByteString, ByteString)] -> AST.JSAST
 applyRenamingMap ast _ = ast -- Simplified for now
 
 -- Helper functions to render different AST types to strings
@@ -1774,11 +1775,11 @@ createStructurallyEquivalent other = other
 simpleExprStmt :: AST.JSExpression -> AST.JSStatement
 simpleExprStmt expr = AST.JSExpressionStatement expr (AST.JSSemi AST.JSNoAnnot)
 
-literalNumber :: String -> AST.JSExpression
+literalNumber :: ByteString -> AST.JSExpression
 literalNumber num = AST.JSDecimal AST.JSNoAnnot num
 
-literalString :: String -> AST.JSExpression
-literalString str = AST.JSStringLiteral AST.JSNoAnnot ("\"" ++ str ++ "\"")
+literalString :: ByteString -> AST.JSExpression
+literalString str = AST.JSStringLiteral AST.JSNoAnnot ("\"" <> str <> "\"")
 
 createEquivalent :: AST.JSAST -> AST.JSAST
 createEquivalent = id -- Simplified for now

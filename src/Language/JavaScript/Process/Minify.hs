@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.JavaScript.Process.Minify
   ( -- * Minify
@@ -7,6 +8,9 @@ module Language.JavaScript.Process.Minify
 where
 
 import Control.Applicative ((<$>))
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
@@ -215,32 +219,31 @@ fixBinOpPlus a lhs rhs =
 -- Concatenate two JSStringLiterals. Since the strings will include the string
 -- terminators (either single or double quotes) we use whatever terminator is
 -- used by the first string.
-stringLitConcat :: String -> String -> JSExpression
-stringLitConcat xs ys | null xs = JSStringLiteral emptyAnnot ys
-stringLitConcat xs ys | null ys = JSStringLiteral emptyAnnot xs
-stringLitConcat xall yall =
-  case yall of
-    [] -> JSStringLiteral emptyAnnot xall
-    (_ : yss) -> JSStringLiteral emptyAnnot (init xall <> (init yss <> "'"))
+stringLitConcat :: ByteString -> ByteString -> JSExpression
+stringLitConcat xs ys
+  | BS.null xs = JSStringLiteral emptyAnnot ys
+  | BS.null ys = JSStringLiteral emptyAnnot xs
+  | otherwise = JSStringLiteral emptyAnnot (BS8.init xs <> BS8.init (BS.drop 1 ys) <> "'")
 
--- Normalize a String. If its single quoted, just return it and its double quoted
--- convert it to single quoted.
-normalizeToSQ :: String -> String
-normalizeToSQ str =
-  case str of
-    [] -> []
-    ('\'' : _) -> str
-    ('"' : xs) -> '\'' : convertSQ xs
-    _ -> str -- Should not happen.
+-- Normalize a ByteString. If its single quoted, just return it and if its
+-- double quoted convert it to single quoted.
+normalizeToSQ :: ByteString -> ByteString
+normalizeToSQ str
+  | BS.null str = str
+  | BS8.head str == '\'' = str
+  | BS8.head str == '"' = BS8.cons '\'' (convertSQ (BS.drop 1 str))
+  | otherwise = str
   where
-    convertSQ [] = []
-    convertSQ [c] = "'"
-    convertSQ (c : rest) = case c of
-      '\'' -> "\\'" <> convertSQ rest
-      '\\' -> case rest of
-        ('"' : rest') -> '"' : convertSQ rest'
-        _ -> c : convertSQ rest
-      _ -> c : convertSQ rest
+    convertSQ bs
+      | BS.null bs = BS.empty
+      | BS.length bs == 1 = "'"
+      | BS8.head bs == '\'' = "\\'" <> convertSQ (BS.drop 1 bs)
+      | BS8.head bs == '\\' = handleEscape (BS.drop 1 bs)
+      | otherwise = BS8.cons (BS8.head bs) (convertSQ (BS.drop 1 bs))
+    handleEscape rest
+      | BS.null rest = "\\"
+      | BS8.head rest == '"' = BS8.cons '"' (convertSQ (BS.drop 1 rest))
+      | otherwise = BS8.cons '\\' (convertSQ rest)
 
 instance MinifyJS JSBinOp where
   fix _ (JSBinOpAnd _) = JSBinOpAnd emptyAnnot

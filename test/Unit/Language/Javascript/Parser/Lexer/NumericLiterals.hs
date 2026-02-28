@@ -184,7 +184,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
       let largeNumber = "12345678901234567890123456789012345678901234567890n"
       case testNumericEdgeCase largeNumber of
         Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _)
-          | val == largeNumber -> pure ()
+          | val == BS8.pack largeNumber -> pure ()
         result -> expectationFailure ("Expected BigInt literal with value " ++ largeNumber ++ ", got: " ++ show result)
 
     it "parses very large hex BigInt" $ do
@@ -196,7 +196,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
       let largeBinary = "0b" ++ List.replicate 64 '1' ++ "n"
       case testNumericEdgeCase largeBinary of
         Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _)
-          | val == largeBinary -> pure ()
+          | val == BS8.pack largeBinary -> pure ()
         result -> expectationFailure ("Expected binary BigInt literal with value " ++ largeBinary ++ ", got: " ++ show result)
 
     it "parses very large octal BigInt" $ do
@@ -209,7 +209,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
       let maxHex = "0x" ++ List.replicate 16 'F'
       case testNumericEdgeCase maxHex of
         Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
-          | val == maxHex -> pure ()
+          | val == BS8.pack maxHex -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ maxHex ++ ", got: " ++ show result)
 
     it "parses mixed case hex" $ do
@@ -222,7 +222,7 @@ boundaryValueTests = describe "Boundary Value Testing" $ do
       let longBinary = "0b" ++ List.replicate 32 '1'
       case testNumericEdgeCase longBinary of
         Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
-          | val == longBinary -> pure ()
+          | val == BS8.pack longBinary -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ longBinary ++ ", got: " ++ show result)
 
     it "parses alternating binary pattern" $ do
@@ -367,7 +367,7 @@ floatingPointEdgeCases = describe "Floating Point Edge Cases" $ do
       let maxPrecision = "1.2345678901234567890123456789"
       case testNumericEdgeCase maxPrecision of
         Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
-          | val == maxPrecision -> pure ()
+          | val == BS8.pack maxPrecision -> pure ()
         result -> expectationFailure ("Expected decimal literal with value " ++ maxPrecision ++ ", got: " ++ show result)
 
     it "parses very small fractional values" $ do
@@ -417,14 +417,14 @@ performanceTests = describe "Performance Testing" $ do
       let large100 = List.replicate 100 '9'
       case testNumericEdgeCase large100 of
         Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
-          | val == large100 -> pure ()
+          | val == BS8.pack large100 -> pure ()
         result -> expectationFailure ("Expected decimal literal with value " ++ large100 ++ ", got: " ++ show result)
 
     it "parses 1000-digit BigInt efficiently" $ do
       let large1000 = List.replicate 1000 '9' ++ "n"
       case testNumericEdgeCase large1000 of
         Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _)
-          | val == large1000 -> pure ()
+          | val == BS8.pack large1000 -> pure ()
         result -> expectationFailure ("Expected BigInt literal with value " ++ large1000 ++ ", got: " ++ show result)
 
   describe "complex numeric patterns" $ do
@@ -432,14 +432,14 @@ performanceTests = describe "Performance Testing" $ do
       let complexHex = "0x" ++ List.take 32 (List.cycle "aBcDeF123456789")
       case testNumericEdgeCase complexHex of
         Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
-          | val == complexHex -> pure ()
+          | val == BS8.pack complexHex -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ complexHex ++ ", got: " ++ show result)
 
     it "parses very long binary sequence" $ do
       let longBinary = "0b" ++ List.take 128 (List.cycle "10")
       case testNumericEdgeCase longBinary of
         Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
-          | val == longBinary -> pure ()
+          | val == BS8.pack longBinary -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ longBinary ++ ", got: " ++ show result)
 
   describe "floating point precision stress tests" $ do
@@ -447,7 +447,7 @@ performanceTests = describe "Performance Testing" $ do
       let maxDecimals = "0." ++ List.replicate 50 '1'
       case testNumericEdgeCase maxDecimals of
         Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
-          | val == maxDecimals -> pure ()
+          | val == BS8.pack maxDecimals -> pure ()
         result -> expectationFailure ("Expected decimal literal with value " ++ maxDecimals ++ ", got: " ++ show result)
 
     it "parses very long exponent" $ do
@@ -471,14 +471,14 @@ propertyBasedTests = describe "Property-Based Testing" $ do
       property $ \n ->
         let numStr = show (abs (n :: Integer))
          in case testNumericEdgeCase numStr of
-              Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) -> val == numStr
+              Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _) -> val == BS8.pack numStr
               _ -> False
 
     it "BigInt round-trip property" $
       property $ \n ->
         let numStr = show (abs (n :: Integer)) ++ "n"
          in case testNumericEdgeCase numStr of
-              Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) -> val == numStr
+              Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ val) _] _) -> val == BS8.pack numStr
               _ -> False
 
   describe "hex literal properties" $ do
@@ -486,14 +486,14 @@ propertyBasedTests = describe "Property-Based Testing" $ do
       let hexStr = "0x" ++ "ABC123"
       case testNumericEdgeCase hexStr of
         Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
-          | val == hexStr -> pure ()
+          | val == BS8.pack hexStr -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ hexStr ++ ", got: " ++ show result)
 
     it "hex prefix preservation 0X" $ do
       let hexStr = "0X" ++ "def456"
       case testNumericEdgeCase hexStr of
         Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
-          | val == hexStr -> pure ()
+          | val == BS8.pack hexStr -> pure ()
         result -> expectationFailure ("Expected hex integer with value " ++ hexStr ++ ", got: " ++ show result)
 
   describe "binary literal properties" $ do
@@ -501,12 +501,12 @@ propertyBasedTests = describe "Property-Based Testing" $ do
       let binStr = "0b" ++ "101010"
       case testNumericEdgeCase binStr of
         Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
-          | val == binStr -> pure ()
+          | val == BS8.pack binStr -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ binStr ++ ", got: " ++ show result)
 
     it "binary parsing 0B" $ do
       let binStr = "0B" ++ "010101"
       case testNumericEdgeCase binStr of
         Right (JSAstProgram [JSExpressionStatement (JSBinaryInteger _ val) _] _)
-          | val == binStr -> pure ()
+          | val == BS8.pack binStr -> pure ()
         result -> expectationFailure ("Expected binary integer with value " ++ binStr ++ ", got: " ++ show result)

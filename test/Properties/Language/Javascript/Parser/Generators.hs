@@ -86,6 +86,7 @@ module Properties.Language.Javascript.Parser.Generators
 where
 
 import Control.Monad (replicateM)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.List as List
 import qualified Data.Text as Text
@@ -228,7 +229,7 @@ genJSAnnot =
           Token.WhiteSpace <$> genTokenPosn <*> genWhitespace,
           pure Token.NoComment
         ]
-    genWhitespace = elements [" ", "\t", "\n", "\r\n"]
+    genWhitespace = BS8.pack <$> elements [" ", "\t", "\n", "\r\n"]
 
 -- | Generate arbitrary semicolon tokens.
 --
@@ -463,14 +464,14 @@ genBoundaryConditions =
 -- Creates identifiers following JavaScript naming rules including
 -- Unicode letter starts, alphanumeric continuation, and reserved
 -- word avoidance for realistic identifier generation.
-genValidIdentifier :: Gen String
+genValidIdentifier :: Gen ByteString
 genValidIdentifier = do
   first <- genIdentifierStart
   rest <- listOf genIdentifierPart
   let identifier = first : rest
   if identifier `elem` reservedWords
     then genValidIdentifier
-    else return identifier
+    else return (BS8.pack identifier)
   where
     genIdentifierStart =
       oneof
@@ -537,7 +538,7 @@ genValidIdentifier = do
 -- Creates numeric literals including integers, floats, scientific
 -- notation, hexadecimal, binary, and octal formats following
 -- JavaScript numeric literal syntax rules.
-genValidNumber :: Gen String
+genValidNumber :: Gen ByteString
 genValidNumber =
   oneof
     [ genDecimalInteger,
@@ -548,31 +549,31 @@ genValidNumber =
       genOctal
     ]
   where
-    genDecimalInteger = show <$> (arbitrary :: Gen Integer)
+    genDecimalInteger = BS8.pack . show <$> (arbitrary :: Gen Integer)
     genDecimalFloat = do
       integral <- abs <$> (arbitrary :: Gen Integer)
       fractional <- abs <$> (arbitrary :: Gen Integer)
-      return (show integral ++ "." ++ show fractional)
+      return (BS8.pack (show integral ++ "." ++ show fractional))
     genScientificNotation = do
       base <- genDecimalFloat
-      exponent <- arbitrary :: Gen Int
-      return (base ++ "e" ++ show exponent)
+      exponent' <- arbitrary :: Gen Int
+      return (base <> BS8.pack ("e" ++ show exponent'))
     genHexadecimal = do
       num <- abs <$> (arbitrary :: Gen Integer)
-      return ("0x" ++ showHex num "")
+      return (BS8.pack ("0x" ++ showHex num ""))
       where
         showHex 0 acc = if null acc then "0" else acc
         showHex n acc = showHex (n `div` 16) (hexDigit (n `mod` 16) : acc)
         hexDigit d = "0123456789abcdef" !! fromInteger d
     genBinary = do
       num <- abs <$> (arbitrary :: Gen Int)
-      return ("0b" ++ showBin num "")
+      return (BS8.pack ("0b" ++ showBin num ""))
       where
         showBin 0 acc = if null acc then "0" else acc
         showBin n acc = showBin (n `div` 2) (show (n `mod` 2) ++ acc)
     genOctal = do
       num <- abs <$> (arbitrary :: Gen Int)
-      return ("0o" ++ showOct num "")
+      return (BS8.pack ("0o" ++ showOct num ""))
       where
         showOct 0 acc = if null acc then "0" else acc
         showOct n acc = showOct (n `div` 8) (show (n `mod` 8) ++ acc)
@@ -582,7 +583,7 @@ genValidNumber =
 -- Creates string literals with proper escaping, quote handling,
 -- and special character support including Unicode escapes
 -- and template literal syntax.
-genValidString :: Gen String
+genValidString :: Gen ByteString
 genValidString =
   oneof
     [ genSingleQuotedString,
@@ -592,30 +593,20 @@ genValidString =
   where
     genSingleQuotedString = do
       content <- genStringContent '\''
-      return ("'" ++ content ++ "'")
+      return (BS8.pack ("'" ++ content ++ "'"))
     genDoubleQuotedString = do
       content <- genStringContent '"'
-      return ("\"" ++ content ++ "\"")
+      return (BS8.pack ("\"" ++ content ++ "\""))
     genTemplateLiteral = do
       content <- genTemplateContent
-      return ("`" ++ content ++ "`")
-    genStringContent quote = listOf (genStringChar quote)
-    genStringChar quote =
+      return (BS8.pack ("`" ++ content ++ "`"))
+    genStringContent _quote = listOf genStringChar
+    genStringChar =
       oneof
         [ choose ('a', 'z'),
           choose ('A', 'Z'),
           choose ('0', '9'),
           return ' '
-        ]
-    genEscapedChar quote =
-      oneof
-        [ return "\\\\",
-          return "\\\'",
-          return "\\\"",
-          return "\\n",
-          return "\\t",
-          return "\\r",
-          if quote == '\'' then return "\\'" else return "\""
         ]
     genTemplateContent = listOf genTemplateChar
     genTemplateChar =
@@ -698,17 +689,17 @@ genLiteralExpression =
     ]
   where
     genBooleanLiteral = elements ["true", "false", "null", "undefined"]
-    genHexNumber = ("0x" ++) <$> genHexDigits
-    genBinaryNumber = ("0b" ++) <$> genBinaryDigits
-    genOctalNumber = ("0o" ++) <$> genOctalDigits
-    genBigIntNumber = (++ "n") <$> genValidNumber
+    genHexNumber = (BS8.append "0x") <$> genHexDigits
+    genBinaryNumber = (BS8.append "0b") <$> genBinaryDigits
+    genOctalNumber = (BS8.append "0o") <$> genOctalDigits
+    genBigIntNumber = (<> "n") <$> genValidNumber
     genRegexLiteral = do
-      pattern <- genRegexPattern
+      pat <- genRegexPattern
       flags <- genRegexFlags
-      return ("/" ++ pattern ++ "/" ++ flags)
-    genHexDigits = listOf1 (elements "0123456789abcdefABCDEF")
-    genBinaryDigits = listOf1 (elements "01")
-    genOctalDigits = listOf1 (elements "01234567")
+      return (BS8.pack ("/" ++ pat ++ "/" ++ flags))
+    genHexDigits = BS8.pack <$> listOf1 (elements "0123456789abcdefABCDEF")
+    genBinaryDigits = BS8.pack <$> listOf1 (elements "01")
+    genOctalDigits = BS8.pack <$> listOf1 (elements "01234567")
     genRegexPattern = listOf (elements "abcdefghijklmnopqrstuvwxyz.*+?[](){}|^$\\")
     genRegexFlags = sublistOf "gimsuvy"
 
@@ -718,7 +709,7 @@ genIdentifierExpression = JSIdentifier <$> genJSAnnot <*> genValidIdentifier
 
 -- | Generate this expressions.
 genThisExpression :: Gen JSExpression
-genThisExpression = JSIdentifier <$> genJSAnnot <*> return "this"
+genThisExpression = JSIdentifier <$> genJSAnnot <*> pure "this"
 
 -- | Generate binary expressions with size control.
 genBinaryExpression :: Int -> Gen JSExpression

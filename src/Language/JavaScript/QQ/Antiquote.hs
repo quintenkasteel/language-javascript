@@ -28,6 +28,7 @@ where
 import Control.Exception (evaluate)
 import Data.Data (Data)
 import Data.Generics (extQ)
+import qualified Data.ByteString.Char8 as BS8
 import Language.Haskell.Meta.Parse (parseExp)
 import Language.Haskell.TH (Exp, Q)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
@@ -110,7 +111,7 @@ astToExpWithSplices spliceMap = dataToExpQ (const Nothing `extQ` handleExpr)
   where
     handleExpr :: AST.JSExpression -> Maybe (Q Exp)
     handleExpr (AST.JSIdentifier _ name) =
-      Map.lookup name spliceMap >>= parseSplice
+      Map.lookup (BS8.unpack name) spliceMap >>= parseSplice
     handleExpr _ = Nothing
 
     parseSplice :: String -> Maybe (Q Exp)

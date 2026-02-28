@@ -151,7 +151,7 @@ testLiteralSerialization = describe "Literal Serialization" $ do
       xml `shouldSatisfy` Text.isInfixOf "<JSIdentifier name=\"variable\">"
 
     it "serializes identifiers with Unicode" $ do
-      let expr = AST.JSIdentifier testAnnot "variableσ"
+      let expr = AST.JSIdentifier testAnnot (Text.encodeUtf8 "variableσ")
       let xml = PXML.renderExpressionToXML expr
       xml `shouldSatisfy` Text.isInfixOf "variableσ"
 

@@ -176,15 +176,13 @@ scanComments bs = go 0
       | otherwise = skipTemplateBrace (i + 1) depth
 
     -- Build a CommentEntry for a comment span.
-    mkComment !start !end = CommentEntry start (CommentA dummyPos text)
+    mkComment !start !end = CommentEntry start (CommentA dummyPos (sliceBS start end))
       where
-        text = BS8.unpack (sliceBS start end)
         dummyPos = TokenPn start 0 0
 
     -- Build a CommentEntry for a whitespace span.
-    mkWS !start !end = CommentEntry start (WhiteSpace dummyPos text)
+    mkWS !start !end = CommentEntry start (WhiteSpace dummyPos (sliceBS start end))
       where
-        text = BS8.unpack (sliceBS start end)
         dummyPos = TokenPn start 0 0
 
     -- Safe byte access.

@@ -52,8 +52,10 @@ module Language.JavaScript.Pretty.SExpr
   )
 where
 
+import qualified Data.ByteString.Char8 as BS8
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import qualified Language.JavaScript.Parser.Token as Token
@@ -116,55 +118,55 @@ renderExpressionToSExpr expr = case expr of
   AST.JSDecimal annot value ->
     formatSExprList
       [ "JSDecimal",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSHexInteger annot value ->
     formatSExprList
       [ "JSHexInteger",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSOctal annot value ->
     formatSExprList
       [ "JSOctal",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSBinaryInteger annot value ->
     formatSExprList
       [ "JSBinaryInteger",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSBigIntLiteral annot value ->
     formatSExprList
       [ "JSBigIntLiteral",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSStringLiteral annot value ->
     formatSExprList
       [ "JSStringLiteral",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSIdentifier annot name ->
     formatSExprList
       [ "JSIdentifier",
-        escapeSExprString name,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ name),
         renderAnnotation annot
       ]
   AST.JSLiteral annot value ->
     formatSExprList
       [ "JSLiteral",
-        escapeSExprString value,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ value),
         renderAnnotation annot
       ]
   AST.JSRegEx annot pattern ->
     formatSExprList
       [ "JSRegEx",
-        escapeSExprString pattern,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ pattern),
         renderAnnotation annot
       ]
   AST.JSExpressionBinary left op right ->
@@ -349,13 +351,13 @@ renderCommentToSExpr comment = case comment of
     formatSExprList
       [ "comment",
         renderPositionToSExpr pos,
-        escapeSExprString content
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ content)
       ]
   Token.WhiteSpace pos content ->
     formatSExprList
       [ "whitespace",
         renderPositionToSExpr pos,
-        escapeSExprString content
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ content)
       ]
   Token.JSDocA pos jsDoc ->
     formatSExprList
@@ -763,7 +765,7 @@ renderIdentToSExpr ident = case ident of
   AST.JSIdentName annot name ->
     formatSExprList
       [ "JSIdentName",
-        escapeSExprString name,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ name),
         renderAnnotation annot
       ]
   AST.JSIdentNone ->

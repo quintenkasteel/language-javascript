@@ -11,7 +11,9 @@ module Language.JavaScript.Pretty.Printer
   )
 where
 
-import Blaze.ByteString.Builder (Builder, toLazyByteString)
+import Blaze.ByteString.Builder (Builder, fromByteString, toLazyByteString)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 #if ! MIN_VERSION_base(4,13,0)
 import Data.Monoid (mempty)
 import Data.Semigroup ((<>))
@@ -135,6 +137,20 @@ instance RenderJS String where
   (|>) (PosAccum (r, c) bb) s = PosAccum (r', c') (bb <> str s)
     where
       (r', c') = foldl' (\(row, col) ch -> go (row, col) ch) (r, c) s
+
+      go (rx, _) '\n' = (rx + 1, 1)
+      go (rx, cx) '\t' = (rx, cx + 8)
+      go (rx, cx) _ = (rx, cx + 1)
+
+-- | Zero-copy rendering of ByteString values directly into the Builder.
+--
+-- This is the primary performance benefit of the ByteString AST migration:
+-- 'fromByteString' performs a zero-copy insertion into the output buffer,
+-- avoiding the per-character encoding that 'fromString' requires.
+instance RenderJS ByteString where
+  (|>) (PosAccum (r, c) bb) bs = PosAccum (r', c') (bb <> fromByteString bs)
+    where
+      (r', c') = BS8.foldl' (\(row, col) ch -> go (row, col) ch) (r, c) bs
 
       go (rx, _) '\n' = (rx + 1, 1)
       go (rx, cx) '\t' = (rx, cx + 8)

@@ -27,6 +27,7 @@ module Unit.Language.Javascript.Parser.Validation.StrictMode
   )
 where
 
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST
@@ -895,16 +896,16 @@ useStrictStmt :: JSStatement
 useStrictStmt = JSExpressionStatement (JSStringLiteral noAnnot "use strict") auto
 
 -- | Test reserved word in specific context.
-testReservedInContext :: String -> String -> JSStatement -> Spec
+testReservedInContext :: ByteString -> String -> JSStatement -> Spec
 testReservedInContext word ctxName stmt =
-  it ("rejects '" ++ word ++ "' in " ++ ctxName) $ do
+  it ("rejects '" ++ BS8.unpack word ++ "' in " ++ ctxName) $ do
     let program = createStrictProgram [stmt]
     validateProgram program `shouldFailWith` isReservedWordError word
 
 -- | Test assignment to reserved identifier.
-testAssignmentToReserved :: String -> (JSAnnot -> JSAssignOp) -> String -> Spec
+testAssignmentToReserved :: ByteString -> (JSAnnot -> JSAssignOp) -> String -> Spec
 testAssignmentToReserved word opConstructor desc =
-  it ("rejects " ++ word ++ " in " ++ desc) $ do
+  it ("rejects " ++ BS8.unpack word ++ " in " ++ desc) $ do
     let program =
           createStrictProgram
             [ JSAssignStatement
@@ -926,9 +927,9 @@ result `shouldFailWith` predicate = case result of
   Right _ -> expectationFailure "Expected validation to fail"
 
 -- | Check if error is reserved word violation.
-isReservedWordError :: String -> ValidationError -> Bool
+isReservedWordError :: ByteString -> ValidationError -> Bool
 isReservedWordError word (ReservedWordAsIdentifier wordText _) =
-  Text.unpack wordText == word
+  Text.unpack wordText == BS8.unpack word
 isReservedWordError _ _ = False
 
 -- | Check if error is any reserved word violation.
@@ -937,7 +938,7 @@ isReservedWordViolation (ReservedWordAsIdentifier _ _) = True
 isReservedWordViolation _ = False
 
 -- | Create variable initialization expression.
-createVarInit :: String -> String -> JSCommaList JSExpression
+createVarInit :: ByteString -> ByteString -> JSCommaList JSExpression
 createVarInit name value =
   JSLOne
     ( JSVarInitExpression

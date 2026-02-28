@@ -23,6 +23,7 @@ module Unit.Language.Javascript.Parser.AST.Construction
 where
 
 import Control.DeepSeq (deepseq)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
@@ -548,7 +549,7 @@ testPatternMatchingCoverage = describe "Pattern matching coverage" $ do
 
 -- Helper functions for constructor testing
 
-extractLiteral :: AST.JSExpression -> String
+extractLiteral :: AST.JSExpression -> ByteString
 extractLiteral (AST.JSIdentifier _ s) = s
 extractLiteral (AST.JSDecimal _ s) = s
 extractLiteral (AST.JSLiteral _ s) = s

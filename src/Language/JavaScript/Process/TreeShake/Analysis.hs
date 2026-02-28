@@ -55,6 +55,7 @@ import qualified Data.Map.Strict as Map
 import Data.Semigroup ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Process.TreeShake.Types hiding (hasSideEffects)
@@ -243,12 +244,12 @@ analyzeStatement stmt = case stmt of
   -- Control flow statements
   JSBreak _ ident _ -> do
     case ident of
-      JSIdentName _ name -> markIdentifierUsed (Text.pack name)
+      JSIdentName _ name -> markIdentifierUsed (Text.decodeUtf8 name)
       JSIdentNone -> pure ()
       
   JSContinue _ ident _ -> do
     case ident of
-      JSIdentName _ name -> markIdentifierUsed (Text.pack name)
+      JSIdentName _ name -> markIdentifierUsed (Text.decodeUtf8 name)
       JSIdentNone -> pure ()
   
   -- For loop variants with variable declarations
@@ -316,7 +317,7 @@ analyzeStatement stmt = case stmt of
 analyzeExpression :: JSExpression -> AnalysisM ()
 analyzeExpression expr = case expr of
   JSIdentifier _ name -> 
-    markIdentifierUsed (Text.pack name)
+    markIdentifierUsed (Text.decodeUtf8 name)
     
   JSVarInitExpression _var initializer ->
     -- Don't analyze the variable name - it's a declaration, not a usage
@@ -596,7 +597,7 @@ declareIdentifier (JSIdentName _ name) = do
   scopeLevel <- gets _currentScopeLevel
   usageMap <- gets _analysisUsageMap
   
-  let identifier = Text.pack name
+  let identifier = Text.decodeUtf8 name
   let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
   let updatedInfo = currentInfo
         & scopeDepth .~ scopeLevel
@@ -658,7 +659,7 @@ markPropertyUsed _target prop =
 markObjectWithDynamicAccess :: JSExpression -> AnalysisM ()
 markObjectWithDynamicAccess expr = case expr of
   JSIdentifier _ name -> do
-    let objectName = Text.pack name
+    let objectName = Text.decodeUtf8 name
     modify $ \s -> s { _analysisDynamicAccess = Set.insert objectName (_analysisDynamicAccess s) }
     -- Mark all properties of this object as potentially used by marking the object as having side effects
     markIdentifierWithSideEffects objectName
@@ -736,7 +737,7 @@ analyzeObjectProperty prop = case prop of
     
   JSPropertyIdentRef _ name ->
     -- ES6 shorthand {prop} is equivalent to {prop: prop}, so mark the identifier as used
-    markIdentifierUsed (Text.pack name)
+    markIdentifierUsed (Text.decodeUtf8 name)
   
   JSObjectMethod method -> analyzeMethodDefinition method
   
@@ -876,7 +877,7 @@ analyzeModuleSystem = analyzeAST
 extractImportInfo :: JSImportDeclaration -> ImportInfo
 extractImportInfo (JSImportDeclaration clause (JSFromClause _ _ moduleName) _ _) =
   ImportInfo
-    { _importModule = Text.pack moduleName
+    { _importModule = Text.decodeUtf8 moduleName
     , _importedNames = extractImportNames clause
     , _importDefault = extractDefaultImport clause
     , _importNamespace = extractNamespaceImport clause
@@ -885,7 +886,7 @@ extractImportInfo (JSImportDeclaration clause (JSFromClause _ _ moduleName) _ _)
     }
 extractImportInfo (JSImportDeclarationBare _ moduleName _ _) =
   ImportInfo
-    { _importModule = Text.pack moduleName
+    { _importModule = Text.decodeUtf8 moduleName
     , _importedNames = Set.empty
     , _importDefault = Nothing
     , _importNamespace = Nothing
@@ -899,7 +900,7 @@ extractExportInfo (JSExportDefault _ stmt _) = extractDefaultExportInfo stmt
 extractExportInfo (JSExportLocals (JSExportClause _ specifiers _) _) =
   fmap extractFromExportSpecifier (fromCommaList specifiers)
 extractExportInfo (JSExportFrom clause (JSFromClause _ _ moduleName) _) =
-  fmap (setExportModule (Text.pack moduleName)) (extractExportInfoFromClause clause)
+  fmap (setExportModule (Text.decodeUtf8 moduleName)) (extractExportInfoFromClause clause)
 extractExportInfo _ = []
 
 buildDependencyGraph :: [ModuleDependency] -> [ModuleDependency]
@@ -972,7 +973,7 @@ isPureFunctionCall :: JSExpression -> Bool
 isPureFunctionCall expr = not $ isCallWithSideEffects expr
 
 extractIdentifierName :: JSExpression -> Maybe Text.Text
-extractIdentifierName (JSIdentifier _ name) = Just $ Text.pack name
+extractIdentifierName (JSIdentifier _ name) = Just $ Text.decodeUtf8 name
 extractIdentifierName _ = Nothing
 
 isTopLevelDeclaration :: JSStatement -> Bool
@@ -1035,25 +1036,25 @@ extractImportNames clause = case clause of
   _ -> Set.empty
 
 extractImportSpecifierName :: JSImportSpecifier -> Text.Text
-extractImportSpecifierName (JSImportSpecifier (JSIdentName _ name)) = Text.pack name
-extractImportSpecifierName (JSImportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ alias)) = Text.pack alias
+extractImportSpecifierName (JSImportSpecifier (JSIdentName _ name)) = Text.decodeUtf8 name
+extractImportSpecifierName (JSImportSpecifierAs (JSIdentName _ _) _ (JSIdentName _ alias)) = Text.decodeUtf8 alias
 extractImportSpecifierName _ = ""
 
 extractDefaultImport :: JSImportClause -> Maybe Text.Text  
-extractDefaultImport (JSImportClauseDefault (JSIdentName _ name)) = Just $ Text.pack name
-extractDefaultImport (JSImportClauseDefaultNameSpace (JSIdentName _ name) _ _) = Just $ Text.pack name
-extractDefaultImport (JSImportClauseDefaultNamed (JSIdentName _ name) _ _) = Just $ Text.pack name
+extractDefaultImport (JSImportClauseDefault (JSIdentName _ name)) = Just $ Text.decodeUtf8 name
+extractDefaultImport (JSImportClauseDefaultNameSpace (JSIdentName _ name) _ _) = Just $ Text.decodeUtf8 name
+extractDefaultImport (JSImportClauseDefaultNamed (JSIdentName _ name) _ _) = Just $ Text.decodeUtf8 name
 extractDefaultImport _ = Nothing
 
 extractNamespaceImport :: JSImportClause -> Maybe Text.Text
-extractNamespaceImport (JSImportClauseNameSpace (JSImportNameSpace _ _ (JSIdentName _ name))) = Just $ Text.pack name
-extractNamespaceImport (JSImportClauseDefaultNameSpace _ _ (JSImportNameSpace _ _ (JSIdentName _ name))) = Just $ Text.pack name
+extractNamespaceImport (JSImportClauseNameSpace (JSImportNameSpace _ _ (JSIdentName _ name))) = Just $ Text.decodeUtf8 name
+extractNamespaceImport (JSImportClauseDefaultNameSpace _ _ (JSImportNameSpace _ _ (JSIdentName _ name))) = Just $ Text.decodeUtf8 name
 extractNamespaceImport _ = Nothing
 
 extractExportInfoFromStatement :: JSStatement -> [ExportInfo]
 extractExportInfoFromStatement stmt = case stmt of
   JSFunction _ (JSIdentName _ name) _ _ _ _ _ ->
-    [createExportInfo (Text.pack name)]
+    [createExportInfo (Text.decodeUtf8 name)]
   JSVariable _ varList _ ->
     fmap (createExportInfo . extractVarName) (fromCommaList varList)
   JSLet _ varList _ ->
@@ -1062,8 +1063,8 @@ extractExportInfoFromStatement stmt = case stmt of
     fmap (createExportInfo . extractVarName) (fromCommaList varList)
   _ -> []
   where
-    extractVarName (JSIdentifier _ name) = Text.pack name
-    extractVarName (JSVarInitExpression (JSIdentifier _ name) _) = Text.pack name
+    extractVarName (JSIdentifier _ name) = Text.decodeUtf8 name
+    extractVarName (JSVarInitExpression (JSIdentifier _ name) _) = Text.decodeUtf8 name
     extractVarName _ = ""
 
 createExportInfo :: Text.Text -> ExportInfo
@@ -1078,11 +1079,11 @@ createExportInfo name = ExportInfo
 
 extractFromExportSpecifier :: JSExportSpecifier -> ExportInfo  
 extractFromExportSpecifier (JSExportSpecifier (JSIdentName _ name)) =
-  createExportInfo (Text.pack name)
+  createExportInfo (Text.decodeUtf8 name)
 extractFromExportSpecifier (JSExportSpecifierAs (JSIdentName _ localName) _ (JSIdentName _ exportName)) =
   ExportInfo
-    { _exportedName = Text.pack exportName
-    , _localName = Just $ Text.pack localName
+    { _exportedName = Text.decodeUtf8 exportName
+    , _localName = Just $ Text.decodeUtf8 localName
     , _exportModule = Nothing
     , _exportLocation = TokenPn 0 0 0
     , _isDefaultExport = False
@@ -1102,13 +1103,13 @@ extractDefaultExportInfo :: JSStatement -> [ExportInfo]
 extractDefaultExportInfo stmt = case stmt of
   -- export default function name() { ... }
   JSFunction _ (JSIdentName _ name) _ _ _ _ _ ->
-    [createDefaultExportInfo (Text.pack name)]
+    [createDefaultExportInfo (Text.decodeUtf8 name)]
   -- export default class Name { ... }
   JSClass _ (JSIdentName _ name) _ _ _ _ _ ->
-    [createDefaultExportInfo (Text.pack name)]
+    [createDefaultExportInfo (Text.decodeUtf8 name)]
   -- export default identifier;
   JSExpressionStatement (JSIdentifier _ name) _ ->
-    [createDefaultExportInfo (Text.pack name)]
+    [createDefaultExportInfo (Text.decodeUtf8 name)]
   -- export default expression;
   JSExpressionStatement _ _ ->
     [createDefaultExportInfo "default"]
@@ -1161,7 +1162,7 @@ analyzeStringLiteralForIdentifiers knownIdentifiers expr = case expr of
   JSStringLiteral _ quotedStr -> do
     -- Remove quotes and extract content
     let unquoted = Text.dropWhile (== '"') (Text.dropWhileEnd (== '"')
-                   (Text.dropWhile (== '\'') (Text.dropWhileEnd (== '\'') (Text.pack quotedStr))))
+                   (Text.dropWhile (== '\'') (Text.dropWhileEnd (== '\'') (Text.decodeUtf8 quotedStr))))
     let foundIdentifiers = extractIdentifiersFromJSString unquoted knownIdentifiers
     traverse_ markIdentifierUsed foundIdentifiers
   _ -> pure ()  -- Not a string literal, skip

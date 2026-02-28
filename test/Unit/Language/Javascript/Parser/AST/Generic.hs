@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Unit.Language.Javascript.Parser.AST.Generic
   ( testGenericNFData,

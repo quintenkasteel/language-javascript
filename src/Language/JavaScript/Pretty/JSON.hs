@@ -52,8 +52,10 @@ module Language.JavaScript.Pretty.JSON
   )
 where
 
+import qualified Data.ByteString.Char8 as BS8
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import qualified Language.JavaScript.Parser.AST as AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import qualified Language.JavaScript.Parser.Token as Token
@@ -136,49 +138,49 @@ renderExpressionToJSON expr = case expr of
       formatJSONObject
         [ ("type", "\"JSDecimal\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString value)
+          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
         ]
     renderHexLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSHexInteger\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString value)
+          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
         ]
     renderOctalLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSOctal\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString value)
+          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
         ]
     renderBigIntLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSBigIntLiteral\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString value)
+          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
         ]
     renderStringLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSStringLiteral\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString value)
+          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
         ]
     renderIdentifier annot name =
       formatJSONObject
         [ ("type", "\"JSIdentifier\""),
           ("annotation", renderAnnotation annot),
-          ("name", escapeJSONString name)
+          ("name", escapeJSONString (Text.unpack . Text.decodeUtf8 $ name))
         ]
     renderGenericLiteral annot value =
       formatJSONObject
         [ ("type", "\"JSLiteral\""),
           ("annotation", renderAnnotation annot),
-          ("value", escapeJSONString value)
+          ("value", escapeJSONString (Text.unpack . Text.decodeUtf8 $ value))
         ]
     renderRegexLiteral annot pattern =
       formatJSONObject
         [ ("type", "\"JSRegEx\""),
           ("annotation", renderAnnotation annot),
-          ("pattern", escapeJSONString pattern)
+          ("pattern", escapeJSONString (Text.unpack . Text.decodeUtf8 $ pattern))
         ]
     renderBinaryExpression left op right =
       formatJSONObject
@@ -451,7 +453,7 @@ renderIdentToJSON (AST.JSIdentName ann name) =
   formatJSONObject
     [ ("type", "\"Identifier\""),
       ("annotation", renderAnnotation ann),
-      ("name", escapeJSONString name)
+      ("name", escapeJSONString (Text.unpack . Text.decodeUtf8 $ name))
     ]
 renderIdentToJSON AST.JSIdentNone =
   formatJSONObject
@@ -488,7 +490,7 @@ renderImportDeclarationToJSON decl = case decl of
     formatJSONObject $
       [ ("type", "\"ImportBareDeclaration\""),
         ("annotation", renderAnnotation ann),
-        ("module", escapeJSONString moduleName),
+        ("module", escapeJSONString (Text.unpack . Text.decodeUtf8 $ moduleName)),
         ("semicolon", renderSemiColonToJSON semi)
       ]
         ++ case attrs of
@@ -522,7 +524,7 @@ renderFromClauseToJSON (AST.JSFromClause ann1 ann2 moduleName) =
     [ ("type", "\"FromClause\""),
       ("fromAnnotation", renderAnnotation ann1),
       ("moduleAnnotation", renderAnnotation ann2),
-      ("module", escapeJSONString moduleName)
+      ("module", escapeJSONString (Text.unpack . Text.decodeUtf8 $ moduleName))
     ]
 
 -- | Render import namespace to JSON.
@@ -581,13 +583,13 @@ renderComment comment = case comment of
     formatJSONObject
       [ ("type", "\"Comment\""),
         ("position", renderPosition pos),
-        ("text", escapeJSONString text)
+        ("text", escapeJSONString (Text.unpack . Text.decodeUtf8 $ text))
       ]
   Token.WhiteSpace pos text ->
     formatJSONObject
       [ ("type", "\"WhiteSpace\""),
         ("position", renderPosition pos),
-        ("text", escapeJSONString text)
+        ("text", escapeJSONString (Text.unpack . Text.decodeUtf8 $ text))
       ]
   Token.JSDocA pos jsDoc ->
     formatJSONObject

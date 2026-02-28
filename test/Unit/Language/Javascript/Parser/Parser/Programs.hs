@@ -10,9 +10,11 @@ where
 import Control.Applicative ((<$>))
 #endif
 
-import Data.ByteString.Char8 (pack)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.List (isPrefixOf)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
   ( JSAST (..),
@@ -100,7 +102,8 @@ testProgramParser = describe "Program parser:" $ do
 
   it "unicode" $ do
     case testProg "àáâãäå = 1;" of
-      Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "àáâãäå") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
+      Right (JSAstProgram [JSAssignStatement (JSIdentifier _ ident) (JSAssign _) (JSDecimal _ "1") _] _)
+        | ident == utf8 "àáâãäå" -> pure ()
       result -> expectationFailure ("Expected unicode assignment, got: " ++ show result)
     case testProg "//comment\x000Ax=1;" of
       Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
@@ -115,10 +118,12 @@ testProgramParser = describe "Program parser:" $ do
       Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
       result -> expectationFailure ("Expected assignment with paragraph separator, got: " ++ show result)
     case testProg "$aà = 1;_b=2;\0065a=2" of
-      Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "$aà") (JSAssign _) (JSDecimal _ "1") _, JSAssignStatement (JSIdentifier _ "_b") (JSAssign _) (JSDecimal _ "2") _, JSAssignStatement (JSIdentifier _ "Aa") (JSAssign _) (JSDecimal _ "2") _] _) -> pure ()
+      Right (JSAstProgram [JSAssignStatement (JSIdentifier _ id1) (JSAssign _) (JSDecimal _ "1") _, JSAssignStatement (JSIdentifier _ "_b") (JSAssign _) (JSDecimal _ "2") _, JSAssignStatement (JSIdentifier _ "Aa") (JSAssign _) (JSDecimal _ "2") _] _)
+        | id1 == utf8 "$aà" -> pure ()
       result -> expectationFailure ("Expected three assignments, got: " ++ show result)
     case testProg "x=\"àáâãäå\";y='\3012a\0068'" of
-      Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSStringLiteral _ "\"àáâãäå\"") _, JSAssignStatement (JSIdentifier _ "y") (JSAssign _) (JSStringLiteral _ "'\3012aD'") _] _) -> pure ()
+      Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSStringLiteral _ str1) _, JSAssignStatement (JSIdentifier _ "y") (JSAssign _) (JSStringLiteral _ str2) _] _)
+        | str1 == utf8 "\"àáâãäå\"", str2 == utf8 "'\3012aD'" -> pure ()
       result -> expectationFailure ("Expected two assignments with unicode strings, got: " ++ show result)
     case testProg "a \f\v\t\r\n=\x00a0\x1680\x180e\x2000\x2001\x2002\x2003\x2004\x2005\x2006\x2007\x2008\x2009\x200a\x2028\x2029\x202f\x205f\x3000\&1;" of
       Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "a") (JSAssign _) (JSDecimal _ "1") _] _) -> pure ()
@@ -244,6 +249,11 @@ testProgramParser = describe "Program parser:" $ do
 
 testProg :: String -> Either String JSAST
 testProg str = parseUsing parseProgram str "src"
+
+-- | Encode a Haskell String to UTF-8 ByteString for test comparisons.
+-- BS8.pack truncates multi-byte chars; this preserves full Unicode.
+utf8 :: String -> ByteString
+utf8 = Text.encodeUtf8 . Text.pack
 
 testFileUtf8 :: FilePath -> IO String
 testFileUtf8 fileName = showStrippedString <$> parseFileUtf8 fileName

@@ -154,7 +154,7 @@ testLiteralSerialization = describe "Literal Serialization" $ do
       validateJSON json
 
     it "serializes identifiers with Unicode" $ do
-      let expr = AST.JSIdentifier testAnnot "café"
+      let expr = AST.JSIdentifier testAnnot (Text.encodeUtf8 "café")
       let json = PJSON.renderExpressionToJSON expr
       json `shouldSatisfy` Text.isInfixOf "JSIdentifier"
       json `shouldSatisfy` Text.isInfixOf "café"

@@ -41,6 +41,7 @@ import Control.Lens ((^.))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Process.TreeShake.Types
 import qualified Language.JavaScript.Process.TreeShake.Types as Types
@@ -601,7 +602,7 @@ isImportSpecifierUsed usageMap spec = case spec of
   JSImportSpecifier ident -> isIdentUsed usageMap ident
   JSImportSpecifierAs ident _ asIdent -> isIdentUsed usageMap asIdent  -- Check the alias name
   where
-    isIdentUsed usageMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.pack name) usageMap
+    isIdentUsed usageMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
     isIdentUsed _ JSIdentNone = False
 
 -- | Check if comma list is empty after filtering.
@@ -681,7 +682,7 @@ isStatementUsed usageMap stmt = case stmt of
 -- or constructs that should be preserved.
 isExpressionUsed :: UsageMap -> JSExpression -> Bool
 isExpressionUsed usageMap expr = case expr of
-  JSIdentifier _ name -> Types.isIdentifierUsed (Text.pack name) usageMap
+  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
   JSVarInitExpression lhs rhs -> 
     isExpressionUsed usageMap lhs || isVarInitializerUsed usageMap rhs
   JSCallExpression target _ args _ ->
@@ -730,7 +731,7 @@ isVarInitializerUsed _ JSVarInitNone = False
 
 -- | Helper to check if identifier is used.
 identifierUsed :: UsageMap -> JSIdent -> Bool  
-identifierUsed usageMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.pack name) usageMap
+identifierUsed usageMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
 identifierUsed _ JSIdentNone = False
 
 -- | Helper to check if array element is used.
@@ -810,7 +811,7 @@ validateTreeShaking _original _optimized = True  -- Minimal implementation: assu
 -- | Extract identifier from simple expressions.
 extractIdentifierFromExpression :: JSExpression -> Maybe Text.Text
 extractIdentifierFromExpression expr = case expr of
-  JSIdentifier _ name -> Just (Text.pack name)
+  JSIdentifier _ name -> Just (Text.decodeUtf8 name)
   _ -> Nothing
 
 -- | Build a comma list from a regular list.
@@ -840,7 +841,7 @@ eliminateBlock opts usageMap (JSBlock lb stmts rb) =
 -- | Check if function is used or contains used identifiers.
 isFunctionUsed :: UsageMap -> JSIdent -> Bool
 isFunctionUsed usageMap (JSIdentName _ name) = 
-  Types.isIdentifierUsed (Text.pack name) usageMap
+  Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
 isFunctionUsed _ JSIdentNone = False
 
 -- | Check if function should be preserved (used or contains used variables).
@@ -912,9 +913,9 @@ isVariableDeclarationUsedOrPotentiallyDynamic usageMap expr =
 -- | Check if variable declaration is used or has side effects.
 isVariableDeclarationUsed :: UsageMap -> JSExpression -> Bool
 isVariableDeclarationUsed usageMap expr = case expr of
-  JSIdentifier _ name -> Types.isIdentifierUsed (Text.pack name) usageMap
+  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
   JSVarInitExpression (JSIdentifier _ name) initializer ->
-    let varName = Text.pack name
+    let varName = Text.decodeUtf8 name
     in -- Preserve if variable is used OR if initializer has side effects OR if initializer references used identifiers OR if variable is assigned an object with dynamic access
     Types.isIdentifierUsed varName usageMap ||
     hasUnavoidableSideEffects initializer ||
@@ -946,7 +947,7 @@ initializerReferencesUsedIdentifiers usageMap initializer = case initializer of
 -- | Check if expression references used identifiers.
 expressionReferencesUsedIdentifiers :: UsageMap -> JSExpression -> Bool
 expressionReferencesUsedIdentifiers usageMap expr = case expr of
-  JSIdentifier _ name -> Types.isIdentifierUsed (Text.pack name) usageMap
+  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
   JSMemberDot obj _ _ -> expressionReferencesUsedIdentifiers usageMap obj
   JSMemberSquare obj _ idx _ ->
     expressionReferencesUsedIdentifiers usageMap obj ||

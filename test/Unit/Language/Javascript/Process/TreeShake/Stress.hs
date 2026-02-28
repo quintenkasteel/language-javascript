@@ -13,6 +13,8 @@ module Unit.Language.Javascript.Process.TreeShake.Stress
   )
 where
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Text as Text
 import Control.Lens ((.~), (&))
 import Language.JavaScript.Parser.AST
@@ -179,28 +181,28 @@ testPathologicalCases = describe "Pathological Cases" $ do
 -- Helper functions (simplified versions)
 
 -- | Check if AST contains specific identifier in its structure.
-astShouldContainIdentifier :: JSAST -> Text.Text -> Expectation
+astShouldContainIdentifier :: JSAST -> ByteString -> Expectation
 astShouldContainIdentifier ast identifier =
   if astContainsIdentifier ast identifier
   then pure ()
-  else expectationFailure $ "Identifier not found in AST: " ++ Text.unpack identifier
+  else expectationFailure $ "Identifier not found in AST: " ++ BS8.unpack identifier
 
 -- | Check if AST does not contain specific identifier in its structure.
-astShouldNotContainIdentifier :: JSAST -> Text.Text -> Expectation
+astShouldNotContainIdentifier :: JSAST -> ByteString -> Expectation
 astShouldNotContainIdentifier ast identifier =
   if astContainsIdentifier ast identifier
-  then expectationFailure $ "Identifier should not be in AST: " ++ Text.unpack identifier
+  then expectationFailure $ "Identifier should not be in AST: " ++ BS8.unpack identifier
   else pure ()
 
 -- | Check if AST contains specific identifier anywhere in its structure.
-astContainsIdentifier :: JSAST -> Text.Text -> Bool
+astContainsIdentifier :: JSAST -> ByteString -> Bool
 astContainsIdentifier ast identifier = case ast of
   JSAstProgram statements _ ->
     any (statementContainsIdentifier identifier) statements
   _ -> False  -- Simplified for stress tests
 
 -- | Check if statement contains identifier.
-statementContainsIdentifier :: Text.Text -> JSStatement -> Bool
+statementContainsIdentifier :: ByteString -> JSStatement -> Bool
 statementContainsIdentifier identifier stmt = case stmt of
   JSFunction _ ident _ _ _ body _ ->
     identifierMatches identifier ident || blockContainsIdentifier identifier body
@@ -215,14 +217,14 @@ statementContainsIdentifier identifier stmt = case stmt of
   _ -> False  -- Simplified
 
 -- | Check if statement block contains identifier.
-blockContainsIdentifier :: Text.Text -> JSBlock -> Bool
+blockContainsIdentifier :: ByteString -> JSBlock -> Bool
 blockContainsIdentifier identifier (JSBlock _ stmts _) =
   any (statementContainsIdentifier identifier) stmts
 
 -- | Check if expression contains identifier.
-expressionContainsIdentifier :: Text.Text -> JSExpression -> Bool
+expressionContainsIdentifier :: ByteString -> JSExpression -> Bool
 expressionContainsIdentifier identifier expr = case expr of
-  JSIdentifier _ name -> Text.pack name == identifier
+  JSIdentifier _ name -> name == identifier
   JSVarInitExpression lhs rhs ->
     expressionContainsIdentifier identifier lhs ||
     initializerContainsIdentifier identifier rhs
@@ -240,13 +242,13 @@ expressionContainsIdentifier identifier expr = case expr of
   _ -> False  -- Simplified
 
 -- | Check if variable initializer contains identifier.
-initializerContainsIdentifier :: Text.Text -> JSVarInitializer -> Bool
+initializerContainsIdentifier :: ByteString -> JSVarInitializer -> Bool
 initializerContainsIdentifier identifier initializer = case initializer of
   JSVarInit _ expr -> expressionContainsIdentifier identifier expr
   JSVarInitNone -> False
 
 -- | Check if JSIdent matches identifier.
-identifierMatches :: Text.Text -> JSIdent -> Bool
-identifierMatches identifier (JSIdentName _ name) = Text.pack name == identifier
+identifierMatches :: ByteString -> JSIdent -> Bool
+identifierMatches identifier (JSIdentName _ name) = name == identifier
 identifierMatches _ JSIdentNone = False
 

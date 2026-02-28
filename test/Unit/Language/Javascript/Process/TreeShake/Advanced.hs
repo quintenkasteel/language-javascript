@@ -25,6 +25,8 @@ module Unit.Language.Javascript.Process.TreeShake.Advanced
   )
 where
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -970,21 +972,21 @@ testFrameworkLifecyclePatterns = describe "Framework Lifecycle Patterns" $ do
 -- Helper functions (reuse from Core.hs)
 
 -- | Check if AST contains specific identifier in its structure.
-astShouldContainIdentifier :: JSAST -> Text.Text -> Expectation
+astShouldContainIdentifier :: JSAST -> ByteString -> Expectation
 astShouldContainIdentifier ast identifier =
   if astContainsIdentifier ast identifier
   then pure ()
-  else expectationFailure $ "Identifier not found in AST: " ++ Text.unpack identifier
+  else expectationFailure $ "Identifier not found in AST: " ++ BS8.unpack identifier
 
 -- | Check if AST does not contain specific identifier in its structure.
-astShouldNotContainIdentifier :: JSAST -> Text.Text -> Expectation
+astShouldNotContainIdentifier :: JSAST -> ByteString -> Expectation
 astShouldNotContainIdentifier ast identifier =
   if astContainsIdentifier ast identifier
-  then expectationFailure $ "Identifier should not be in AST: " ++ Text.unpack identifier
+  then expectationFailure $ "Identifier should not be in AST: " ++ BS8.unpack identifier
   else pure ()
 
 -- | Check if AST contains specific identifier anywhere in its structure.
-astContainsIdentifier :: JSAST -> Text.Text -> Bool
+astContainsIdentifier :: JSAST -> ByteString -> Bool
 astContainsIdentifier ast identifier = case ast of
   JSAstProgram statements _ ->
     any (statementContainsIdentifier identifier) statements
@@ -998,7 +1000,7 @@ astContainsIdentifier ast identifier = case ast of
     expressionContainsIdentifier identifier expr
 
 -- | Check if statement contains identifier.
-statementContainsIdentifier :: Text.Text -> JSStatement -> Bool
+statementContainsIdentifier :: ByteString -> JSStatement -> Bool
 statementContainsIdentifier identifier stmt = case stmt of
   JSFunction _ ident _ _ _ body _ ->
     identifierMatches identifier ident || blockContainsIdentifier identifier body
@@ -1033,9 +1035,9 @@ statementContainsIdentifier identifier stmt = case stmt of
   _ -> False
 
 -- | Check if expression contains identifier.
-expressionContainsIdentifier :: Text.Text -> JSExpression -> Bool
+expressionContainsIdentifier :: ByteString -> JSExpression -> Bool
 expressionContainsIdentifier identifier expr = case expr of
-  JSIdentifier _ name -> Text.pack name == identifier
+  JSIdentifier _ name -> name == identifier
   JSVarInitExpression lhs rhs ->
     expressionContainsIdentifier identifier lhs ||
     case rhs of
@@ -1075,22 +1077,22 @@ expressionContainsIdentifier identifier expr = case expr of
   _ -> False
 
 -- Helper functions for complex expressions
-arrayElementContainsIdentifier :: Text.Text -> JSArrayElement -> Bool
+arrayElementContainsIdentifier :: ByteString -> JSArrayElement -> Bool
 arrayElementContainsIdentifier identifier element = case element of
   JSArrayElement expr -> expressionContainsIdentifier identifier expr
   JSArrayComma _ -> False
 
-objectPropertyListContainsIdentifier :: Text.Text -> JSObjectPropertyList -> Bool
+objectPropertyListContainsIdentifier :: ByteString -> JSObjectPropertyList -> Bool
 objectPropertyListContainsIdentifier identifier propList = case propList of
   JSCTLComma props _ -> any (objectPropertyContainsIdentifier identifier) (fromCommaList props)
   JSCTLNone props -> any (objectPropertyContainsIdentifier identifier) (fromCommaList props)
 
-objectPropertyContainsIdentifier :: Text.Text -> JSObjectProperty -> Bool
+objectPropertyContainsIdentifier :: ByteString -> JSObjectProperty -> Bool
 objectPropertyContainsIdentifier identifier prop = case prop of
   JSPropertyNameandValue propName _ values ->
     propertyNameContainsIdentifier identifier propName ||
     any (expressionContainsIdentifier identifier) values
-  JSPropertyIdentRef _ name -> Text.pack name == identifier
+  JSPropertyIdentRef _ name -> name == identifier
   JSObjectMethod (JSMethodDefinition propName _ params _ body) ->
     propertyNameContainsIdentifier identifier propName ||
     any (expressionContainsIdentifier identifier) (fromCommaList params) ||
@@ -1106,27 +1108,27 @@ objectPropertyContainsIdentifier identifier prop = case prop of
   JSObjectSpread _ expr -> expressionContainsIdentifier identifier expr
 
 -- | Check if property name contains identifier.
-propertyNameContainsIdentifier :: Text.Text -> JSPropertyName -> Bool
+propertyNameContainsIdentifier :: ByteString -> JSPropertyName -> Bool
 propertyNameContainsIdentifier identifier propName = case propName of
-  JSPropertyIdent _ name -> Text.pack name == identifier
-  JSPropertyString _ str -> Text.pack str == identifier
-  JSPropertyNumber _ num -> Text.pack num == identifier
+  JSPropertyIdent _ name -> name == identifier
+  JSPropertyString _ str -> str == identifier
+  JSPropertyNumber _ num -> num == identifier
   JSPropertyComputed _ expr _ -> expressionContainsIdentifier identifier expr
 
 -- | Check if block contains identifier.
-blockContainsIdentifier :: Text.Text -> JSBlock -> Bool
+blockContainsIdentifier :: ByteString -> JSBlock -> Bool
 blockContainsIdentifier identifier (JSBlock _ stmts _) =
   any (statementContainsIdentifier identifier) stmts
 
 -- | Check if module item contains identifier.
-moduleItemContainsIdentifier :: Text.Text -> JSModuleItem -> Bool
+moduleItemContainsIdentifier :: ByteString -> JSModuleItem -> Bool
 moduleItemContainsIdentifier identifier item = case item of
   JSModuleStatementListItem stmt -> statementContainsIdentifier identifier stmt
   JSModuleImportDeclaration _ importDecl -> importContainsIdentifier identifier importDecl
   JSModuleExportDeclaration _ exportDecl -> exportContainsIdentifier identifier exportDecl
 
 -- | Check if import declaration contains identifier.
-importContainsIdentifier :: Text.Text -> JSImportDeclaration -> Bool
+importContainsIdentifier :: ByteString -> JSImportDeclaration -> Bool
 importContainsIdentifier identifier importDecl = case importDecl of
   JSImportDeclaration importClause _ _ _ ->
     case importClause of
@@ -1142,14 +1144,14 @@ importContainsIdentifier identifier importDecl = case importDecl of
   _ -> False
 
 -- | Check if import spec contains identifier.
-importSpecContainsIdentifier :: Text.Text -> JSImportSpecifier -> Bool
+importSpecContainsIdentifier :: ByteString -> JSImportSpecifier -> Bool
 importSpecContainsIdentifier identifier spec = case spec of
   JSImportSpecifier ident -> identifierMatches identifier ident
   JSImportSpecifierAs _ _ localIdent -> identifierMatches identifier localIdent
   _ -> False
 
 -- | Check if export declaration contains identifier.
-exportContainsIdentifier :: Text.Text -> JSExportDeclaration -> Bool
+exportContainsIdentifier :: ByteString -> JSExportDeclaration -> Bool
 exportContainsIdentifier identifier exportDecl = case exportDecl of
   JSExportFrom exportClause _ _ ->
     exportClauseContainsIdentifier identifier exportClause
@@ -1158,20 +1160,20 @@ exportContainsIdentifier identifier exportDecl = case exportDecl of
   _ -> False
 
 -- | Check if export clause contains identifier.
-exportClauseContainsIdentifier :: Text.Text -> JSExportClause -> Bool
+exportClauseContainsIdentifier :: ByteString -> JSExportClause -> Bool
 exportClauseContainsIdentifier identifier exportClause = case exportClause of
   JSExportClause _ specs _ ->
     any (exportSpecContainsIdentifier identifier) (fromCommaList specs)
 
 -- | Check if export spec contains identifier.
-exportSpecContainsIdentifier :: Text.Text -> JSExportSpecifier -> Bool
+exportSpecContainsIdentifier :: ByteString -> JSExportSpecifier -> Bool
 exportSpecContainsIdentifier identifier spec = case spec of
   JSExportSpecifier ident -> identifierMatches identifier ident
   JSExportSpecifierAs ident _ _ -> identifierMatches identifier ident
   _ -> False
 
 -- | Check if JSIdent matches identifier.
-identifierMatches :: Text.Text -> JSIdent -> Bool
-identifierMatches identifier (JSIdentName _ name) = Text.pack name == identifier
+identifierMatches :: ByteString -> JSIdent -> Bool
+identifierMatches identifier (JSIdentName _ name) = name == identifier
 identifierMatches _ JSIdentNone = False
 

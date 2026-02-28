@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | High-performance JavaScript parser using flatparse backend.
 --
 -- This module provides the main parsing interface for JavaScript source code,
