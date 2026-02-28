@@ -34,7 +34,7 @@ import qualified Data.Text.Encoding.Error as Text
 import Test.Hspec
 import qualified Test.Hspec as Hspec
 
--- | Main test suite for advanced lexer features - pending flatparse migration
+-- | Main test suite for advanced lexer features - needs flatparse test helpers
 testAdvancedLexer :: Spec
 testAdvancedLexer = Hspec.describe "Advanced Lexer Features" $ do
   testRegexDivisionDisambiguation
@@ -50,30 +50,22 @@ testAdvancedLexer = Hspec.describe "Advanced Lexer Features" $ do
 testRegexDivisionDisambiguation :: Spec
 testRegexDivisionDisambiguation = describe "Regex/Division Disambiguation" $ do
   it "all regex/division disambiguation tests" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
-    -- The comprehensive test suite that was here will be re-enabled
-    -- when the flatparse lexer is fully implemented
+    pending
 
 -- | Phase 2: Comprehensive ASI testing (~100 paths)
 testASIComprehensive :: Spec
 testASIComprehensive = describe "Comprehensive ASI Testing" $ do
   it "all ASI tests" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
-    -- The comprehensive ASI test suite will be re-enabled
-    -- when the flatparse lexer is fully implemented
+    pending
 
 -- | Phase 3: Multi-state lexer transitions (~80 paths)
 testMultiStateLexerTransitions :: Spec
 testMultiStateLexerTransitions = describe "Multi-state Lexer Transitions" $ do
   it "all lexer transition tests" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
-    -- The multi-state transition tests will be re-enabled
-    -- when the flatparse lexer is fully implemented
+    pending
 
 -- | Phase 4: Lexer error recovery (~60 paths)
 testLexerErrorRecovery :: Spec
 testLexerErrorRecovery = describe "Lexer Error Recovery" $ do
   it "all error recovery tests" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
-    -- The error recovery tests will be re-enabled
-    -- when the flatparse lexer is fully implemented
+    pending

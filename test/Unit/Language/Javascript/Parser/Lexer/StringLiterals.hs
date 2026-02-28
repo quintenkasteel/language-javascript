@@ -33,44 +33,44 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Encoding.Error as Text
 import Test.Hspec
 
--- | Main test suite for string literal complexity - pending flatparse migration
+-- | Main test suite for string literal complexity - needs flatparse test helpers
 testStringLiteralComplexity :: Spec
 testStringLiteralComplexity = describe "String Literal Complexity" $ do
   describe "Extended string literal tests" $ do
     it "all escape sequences" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "unicode handling" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "cross-quotes" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "error cases" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Template literal comprehensive tests" $ do
     it "interpolation" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "nesting" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "escapes" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "tagged templates" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Edge cases and performance" $ do
     it "long strings" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "complex escapes" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
     it "boundary conditions" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
 -- Legacy Alex-based tokenizer test helpers - disabled for flatparse migration
 {-

@@ -40,36 +40,36 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Encoding.Error as Text
 import Test.Hspec
 
--- | Main test suite for Unicode support - pending flatparse migration
+-- | Main test suite for Unicode support - needs flatparse test helpers
 testUnicodeSupport :: Spec
 testUnicodeSupport = describe "Unicode Support" $ do
   describe "BOM handling" $ do
     it "all BOM tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Unicode line separators" $ do
     it "all line separator tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Unicode in comments" $ do
     it "all Unicode comment tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Unicode whitespace" $ do
     it "all Unicode whitespace tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Unicode escape sequences" $ do
     it "all escape sequence tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Unicode identifiers" $ do
     it "all Unicode identifier tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
   describe "Unicode string literals" $ do
     it "all Unicode string literal tests" $ do
-      pendingWith "Waiting for flatparse lexer migration to complete"
+      pending
 
 -- Legacy Alex-based tokenizer test helpers - disabled for flatparse migration
 {-

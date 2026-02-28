@@ -11,33 +11,33 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Encoding.Error as Text
 import Test.Hspec
 
--- | All lexer tests are pending while we migrate from Alex/Happy to flatparse
+-- | Basic lexer tests - needs flatparse test helpers to replace legacy Alex-based helpers
 testLexer :: Spec
 testLexer = describe "Lexer:" $ do
   it "comments" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "// 𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡 " `shouldBe` "[CommentToken]"
     -- testLex "/* 𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡 */" `shouldBe` "[CommentToken]"
 
   it "numbers" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "123" `shouldBe` "[DecimalToken 123]"
     -- testLex "037" `shouldBe` "[OctalToken 037]"
     -- testLex "0xab" `shouldBe` "[HexIntegerToken 0xab]"
     -- testLex "0xCD" `shouldBe` "[HexIntegerToken 0xCD]"
 
   it "invalid numbers" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "089" `shouldBe` "[DecimalToken 0,DecimalToken 89]"
     -- testLex "0xGh" `shouldBe` "[DecimalToken 0,IdentifierToken 'xGh']"
 
   it "string" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "'cat'" `shouldBe` "[StringToken 'cat']"
     -- testLex "\"dog\"" `shouldBe` "[StringToken \"dog\"]"
 
   it "strings with escape chars" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "'\t'" `shouldBe` "[StringToken '\t']"
     -- testLex "'\\n'" `shouldBe` "[StringToken '\\n']"
     -- testLex "'\\\\n'" `shouldBe` "[StringToken '\\\\n']"
@@ -48,11 +48,11 @@ testLexer = describe "Lexer:" $ do
     -- testLex "'\\-'" `shouldBe` "[StringToken '\\-']"
 
   it "strings with non-escaped chars" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "'\\/'" `shouldBe` "[StringToken '\\/']"
 
   it "strings with escaped quotes" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "'\"'" `shouldBe` "[StringToken '\"']"
     -- testLex "\"\\\"\"" `shouldBe` "[StringToken \"\\\\\"\"]"
     -- testLex "'\\\''" `shouldBe` "[StringToken '\\\\'']"
@@ -60,36 +60,36 @@ testLexer = describe "Lexer:" $ do
     -- testLex "\"\\'\"" `shouldBe` "[StringToken \"\\'\"]"
 
   it "spread token" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "...a" `shouldBe` "[SpreadToken,IdentifierToken 'a']"
 
   it "assignment" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "x=1" `shouldBe` "[IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
     -- testLex "x=1\ny=2" `shouldBe` "[IdentifierToken 'x',SimpleAssignToken,DecimalToken 1,WsToken,IdentifierToken 'y',SimpleAssignToken,DecimalToken 2]"
 
   it "break/continue/return" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "break\nx=1" `shouldBe` "[BreakToken,WsToken,IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
     -- testLex "continue\nx=1" `shouldBe` "[ContinueToken,WsToken,IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
     -- testLex "return\nx=1" `shouldBe` "[ReturnToken,WsToken,IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
 
   it "var/let" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "var\n" `shouldBe` "[VarToken,WsToken]"
     -- testLex "let\n" `shouldBe` "[LetToken,WsToken]"
 
   it "in/of" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "in\n" `shouldBe` "[InToken,WsToken]"
     -- testLex "of\n" `shouldBe` "[OfToken,WsToken]"
 
   it "function" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "async function\n" `shouldBe` "[AsyncToken,WsToken,FunctionToken,WsToken]"
 
   it "bigint literals" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "123n" `shouldBe` "[BigIntToken 123n]"
     -- testLex "0n" `shouldBe` "[BigIntToken 0n]"
     -- testLex "0x1234n" `shouldBe` "[BigIntToken 0x1234n]"
@@ -97,18 +97,18 @@ testLexer = describe "Lexer:" $ do
     -- testLex "077n" `shouldBe` "[BigIntToken 077n]"
 
   it "optional chaining" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "obj?.prop" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,IdentifierToken 'prop']"
     -- testLex "obj?.[key]" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,LeftBracketToken,IdentifierToken 'key',RightBracketToken]"
     -- testLex "obj?.method()" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,IdentifierToken 'method',LeftParenToken,RightParenToken]"
 
   it "nullish coalescing" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- testLex "x ?? y" `shouldBe` "[IdentifierToken 'x',WsToken,NullishCoalescingToken,WsToken,IdentifierToken 'y']"
     -- testLex "null??'default'" `shouldBe` "[NullToken,NullishCoalescingToken,StringToken 'default']"
 
   it "automatic semicolon insertion with comments" $ do
-    pendingWith "Waiting for flatparse lexer migration to complete"
+    pending
     -- Single-line comments with newlines trigger ASI
     -- testLexASI "return // comment\n4" `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,AutoSemiToken,DecimalToken 4]"
     -- testLexASI "break // comment\nx" `shouldBe` "[BreakToken,WsToken,CommentToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
