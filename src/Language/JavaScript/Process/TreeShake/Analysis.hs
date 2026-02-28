@@ -71,6 +71,7 @@ data AnalysisState = AnalysisState
   , _analysisHasEval :: !Bool
   , _analysisEvalCount :: !Int
   , _analysisDynamicAccess :: !(Set.Set Text.Text)
+  , _analysisSideEffectCount :: !Int
   } deriving (Eq, Show)
 
 type AnalysisM = State AnalysisState
@@ -91,6 +92,7 @@ analyzeUsageWithOptions opts ast =
         , _analysisHasEval = False
         , _analysisEvalCount = 0
         , _analysisDynamicAccess = Set.empty
+        , _analysisSideEffectCount = 0
         }
       
       finalState = execState (analyzeAST ast) initialState
@@ -593,28 +595,67 @@ exitScope = do
 
 -- | Declare identifier in current scope.
 declareIdentifier :: JSIdent -> AnalysisM ()
-declareIdentifier (JSIdentName _ name) = do
+declareIdentifier (JSIdentName annot name) = do
   scopeLevel <- gets _currentScopeLevel
   usageMap <- gets _analysisUsageMap
-  
+
   let identifier = Text.decodeUtf8 name
   let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
   let updatedInfo = currentInfo
         & scopeDepth .~ scopeLevel
-        & declarationLocation ?~ TokenPn 0 0 0  -- TODO: Get real position
-  
+        & declarationLocation ?~ annotPosition annot
+
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
-  
+
 declareIdentifier JSIdentNone = pure ()
 
--- | Declare identifier from expression (handles destructuring).
+-- | Extract position from annotation, defaulting to origin for missing annotations.
+annotPosition :: JSAnnot -> TokenPosn
+annotPosition (JSAnnot pos _) = pos
+annotPosition JSAnnotSpace = TokenPn 0 0 0
+annotPosition JSNoAnnot = TokenPn 0 0 0
+
+-- | Declare identifier from expression, handling destructuring patterns.
+-- Supports array destructuring @[a, b]@, object destructuring @{a, b: c}@,
+-- spread elements @...rest@, and default values @x = defaultVal@.
 declareFromExpression :: JSExpression -> AnalysisM ()
-declareFromExpression (JSIdentifier _ name) = 
-  declareIdentifier (JSIdentName noAnnotation name)
-  where noAnnotation = JSNoAnnot
-declareFromExpression (JSVarInitExpression var _) = 
+declareFromExpression (JSIdentifier _ name) =
+  declareIdentifier (JSIdentName JSNoAnnot name)
+declareFromExpression (JSVarInitExpression var _) =
   declareFromExpression var
-declareFromExpression _ = pure ()  -- TODO: Handle destructuring patterns
+declareFromExpression (JSArrayLiteral _ elements _) =
+  traverse_ declareFromArrayElement elements
+declareFromExpression (JSObjectLiteral _ properties _) =
+  declareFromObjectProperties properties
+declareFromExpression (JSSpreadExpression _ expr) =
+  declareFromExpression expr
+declareFromExpression (JSAssignExpression lhs _ _rhs) =
+  declareFromExpression lhs
+declareFromExpression _ = pure ()
+
+-- | Declare identifiers from array destructuring elements.
+declareFromArrayElement :: JSArrayElement -> AnalysisM ()
+declareFromArrayElement (JSArrayElement expr) = declareFromExpression expr
+declareFromArrayElement (JSArrayComma _) = pure ()
+
+-- | Declare identifiers from object destructuring properties.
+declareFromObjectProperties :: JSObjectPropertyList -> AnalysisM ()
+declareFromObjectProperties (JSCTLComma props _) = declareFromObjectPropertyList props
+declareFromObjectProperties (JSCTLNone props) = declareFromObjectPropertyList props
+
+-- | Walk the comma list of object properties for destructuring declarations.
+declareFromObjectPropertyList :: JSCommaList JSObjectProperty -> AnalysisM ()
+declareFromObjectPropertyList = traverse_ declareFromObjectProperty . fromCommaList
+
+-- | Declare identifier from a single object destructuring property.
+declareFromObjectProperty :: JSObjectProperty -> AnalysisM ()
+declareFromObjectProperty (JSPropertyNameandValue _ _ exprs) =
+  traverse_ declareFromExpression exprs
+declareFromObjectProperty (JSPropertyIdentRef _ name) =
+  declareIdentifier (JSIdentName JSNoAnnot name)
+declareFromObjectProperty (JSObjectSpread _ expr) =
+  declareFromExpression expr
+declareFromObjectProperty (JSObjectMethod _) = pure ()
 
 -- | Analyze variable initializer (right-hand side of var x = expr).
 analyzeVariableInitializer :: JSExpression -> AnalysisM ()
@@ -689,9 +730,10 @@ markIdentifierExported identifier = do
   
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
 
--- | Mark that a side effect occurred.
+-- | Mark that a side effect occurred in the current analysis context.
+-- Increments the global side effect counter for use in elimination decisions.
 markSideEffect :: AnalysisM ()
-markSideEffect = pure ()  -- TODO: Track side effects in current context
+markSideEffect = modify $ \s -> s { _analysisSideEffectCount = _analysisSideEffectCount s + 1 }
 
 -- | Check if unary operator has side effects.
 isUnaryOpSideEffect :: JSUnaryOp -> Bool

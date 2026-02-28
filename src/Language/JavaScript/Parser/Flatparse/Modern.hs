@@ -183,7 +183,7 @@ getPos = FP.getPos
 parseError :: String -> JSParser a
 parseError msg = FP.err (BS8.pack msg)
 
--- | Parse simple statement (placeholder implementation)
+-- | Parse a simple expression statement (expression followed by semicolon).
 simpleStatement :: JSParser JSStatement
 simpleStatement = do
   expr <- expression

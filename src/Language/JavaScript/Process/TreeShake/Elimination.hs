@@ -1128,18 +1128,6 @@ isDynamicallyAccessedObject usageMap objName =
     Just usageInfo -> usageInfo ^. Types.hasSideEffects
     Nothing -> False
 
--- | Get object identifier from an expression context
-getObjectIdentifierFromContext :: JSExpression -> Maybe Text.Text
-getObjectIdentifierFromContext (JSObjectLiteral {}) = Nothing  -- Anonymous object
-getObjectIdentifierFromContext _ = Nothing  -- For now, handle only simple cases
-
--- | Filter object properties based on usage analysis
-filterObjectProperties :: UsageMap -> JSObjectPropertyList -> JSObjectPropertyList
-filterObjectProperties usageMap props =
-  -- For now, return all properties (conservative approach)
-  -- TODO: Implement actual filtering based on usage analysis
-  props
-
 -- | Check if a constructor is safe to eliminate when unused.
 -- Safe constructors are those that don't have observable side effects when called.
 isSafeConstructor :: JSExpression -> Bool
