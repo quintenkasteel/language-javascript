@@ -3,6 +3,25 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoOverloadedStrings #-}
 
+-- | JavaScript pretty printer — renders a parsed AST back to source text.
+--
+-- Produces semantically equivalent JavaScript output from an AST, preserving
+-- comments and whitespace annotations. Uses 'Blaze.ByteString.Builder' for
+-- efficient incremental output with zero-copy 'ByteString' rendering.
+--
+-- ==== Usage
+--
+-- @
+-- import Language.JavaScript.Parser (readJsSafe)
+-- import Language.JavaScript.Pretty.Printer (renderToString)
+--
+-- roundTrip :: String -> String
+-- roundTrip src = case readJsSafe src of
+--   Right ast -> renderToString ast
+--   Left err  -> err
+-- @
+--
+-- @since 0.6.0.0
 module Language.JavaScript.Pretty.Printer
   ( -- * Printing
     renderJS,

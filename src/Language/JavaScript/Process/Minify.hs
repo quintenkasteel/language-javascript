@@ -1,6 +1,24 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | JavaScript minification — reduces AST to minimal whitespace output.
+--
+-- Strips all comments, collapses whitespace annotations, and normalizes
+-- semicolons to produce the smallest semantically equivalent JavaScript.
+-- Operates purely on the AST without re-parsing.
+--
+-- ==== Usage
+--
+-- @
+-- import Language.JavaScript.Parser (readJsSafe)
+-- import Language.JavaScript.Process.Minify (minifyJS)
+-- import Language.JavaScript.Pretty.Printer (renderToString)
+--
+-- minify :: String -> Either String String
+-- minify src = renderToString . minifyJS \<$\> readJsSafe src
+-- @
+--
+-- @since 0.6.0.0
 module Language.JavaScript.Process.Minify
   ( -- * Minify
     minifyJS,

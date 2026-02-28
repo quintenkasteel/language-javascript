@@ -1,3 +1,15 @@
+-- | Main entry point for the language-javascript parser library.
+--
+-- Re-exports all public parsing functions, AST types, pretty printing, and
+-- serialization utilities. Most users should import only this module.
+--
+-- Three API tiers are available, from highest to lowest performance:
+--
+--   * 'parseBS' / 'parseModuleBS' — zero-copy 'ByteString' input
+--   * 'parseText' / 'parseModuleText' — 'Text' input (UTF-8 encoded internally)
+--   * 'parse' / 'readJsSafe' — 'String' input (backward compatible)
+--
+-- @since 0.5.0.0
 module Language.JavaScript.Parser
   ( -- * String-based Parsing (backward compatible)
     PA.parse,
