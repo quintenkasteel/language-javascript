@@ -62,8 +62,46 @@ module Language.JavaScript.Process.TreeShake.Types
     unusedCount,
     sideEffectCount,
     estimatedReduction,
+    hasEvalCall,
+    evalCallCount,
     dynamicAccessObjects,
-    
+
+    -- * Lenses for ImportInfo
+    importModule,
+    importedNames,
+    importDefault,
+    importNamespace,
+    importLocation,
+    isImportTypeOnly,
+
+    -- * Lenses for ExportInfo
+    exportedName,
+    localName,
+    exportModule,
+    exportLocation,
+    isDefaultExport,
+    isExportTypeOnly,
+
+    -- * Lenses for ModuleDependency
+    moduleName,
+    imports,
+    exports,
+    hasImportSideEffects,
+    reExportsFrom,
+
+    -- * Lenses for EliminationResult
+    eliminatedIdentifiers,
+    preservedIdentifiers,
+    eliminationReasons,
+    preservationReasons,
+    actualReduction,
+
+    -- * Lenses for ScopeInfo
+    scopeType,
+    scopeLevel,
+    scopeBindings,
+    parentScope,
+
     -- * Smart Constructors
     defaultUsageInfo,
     emptyUsageAnalysis,
@@ -373,8 +411,8 @@ defaultTreeShakeOptions = TreeShakeOptions
 --
 -- Utility function for quick usage checks during elimination.
 isIdentifierUsed :: Text.Text -> UsageMap -> Bool
-isIdentifierUsed identifier usageMap =
-  case Map.lookup identifier usageMap of
+isIdentifierUsed identifier uMap =
+  case Map.lookup identifier uMap of
     Just info -> _isUsed info
     Nothing -> False
 
@@ -383,8 +421,8 @@ isIdentifierUsed identifier usageMap =
 -- Determines if identifier has explicit references in the code
 -- beyond just being declared.
 hasDirectReferences :: Text.Text -> UsageMap -> Bool
-hasDirectReferences identifier usageMap =
-  case Map.lookup identifier usageMap of
+hasDirectReferences identifier uMap =
+  case Map.lookup identifier uMap of
     Just info -> _directReferences info > 0
     Nothing -> False
 

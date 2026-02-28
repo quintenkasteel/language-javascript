@@ -9,7 +9,6 @@ import Control.Monad (forM_)
 import Data.Char (chr, isPrint)
 import Data.List (isInfixOf)
 import Language.JavaScript.Parser
-import Language.JavaScript.Parser.AST (JSAST (..), JSExpression (..), JSStatement (..))
 import Test.Hspec
 
 testLiteralParser :: Spec

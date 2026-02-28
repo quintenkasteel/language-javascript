@@ -22,7 +22,7 @@ import Language.JavaScript.Parser.AST
     JSPropertyName (..),
     JSVarInitializer (..),
   )
-import Language.JavaScript.Parser.Parser (parseProgram, parseUsing, showStrippedMaybeString, showStrippedString)
+import Language.JavaScript.Parser.Parser (parseProgram, parseUsing, showStrippedString)
 import Test.Hspec
 
 testProgramParser :: Spec

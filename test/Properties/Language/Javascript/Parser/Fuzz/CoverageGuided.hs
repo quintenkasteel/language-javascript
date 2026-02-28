@@ -80,13 +80,12 @@ module Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
   )
 where
 
-import Control.Exception (SomeException, catch)
 import Control.Monad (forM, replicateM)
 import Data.List (nub, sortBy, (\\))
 import Data.Ord (Down (..), comparing)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Language.JavaScript.Parser (readJs)
+import Language.JavaScript.Parser (readJsSafe)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
   ( applyRandomMutations,
@@ -202,15 +201,14 @@ measureLineCoverage input = do
 measureBranchCoverage :: String -> IO [BranchCoverage]
 measureBranchCoverage input = do
   -- Simulate branch coverage measurement
-  result <- catch (return $ readJs input) (\(_ :: SomeException) -> return $ AST.JSAstProgram [] (AST.JSNoAnnot))
-  case result of
-    AST.JSAstProgram stmts _ -> do
-      branches <- forM (zip [1 ..] stmts) $ \(i, stmt) -> do
-        taken <- return $ case stmt of
-          AST.JSIf {} -> True
-          AST.JSIfElse {} -> True
-          AST.JSSwitch {} -> True
-          _ -> False
+  case readJsSafe input of
+    Right (AST.JSAstProgram stmts _) -> do
+      forM (zip [1 ..] stmts) $ \(i, stmt) -> do
+        let taken = case stmt of
+              AST.JSIf {} -> True
+              AST.JSIfElse {} -> True
+              AST.JSSwitch {} -> True
+              _ -> False
         return $
           BranchCoverage
             { branchId = "branch_" ++ show i,
@@ -218,17 +216,14 @@ measureBranchCoverage input = do
               branchCount = if taken then 1 else 0,
               branchLocation = "stmt_" ++ show i
             }
-      return branches
     _ -> return []
 
 -- | Measure path coverage through parser
 measurePathCoverage :: String -> IO [CoveragePath]
 measurePathCoverage input = do
-  -- Simulate path coverage measurement
-  result <- catch (return $ readJs input) (\(_ :: SomeException) -> return $ AST.JSAstProgram [] (AST.JSNoAnnot))
-  case result of
-    AST.JSAstProgram stmts _ -> do
-      paths <- forM (zip [1 ..] stmts) $ \(i, _stmt) -> do
+  case readJsSafe input of
+    Right (AST.JSAstProgram stmts _) ->
+      forM (zip [1 ..] stmts) $ \(i, _stmt) ->
         return $
           CoveragePath
             { pathId = "path_" ++ show i,
@@ -236,7 +231,6 @@ measurePathCoverage input = do
               pathFrequency = 1,
               pathDepth = i
             }
-      return paths
     _ -> return []
 
 -- | Combine multiple coverage measurements

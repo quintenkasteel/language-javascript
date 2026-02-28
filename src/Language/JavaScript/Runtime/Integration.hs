@@ -62,9 +62,7 @@ import Language.JavaScript.Parser.Validator
   , RuntimeValidationConfig(..)
   , validateRuntimeCall
   , validateRuntimeReturn
-  , validateRuntimeParameters
   , formatValidationError
-  , defaultValidationConfig
   , developmentConfig
   , productionConfig
   )
@@ -75,7 +73,6 @@ import Language.JavaScript.Parser.Token
   , JSDocObjectField(..)
   )
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(..))
-import qualified Language.JavaScript.Parser.SrcLocation as SrcLoc
 
 -- | Integrate runtime validation with JavaScript function AST
 --

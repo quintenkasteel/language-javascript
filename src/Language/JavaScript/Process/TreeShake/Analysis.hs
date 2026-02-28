@@ -52,7 +52,6 @@ import Control.Lens ((&), (.~), (%~), (^.), (?~))
 import Control.Monad.State.Strict (State, gets, modify, execState)
 import Data.Foldable (traverse_, for_)
 import qualified Data.Map.Strict as Map
-import Data.Semigroup ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -169,8 +168,8 @@ analyzeStatement stmt = case stmt of
     analyzeStatement thenStmt
     analyzeStatement elseStmt
     
-  JSFor _ _ init _ condition _ increment _ body -> do
-    traverse_ analyzeExpression (fromCommaList init)
+  JSFor _ _ initExprs _ condition _ increment _ body -> do
+    traverse_ analyzeExpression (fromCommaList initExprs)
     traverse_ analyzeExpression (fromCommaList condition)
     traverse_ analyzeExpression (fromCommaList increment)
     analyzeStatement body
@@ -212,9 +211,9 @@ analyzeStatement stmt = case stmt of
     analyzeExpression expr
     analyzeStatement body
     
-  JSLabelled ident _ stmt -> do
+  JSLabelled ident _ innerStmt -> do
     declareIdentifier ident
-    analyzeStatement stmt
+    analyzeStatement innerStmt
     
   JSStatementBlock _ stmts _ _ ->
     withBlockScope $ traverse_ analyzeStatement stmts
@@ -439,16 +438,16 @@ analyzeExpression expr = case expr of
     maybe (pure ()) analyzeExpression maybeExpr
     markSideEffect
     
-  JSYieldFromExpression _ _ expr -> do
-    analyzeExpression expr
+  JSYieldFromExpression _ _ subExpr -> do
+    analyzeExpression subExpr
     markSideEffect
-    
-  JSAwaitExpression _ expr -> do
-    analyzeExpression expr
+
+  JSAwaitExpression _ subExpr -> do
+    analyzeExpression subExpr
     markSideEffect
-    
-  JSSpreadExpression _ expr ->
-    analyzeExpression expr
+
+  JSSpreadExpression _ subExpr ->
+    analyzeExpression subExpr
     
   JSTemplateLiteral maybeTag _ _ parts -> do
     maybe (pure ()) analyzeExpression maybeTag
@@ -459,8 +458,8 @@ analyzeExpression expr = case expr of
     analyzeClassHeritage heritage
     traverse_ analyzeClassElement elements
     
-  JSExpressionParen _ expr _ ->
-    analyzeExpression expr
+  JSExpressionParen _ subExpr _ ->
+    analyzeExpression subExpr
     
   -- Literals and simple expressions
   JSDecimal {} -> pure ()
@@ -472,7 +471,7 @@ analyzeExpression expr = case expr of
   JSStringLiteral {} -> pure ()
   JSRegEx {} -> pure ()
   JSImportMeta {} -> pure ()
-  JSImportCall _ _ expr _ -> analyzeExpression expr
+  JSImportCall _ _ subExpr _ -> analyzeExpression subExpr
 
   -- Additional expression patterns
   JSAsyncFunctionExpression _ _ ident _ params _ body -> do
@@ -487,6 +486,17 @@ analyzeExpression expr = case expr of
       traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
       
+  JSAsyncArrowExpression _ arrowParams _ arrowBody ->
+    withFunctionScope $ do
+      analyzeArrowParams arrowParams
+      analyzeConciseBody arrowBody
+
+  JSAsyncGeneratorExpression _ _ _ ident _ params _ body -> do
+    declareIdentifier ident
+    withFunctionScope $ do
+      traverse_ declareFromExpression (fromCommaList params)
+      analyzeBlock body
+
   JSMemberExpression target _ args _ -> do
     analyzeExpression target
     traverse_ analyzeExpression (fromCommaList args)
@@ -562,12 +572,12 @@ withBlockScope action = do
 
 -- | Enter a new scope.
 enterScope :: ScopeType -> AnalysisM ()
-enterScope scopeType = do
+enterScope sType = do
   currentLevel <- gets _currentScopeLevel
   currentStack <- gets _analysisScopeStack
   
   let newScope = ScopeInfo
-        { _scopeType = scopeType
+        { _scopeType = sType
         , _scopeBindings = Set.empty
         , _scopeLevel = currentLevel + 1
         , _parentScope = case currentStack of
@@ -596,16 +606,16 @@ exitScope = do
 -- | Declare identifier in current scope.
 declareIdentifier :: JSIdent -> AnalysisM ()
 declareIdentifier (JSIdentName annot name) = do
-  scopeLevel <- gets _currentScopeLevel
-  usageMap <- gets _analysisUsageMap
+  currentDepth <- gets _currentScopeLevel
+  uMap <- gets _analysisUsageMap
 
   let identifier = Text.decodeUtf8 name
-  let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
+  let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
-        & scopeDepth .~ scopeLevel
+        & scopeDepth .~ currentDepth
         & declarationLocation ?~ annotPosition annot
 
-  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
+  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 
 declareIdentifier JSIdentNone = pure ()
 
@@ -669,26 +679,26 @@ analyzeVariableInitializer expr =
 -- | Declare imported identifier.
 declareImportedIdentifier :: Text.Text -> AnalysisM ()
 declareImportedIdentifier identifier = do
-  usageMap <- gets _analysisUsageMap
-  
-  let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
+  uMap <- gets _analysisUsageMap
+
+  let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
         & scopeDepth .~ 0  -- Module scope
         & declarationLocation ?~ TokenPn 0 0 0
-  
-  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
+
+  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 
 -- | Mark identifier as used.
 markIdentifierUsed :: Text.Text -> AnalysisM ()
 markIdentifierUsed identifier = do
-  usageMap <- gets _analysisUsageMap
+  uMap <- gets _analysisUsageMap
 
-  let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
+  let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
         & isUsed .~ True
         & directReferences %~ (+1)
 
-  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
+  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 
 -- | Mark property as used via member access (obj.prop).
 markPropertyUsed :: JSExpression -> JSExpression -> AnalysisM ()
@@ -709,26 +719,26 @@ markObjectWithDynamicAccess expr = case expr of
 -- | Mark identifier as having side effects.
 markIdentifierWithSideEffects :: Text.Text -> AnalysisM ()
 markIdentifierWithSideEffects identifier = do
-  usageMap <- gets _analysisUsageMap
+  uMap <- gets _analysisUsageMap
 
-  let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
+  let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
         & isUsed .~ True
         & Types.hasSideEffects .~ True
 
-  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
+  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 
 -- | Mark identifier as exported.
 markIdentifierExported :: Text.Text -> AnalysisM ()
 markIdentifierExported identifier = do
-  usageMap <- gets _analysisUsageMap
-  
-  let currentInfo = Map.findWithDefault defaultUsageInfo identifier usageMap
+  uMap <- gets _analysisUsageMap
+
+  let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
         & isExported .~ True
         & isUsed .~ True  -- Exported identifiers are considered used
-  
-  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo usageMap }
+
+  modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 
 -- | Mark that a side effect occurred in the current analysis context.
 -- Increments the global side effect counter for use in elimination decisions.
@@ -885,6 +895,19 @@ analyzeClassElement element = case element of
     withFunctionScope $ do
       traverse_ declareFromExpression (fromCommaList params)
       analyzeBlock body
+  JSClassField propName _ maybeInit _ -> do
+    analyzePropertyName propName
+    maybe (pure ()) analyzeExpression maybeInit
+  JSClassStaticField _ propName _ maybeInit _ -> do
+    analyzePropertyName propName
+    maybe (pure ()) analyzeExpression maybeInit
+  JSClassStaticBlock _ block ->
+    analyzeBlock block
+  JSAsyncGeneratorMethodDefinition _ _ propName _ params _ body -> do
+    analyzePropertyName propName
+    withFunctionScope $ do
+      traverse_ declareFromExpression (fromCommaList params)
+      analyzeBlock body
 
 
 -- Implementation of remaining exported functions
@@ -917,18 +940,18 @@ analyzeModuleSystem :: JSAST -> AnalysisM ()
 analyzeModuleSystem = analyzeAST
 
 extractImportInfo :: JSImportDeclaration -> ImportInfo
-extractImportInfo (JSImportDeclaration clause (JSFromClause _ _ moduleName) _ _) =
+extractImportInfo (JSImportDeclaration clause (JSFromClause _ _ modName) _ _) =
   ImportInfo
-    { _importModule = Text.decodeUtf8 moduleName
+    { _importModule = Text.decodeUtf8 modName
     , _importedNames = extractImportNames clause
     , _importDefault = extractDefaultImport clause
     , _importNamespace = extractNamespaceImport clause
     , _importLocation = TokenPn 0 0 0
     , _isImportTypeOnly = False
     }
-extractImportInfo (JSImportDeclarationBare _ moduleName _ _) =
+extractImportInfo (JSImportDeclarationBare _ modName _ _) =
   ImportInfo
-    { _importModule = Text.decodeUtf8 moduleName
+    { _importModule = Text.decodeUtf8 modName
     , _importedNames = Set.empty
     , _importDefault = Nothing
     , _importNamespace = Nothing
@@ -941,8 +964,8 @@ extractExportInfo (JSExport stmt _) = extractExportInfoFromStatement stmt
 extractExportInfo (JSExportDefault _ stmt _) = extractDefaultExportInfo stmt
 extractExportInfo (JSExportLocals (JSExportClause _ specifiers _) _) =
   fmap extractFromExportSpecifier (fromCommaList specifiers)
-extractExportInfo (JSExportFrom clause (JSFromClause _ _ moduleName) _) =
-  fmap (setExportModule (Text.decodeUtf8 moduleName)) (extractExportInfoFromClause clause)
+extractExportInfo (JSExportFrom clause (JSFromClause _ _ modName) _) =
+  fmap (setExportModule (Text.decodeUtf8 modName)) (extractExportInfoFromClause clause)
 extractExportInfo _ = []
 
 buildDependencyGraph :: [ModuleDependency] -> [ModuleDependency]
@@ -1046,24 +1069,24 @@ isExportedDeclaration stmt = case stmt of
     isExportedVarDecl _ = False
 
 calculateEstimatedReduction :: UsageMap -> Double
-calculateEstimatedReduction usageMap 
-  | Map.null usageMap = 0.0
-  | otherwise = fromIntegral unusedCount / fromIntegral totalCount
+calculateEstimatedReduction uMap
+  | Map.null uMap = 0.0
+  | otherwise = fromIntegral unusedCnt / fromIntegral totalCount
   where
-    totalCount = Map.size usageMap
-    unusedCount = Map.size $ Map.filter (not . (^. isUsed)) usageMap
+    totalCount = Map.size uMap
+    unusedCnt = Map.size $ Map.filter (not . (^. isUsed)) uMap
 
 hasIdentifierUsage :: Text.Text -> JSAST -> Bool
-hasIdentifierUsage identifier ast = 
-  let usageMap = buildUsageMap defaultTreeShakeOptions ast
-  in case Map.lookup identifier usageMap of
+hasIdentifierUsage identifier ast =
+  let uMap = buildUsageMap defaultTreeShakeOptions ast
+  in case Map.lookup identifier uMap of
        Just info -> info ^. isUsed
        Nothing -> False
 
 isExportedIdentifier :: Text.Text -> JSAST -> Bool
-isExportedIdentifier identifier ast = 
-  let usageMap = buildUsageMap defaultTreeShakeOptions ast
-  in case Map.lookup identifier usageMap of
+isExportedIdentifier identifier ast =
+  let uMap = buildUsageMap defaultTreeShakeOptions ast
+  in case Map.lookup identifier uMap of
        Just info -> info ^. isExported
        Nothing -> False
 
@@ -1122,10 +1145,10 @@ createExportInfo name = ExportInfo
 extractFromExportSpecifier :: JSExportSpecifier -> ExportInfo  
 extractFromExportSpecifier (JSExportSpecifier (JSIdentName _ name)) =
   createExportInfo (Text.decodeUtf8 name)
-extractFromExportSpecifier (JSExportSpecifierAs (JSIdentName _ localName) _ (JSIdentName _ exportName)) =
+extractFromExportSpecifier (JSExportSpecifierAs (JSIdentName _ srcName) _ (JSIdentName _ exportName)) =
   ExportInfo
     { _exportedName = Text.decodeUtf8 exportName
-    , _localName = Just $ Text.decodeUtf8 localName
+    , _localName = Just $ Text.decodeUtf8 srcName
     , _exportModule = Nothing
     , _exportLocation = TokenPn 0 0 0
     , _isDefaultExport = False
@@ -1134,7 +1157,7 @@ extractFromExportSpecifier (JSExportSpecifierAs (JSIdentName _ localName) _ (JSI
 extractFromExportSpecifier _ = createExportInfo ""
 
 setExportModule :: Text.Text -> ExportInfo -> ExportInfo
-setExportModule moduleName exportInfo = exportInfo { _exportModule = Just moduleName }
+setExportModule modName exportInfo = exportInfo { _exportModule = Just modName }
 
 extractExportInfoFromClause :: JSExportClause -> [ExportInfo]
 extractExportInfoFromClause (JSExportClause _ specifiers _) =
@@ -1194,8 +1217,8 @@ markHasEvalCall = modify (\s -> s { _analysisHasEval = True, _analysisEvalCount 
 -- | Analyze arguments to eval/Function calls and mark potential identifiers as used.
 markPotentialEvalIdentifiers :: JSCommaList JSExpression -> AnalysisM ()
 markPotentialEvalIdentifiers args = do
-  usageMap <- gets _analysisUsageMap
-  let allIdentifiers = Set.fromList (Map.keys usageMap)
+  uMap <- gets _analysisUsageMap
+  let allIdentifiers = Set.fromList (Map.keys uMap)
   traverse_ (analyzeStringLiteralForIdentifiers allIdentifiers) (fromCommaList args)
 
 -- | Analyze a string literal argument to eval/Function and mark identifiers as used.

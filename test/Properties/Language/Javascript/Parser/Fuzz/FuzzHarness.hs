@@ -73,7 +73,7 @@ import Data.List (sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
-import Language.JavaScript.Parser (readJs, renderToString)
+import Language.JavaScript.Parser (readJsSafe, renderToString)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
   ( CoverageData (..),
@@ -389,9 +389,8 @@ validateProperties _config input = do
   result <-
     catch
       ( do
-          let ast = readJs (Text.unpack input)
-          case ast of
-            prog@(AST.JSAstProgram _ _) -> do
+          case readJsSafe (Text.unpack input) of
+            Right prog@(AST.JSAstProgram _ _) -> do
               violations <- checkASTInvariants prog
               case violations of
                 [] -> return Nothing
@@ -509,10 +508,9 @@ generateFailureReport inputFailures = do
 
 -- | Test parsing with strict evaluation to catch crashes
 testParseStrictly :: Text.Text -> IO (Either String ())
-testParseStrictly input = do
-  let result = readJs (Text.unpack input)
-  case result of
-    ast@(AST.JSAstProgram _ _) -> do
+testParseStrictly input =
+  case readJsSafe (Text.unpack input) of
+    Right ast@(AST.JSAstProgram _ _) -> do
       _ <- evaluate (length (renderToString ast))
       return $ Right ()
     _ -> return $ Left "Parse failed"

@@ -26,7 +26,6 @@ module Language.JavaScript.QQ.Antiquote
 where
 
 import Control.Exception (evaluate)
-import Data.Data (Data)
 import Data.Generics (extQ)
 import qualified Data.ByteString.Char8 as BS8
 import Language.Haskell.Meta.Parse (parseExp)
@@ -87,7 +86,7 @@ antiquoteJS input = do
 -- unique placeholder identifier and building a map from placeholder
 -- names to the original Haskell expression strings.
 extractSplices :: String -> (String, Map.Map String String)
-extractSplices = go 0 [] Map.empty
+extractSplices = go (0 :: Int) [] Map.empty
   where
     go _ acc smap [] = (reverse acc, smap)
     go n acc smap ('$' : '{' : rest) =

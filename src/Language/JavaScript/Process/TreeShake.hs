@@ -78,11 +78,9 @@ module Language.JavaScript.Process.TreeShake
 where
 
 import Control.Lens ((^.), (.~), (&))
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Process.TreeShake.Types
 import qualified Language.JavaScript.Process.TreeShake.Analysis as Analysis
 import qualified Language.JavaScript.Process.TreeShake.Elimination as Elimination
@@ -133,7 +131,7 @@ treeShake opts = iterativeTreeShake opts
 -- Repeatedly performs analysis and elimination until a fixpoint is reached,
 -- ensuring all transitively unused code is eliminated.
 iterativeTreeShake :: TreeShakeOptions -> JSAST -> JSAST
-iterativeTreeShake opts ast = go ast 0
+iterativeTreeShake opts ast = go ast (0 :: Int)
   where
     maxIterations = 10  -- Prevent infinite loops
 
@@ -189,7 +187,7 @@ buildUsageMap = Analysis.buildUsageMap
 -- Second phase of tree shaking that removes unused code
 -- while preserving program semantics and configured exports.
 eliminateDeadCode :: UsageMap -> JSAST -> JSAST
-eliminateDeadCode usageMap ast = Elimination.eliminateDeadCode defaultOptions usageMap ast
+eliminateDeadCode uMap ast = Elimination.eliminateDeadCode defaultOptions uMap ast
 
 -- | Validate tree shaking results for correctness.
 --

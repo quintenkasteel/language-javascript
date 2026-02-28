@@ -89,13 +89,12 @@ module Properties.Language.Javascript.Parser.Fuzz.DifferentialTesting
   )
 where
 
-import Control.Exception (SomeException, catch)
 import Control.Monad (forM)
 import Data.List (intercalate, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
-import Language.JavaScript.Parser (readJs)
+import Language.JavaScript.Parser (readJsSafe)
 import qualified Language.JavaScript.Parser.AST as AST
 import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
@@ -499,17 +498,10 @@ summarizeDifferences comparisons =
 
 -- | Parse with our language-javascript parser
 parseWithOurParser :: Text.Text -> IO (Maybe AST.JSAST)
-parseWithOurParser input = do
-  result <- catch (evaluate' (readJs (Text.unpack input))) handleException
-  case result of
-    Left _ -> return Nothing
-    Right ast -> return (Just ast)
-  where
-    evaluate' ast = case ast of
-      result@(AST.JSAstProgram _ _) -> return (Right result)
-      _ -> return (Left "Parse failed")
-    handleException :: SomeException -> IO (Either String AST.JSAST)
-    handleException _ = return (Left "Exception during parsing")
+parseWithOurParser input =
+  case readJsSafe (Text.unpack input) of
+    Right ast@(AST.JSAstProgram _ _) -> return (Just ast)
+    _ -> return Nothing
 
 -- | Parse with Babel (external process)
 parseWithBabel :: Text.Text -> IO (Maybe String)

@@ -12,22 +12,22 @@ module Language.JavaScript.Process.TreeShake.Elimination
   ( -- * Main Elimination Functions
     eliminateDeadCode,
     eliminateWithOptions,
-    
+
     -- * Statement-Level Elimination
     eliminateStatements,
     eliminateUnusedDeclarations,
     shouldPreserveStatement,
-    
-    -- * Expression-Level Elimination  
+
+    -- * Expression-Level Elimination
     eliminateExpressions,
     optimizeUnusedExpressions,
     expressionHasSideEffects,
-    
+
     -- * Module-Level Elimination
     eliminateUnusedImports,
     eliminateUnusedExports,
     optimizeModuleItems,
-    
+
     -- * Utility Functions
     isStatementUsed,
     isExpressionUsed,
@@ -52,24 +52,24 @@ import qualified Language.JavaScript.Process.TreeShake.Types as Types
 -- program semantics. Uses comprehensive usage analysis to make safe
 -- elimination decisions.
 eliminateDeadCode :: TreeShakeOptions -> UsageMap -> JSAST -> JSAST
-eliminateDeadCode opts usageMap ast = eliminateWithOptions opts usageMap ast
+eliminateDeadCode opts uMap ast = eliminateWithOptions opts uMap ast
 
 -- | Eliminate dead code with specific configuration options.
 --
 -- Provides fine-grained control over elimination behavior including
 -- preservation levels and optimization aggressiveness.
 eliminateWithOptions :: TreeShakeOptions -> UsageMap -> JSAST -> JSAST
-eliminateWithOptions opts usageMap ast =
+eliminateWithOptions opts uMap ast =
   let hasEval = astContainsEval ast
       totalVarCount = countTotalVariables ast
-      isUltraConservative = hasEval && not (opts ^. Types.aggressiveShaking) && totalVarCount > 10
+      ultraConservative = hasEval && not (opts ^. Types.aggressiveShaking) && totalVarCount > 10
   in case ast of
     JSAstProgram statements annot ->
-      JSAstProgram (eliminateStatementsWithEvalContext opts usageMap hasEval isUltraConservative statements) annot
+      JSAstProgram (eliminateStatementsWithEvalContext opts uMap hasEval ultraConservative statements) annot
     JSAstModule moduleItems annot ->
-      JSAstModule (eliminateModuleItems opts usageMap moduleItems) annot
+      JSAstModule (eliminateModuleItems opts uMap moduleItems) annot
     JSAstStatement stmt annot ->
-      JSAstStatement (eliminateStatementWithEvalContext opts usageMap hasEval isUltraConservative stmt) annot
+      JSAstStatement (eliminateStatementWithEvalContext opts uMap hasEval ultraConservative stmt) annot
     JSAstExpression expr annot ->
       JSAstExpression expr annot  -- Preserve expressions
     JSAstLiteral expr annot ->
@@ -80,10 +80,10 @@ eliminateWithOptions opts usageMap ast =
 -- Processes statement sequences and removes dead statements while
 -- preserving semantic dependencies and side effects.
 eliminateStatements :: TreeShakeOptions -> UsageMap -> [JSStatement] -> [JSStatement]
-eliminateStatements opts usageMap stmts =
+eliminateStatements opts uMap stmts =
   -- First filter out unused statements, then process remaining ones
-  let preservedStmts = filter (shouldPreserveStatement opts usageMap) stmts
-      processedStmts = map (eliminateStatement opts usageMap) preservedStmts
+  let preservedStmts = filter (shouldPreserveStatement opts uMap) stmts
+      processedStmts = map (eliminateStatement opts uMap) preservedStmts
   in processedStmts
 
 -- | Count total number of variable declarations in AST.
@@ -113,22 +113,15 @@ countVariablesInModuleItem item = case item of
 
 -- | Eliminate statements with eval context awareness including ultra-conservative mode.
 eliminateStatementsWithEvalContext :: TreeShakeOptions -> UsageMap -> Bool -> Bool -> [JSStatement] -> [JSStatement]
-eliminateStatementsWithEvalContext opts usageMap hasEval isUltraConservative stmts =
-  let preservedStmts = filter (shouldPreserveStatementWithEvalContext opts usageMap hasEval isUltraConservative) stmts
-      processedStmts = map (eliminateStatementWithEvalContext opts usageMap hasEval isUltraConservative) preservedStmts
-  in processedStmts
-
--- | Eliminate statements with eval context awareness.
-eliminateStatementsWithEval :: TreeShakeOptions -> UsageMap -> Bool -> [JSStatement] -> [JSStatement]
-eliminateStatementsWithEval opts usageMap hasEval stmts =
-  let preservedStmts = filter (shouldPreserveStatementWithEval opts usageMap hasEval) stmts
-      processedStmts = map (eliminateStatementWithEval opts usageMap hasEval) preservedStmts
+eliminateStatementsWithEvalContext opts uMap hasEval ultraConservative stmts =
+  let preservedStmts = filter (shouldPreserveStatementWithEvalContext opts uMap hasEval ultraConservative) stmts
+      processedStmts = map (eliminateStatementWithEvalContext opts uMap hasEval ultraConservative) preservedStmts
   in processedStmts
 
 -- | Check if statement should be preserved with eval context.
 shouldPreserveStatementWithEval :: TreeShakeOptions -> UsageMap -> Bool -> JSStatement -> Bool
-shouldPreserveStatementWithEval opts usageMap hasEval stmt =
-  shouldPreserveStatement opts usageMap stmt ||
+shouldPreserveStatementWithEval opts uMap hasEval stmt =
+  shouldPreserveStatement opts uMap stmt ||
   shouldPreserveForEvalContext opts hasEval stmt
 
 -- | Check if statement should be preserved for eval safety.
@@ -145,30 +138,30 @@ shouldPreserveForEvalContext opts hasEval stmt
 
 -- | Check if statement should be preserved with eval context and ultra-conservative flag.
 shouldPreserveStatementWithEvalContext :: TreeShakeOptions -> UsageMap -> Bool -> Bool -> JSStatement -> Bool
-shouldPreserveStatementWithEvalContext opts usageMap hasEval isUltraConservative stmt =
-  if isUltraConservative
+shouldPreserveStatementWithEvalContext opts uMap hasEval ultraConservative stmt =
+  if ultraConservative
     then case stmt of
       JSVariable {} -> True  -- Ultra-conservative: preserve all variables
       JSLet {} -> True
       JSConstant {} -> True
-      _ -> shouldPreserveStatementWithEval opts usageMap hasEval stmt
-    else shouldPreserveStatementWithEval opts usageMap hasEval stmt
+      _ -> shouldPreserveStatementWithEval opts uMap hasEval stmt
+    else shouldPreserveStatementWithEval opts uMap hasEval stmt
 
 -- | Eliminate individual statement with eval context and ultra-conservative flag.
 eliminateStatementWithEvalContext :: TreeShakeOptions -> UsageMap -> Bool -> Bool -> JSStatement -> JSStatement
-eliminateStatementWithEvalContext opts usageMap hasEval isUltraConservative stmt =
-  if isUltraConservative
+eliminateStatementWithEvalContext opts uMap hasEval ultraConservative stmt =
+  if ultraConservative
     then case stmt of
       JSVariable {} -> stmt  -- Ultra-conservative: preserve all variables
       JSLet {} -> stmt
       JSConstant {} -> stmt
-      _ -> eliminateStatementWithEval opts usageMap hasEval stmt
-    else eliminateUnusedDeclarationsWithEval opts usageMap hasEval stmt
+      _ -> eliminateStatementWithEval opts uMap hasEval stmt
+    else eliminateUnusedDeclarationsWithEval opts uMap hasEval stmt
 
 -- | Eliminate individual statement with eval context.
 eliminateStatementWithEval :: TreeShakeOptions -> UsageMap -> Bool -> JSStatement -> JSStatement
-eliminateStatementWithEval opts usageMap hasEval stmt =
-  eliminateUnusedDeclarationsWithEval opts usageMap hasEval stmt
+eliminateStatementWithEval opts uMap hasEval stmt =
+  eliminateUnusedDeclarationsWithEval opts uMap hasEval stmt
 
 -- | Eliminate unused declarations.
 --
@@ -176,9 +169,9 @@ eliminateStatementWithEval opts usageMap hasEval stmt =
 -- referenced in the usage map, while respecting configuration options.
 -- | Eliminate unused declarations with eval context awareness.
 eliminateUnusedDeclarationsWithEval :: TreeShakeOptions -> UsageMap -> Bool -> JSStatement -> JSStatement
-eliminateUnusedDeclarationsWithEval opts usageMap hasEval stmt = case stmt of
-  JSFunction annot ident lb params rb body semi ->
-    JSFunction annot ident lb params rb (eliminateBlock opts usageMap body) semi
+eliminateUnusedDeclarationsWithEval opts uMap hasEval stmt = case stmt of
+  JSFunction annot ident lb params rb body _semi ->
+    JSFunction annot ident lb params rb (eliminateBlock opts uMap body) _semi
 
   JSVariable annot decls semi ->
     -- Respect preserveTopLevel setting for variable declarations
@@ -186,7 +179,7 @@ eliminateUnusedDeclarationsWithEval opts usageMap hasEval stmt = case stmt of
     then JSVariable annot decls semi  -- Preserve all variables when preserveTopLevel is enabled
     -- Apply eval-aware filtering in all cases, with conservative vs aggressive behavior
     else
-      let filteredDecls = filterVariableDeclarationsWithEval opts usageMap hasEval decls
+      let filteredDecls = filterVariableDeclarationsWithEval opts uMap hasEval decls
       in if null (fromCommaList filteredDecls)
          then JSEmptyStatement annot
          else JSVariable annot filteredDecls semi
@@ -196,7 +189,7 @@ eliminateUnusedDeclarationsWithEval opts usageMap hasEval stmt = case stmt of
     if isTopLevelStatement stmt && (opts ^. Types.preserveTopLevel)
     then JSLet annot decls semi
     else
-      let filteredDecls = filterVariableDeclarationsWithEval opts usageMap hasEval decls
+      let filteredDecls = filterVariableDeclarationsWithEval opts uMap hasEval decls
       in if null (fromCommaList filteredDecls)
          then JSEmptyStatement annot
          else JSLet annot filteredDecls semi
@@ -206,22 +199,22 @@ eliminateUnusedDeclarationsWithEval opts usageMap hasEval stmt = case stmt of
     if isTopLevelStatement stmt && (opts ^. Types.preserveTopLevel)
     then JSConstant annot decls semi
     else
-      let filteredDecls = filterVariableDeclarationsWithEval opts usageMap hasEval decls
+      let filteredDecls = filterVariableDeclarationsWithEval opts uMap hasEval decls
       in if null (fromCommaList filteredDecls)
          then JSEmptyStatement annot
          else JSConstant annot filteredDecls semi
 
-  JSClass annot ident heritage lb elements rb semi ->
-    if isClassUsed usageMap ident
+  JSClass annot _ident _heritage _lb _elements _rb _semi ->
+    if isClassUsed uMap _ident
     then stmt  -- Keep entire class for now
     else JSEmptyStatement annot
 
   _ -> stmt  -- Keep other statements as-is
 
 eliminateUnusedDeclarations :: TreeShakeOptions -> UsageMap -> JSStatement -> JSStatement
-eliminateUnusedDeclarations opts usageMap stmt = case stmt of
-  JSFunction annot ident lb params rb body semi ->
-    JSFunction annot ident lb params rb (eliminateBlock opts usageMap body) semi
+eliminateUnusedDeclarations opts uMap stmt = case stmt of
+  JSFunction annot ident lb params rb body _semi ->
+    JSFunction annot ident lb params rb (eliminateBlock opts uMap body) _semi
 
   JSVariable annot decls semi ->
     -- Respect preserveTopLevel setting for variable declarations
@@ -231,11 +224,11 @@ eliminateUnusedDeclarations opts usageMap stmt = case stmt of
     else if shouldPreserveForDynamicUsage opts stmt
     then JSVariable annot decls semi  -- Preserve variables in conservative mode for eval safety
     else
-      let filteredDecls = filterVariableDeclarations usageMap decls
+      let filteredDecls = filterVariableDeclarations uMap decls
       in if null (fromCommaList filteredDecls)
          then JSEmptyStatement annot
          else JSVariable annot filteredDecls semi
-       
+
   JSLet annot decls semi ->
     -- Respect preserveTopLevel setting for let declarations
     if isTopLevelStatement stmt && (opts ^. Types.preserveTopLevel)
@@ -244,7 +237,7 @@ eliminateUnusedDeclarations opts usageMap stmt = case stmt of
     else if shouldPreserveForDynamicUsage opts stmt
     then JSLet annot decls semi  -- Preserve let declarations in conservative mode for eval safety
     else
-      let filteredDecls = filterVariableDeclarations usageMap decls
+      let filteredDecls = filterVariableDeclarations uMap decls
       in if null (fromCommaList filteredDecls)
          then JSEmptyStatement annot
          else JSLet annot filteredDecls semi
@@ -257,16 +250,16 @@ eliminateUnusedDeclarations opts usageMap stmt = case stmt of
     else if shouldPreserveForDynamicUsage opts stmt
     then JSConstant annot decls semi  -- Preserve const declarations in conservative mode for eval safety
     else
-      let filteredDecls = filterVariableDeclarations usageMap decls
+      let filteredDecls = filterVariableDeclarations uMap decls
       in if null (fromCommaList filteredDecls)
          then JSEmptyStatement annot
          else JSConstant annot filteredDecls semi
-       
-  JSClass annot ident heritage lb elements rb semi ->
-    if isClassUsed usageMap ident
+
+  JSClass annot _ident _heritage _lb _elements _rb _semi ->
+    if isClassUsed uMap _ident
     then stmt  -- Keep entire class for now
     else JSEmptyStatement annot
-    
+
   _ -> stmt
 
 -- | Determine if statement should be preserved.
@@ -274,9 +267,9 @@ eliminateUnusedDeclarations opts usageMap stmt = case stmt of
 -- Comprehensive analysis that considers usage, side effects,
 -- and configuration options to determine preservation.
 shouldPreserveStatement :: TreeShakeOptions -> UsageMap -> JSStatement -> Bool
-shouldPreserveStatement opts usageMap stmt =
+shouldPreserveStatement opts uMap stmt =
   -- Always preserve if used
-  isStatementUsed usageMap stmt ||
+  isStatementUsed uMap stmt ||
   -- Preserve if has side effects and we're preserving them
   (hasObservableSideEffects stmt && (opts ^. Types.preserveSideEffects)) ||
   -- Special handling for top-level preservation (when explicitly enabled)
@@ -325,57 +318,12 @@ isCriticalControlFlowStatement stmt = case stmt of
   JSWith {} -> True       -- Changes scope, always critical
   _ -> False
 
--- | Check if statement affects control flow (broader definition).
-isControlFlowStatement :: JSStatement -> Bool
-isControlFlowStatement stmt = case stmt of
-  JSIf {} -> True
-  JSIfElse {} -> True
-  JSFor {} -> True
-  JSForIn {} -> True
-  JSForOf {} -> True
-  JSForVar {} -> True
-  JSForVarIn {} -> True
-  JSForVarOf {} -> True
-  JSForLet {} -> True
-  JSForLetIn {} -> True
-  JSForLetOf {} -> True
-  JSForConst {} -> True
-  JSForConstIn {} -> True
-  JSForConstOf {} -> True
-  JSForAwaitOf {} -> True
-  JSForAwaitVarOf {} -> True
-  JSForAwaitLetOf {} -> True
-  JSForAwaitConstOf {} -> True
-  JSWhile {} -> True
-  JSDoWhile {} -> True
-  JSTry {} -> True
-  JSSwitch {} -> True
-  JSWith {} -> True
-  JSDebugger {} -> True
-  JSReturn {} -> True
-  JSThrow {} -> True
-  JSBreak {} -> True
-  JSContinue {} -> True
-  _ -> False
-
 -- | Check if statement should be preserved for dynamic usage patterns.
 --
 -- Handles cases where aggressive vs conservative optimization should differ,
 -- particularly around eval, with statements, and dynamic property access.
 shouldPreserveForDynamicUsage :: TreeShakeOptions -> JSStatement -> Bool
 shouldPreserveForDynamicUsage _opts _stmt = False  -- Disabled for now - will use context-aware eval detection instead
-
--- | Check if statement should be preserved for eval safety in conservative mode.
-shouldPreserveForEvalSafety :: TreeShakeOptions -> JSAST -> JSStatement -> Bool
-shouldPreserveForEvalSafety opts fullAst stmt
-  | not (opts ^. Types.aggressiveShaking) && astContainsEval fullAst =
-      -- Conservative mode with eval present: preserve variables for eval safety
-      case stmt of
-        JSVariable {} -> True   -- Preserve variables when eval is present
-        JSLet {} -> True        -- Preserve let declarations when eval is present
-        JSConstant {} -> True   -- Preserve const declarations when eval is present
-        _ -> False
-  | otherwise = False  -- Aggressive mode or no eval: don't preserve extra
 
 -- | Check if AST contains eval calls (recursive search).
 astContainsEval :: JSAST -> Bool
@@ -445,14 +393,14 @@ moduleItemContainsEval item = case item of
 -- Simplifies expressions by removing unused sub-expressions while
 -- maintaining side effects and program correctness.
 eliminateExpressions :: TreeShakeOptions -> UsageMap -> [JSExpression] -> [JSExpression]
-eliminateExpressions _opts _usageMap exprs = exprs  -- Minimal implementation: return unchanged
+eliminateExpressions _opts _uMap exprs = exprs  -- Minimal implementation: return unchanged
 
 -- | Optimize unused expressions.
 --
 -- Advanced optimization that replaces unused expressions with
 -- minimal equivalents while preserving observable side effects.
 optimizeUnusedExpressions :: TreeShakeOptions -> UsageMap -> JSExpression -> JSExpression
-optimizeUnusedExpressions opts usageMap expr = case expr of
+optimizeUnusedExpressions opts uMap expr = case expr of
   -- Handle object literals - keep all properties for now since we can't easily
   -- determine which specific properties are accessed dynamically
   JSObjectLiteral annot props closing ->
@@ -461,16 +409,16 @@ optimizeUnusedExpressions opts usageMap expr = case expr of
   -- Recursively optimize nested expressions
   JSCallExpression target lb args rb ->
     JSCallExpression
-      (optimizeUnusedExpressions opts usageMap target)
+      (optimizeUnusedExpressions opts uMap target)
       lb
-      (buildCommaList $ map (optimizeUnusedExpressions opts usageMap) $ fromCommaList args)
+      (buildCommaList $ map (optimizeUnusedExpressions opts uMap) $ fromCommaList args)
       rb
 
   JSAssignExpression lhs op rhs ->
     JSAssignExpression
-      (optimizeUnusedExpressions opts usageMap lhs)
+      (optimizeUnusedExpressions opts uMap lhs)
       op
-      (optimizeUnusedExpressions opts usageMap rhs)
+      (optimizeUnusedExpressions opts uMap rhs)
 
   -- For other expressions, return unchanged for now
   _ -> expr
@@ -487,10 +435,10 @@ expressionHasSideEffects expr = case expr of
   JSCallExpressionSquare {} -> True
   JSOptionalCallExpression {} -> True
   JSAssignExpression {} -> True
-  JSNewExpression _ expr ->
-    not (isSafeConstructor expr)
-  JSMemberNew _ expr _ _ _ ->
-    not (isSafeConstructor expr)
+  JSNewExpression _ newExpr ->
+    not (isSafeConstructor newExpr)
+  JSMemberNew _ newExpr _ _ _ ->
+    not (isSafeConstructor newExpr)
 
   -- Increment/decrement operators have side effects
   JSExpressionPostfix _ (JSUnaryOpIncr _) -> True
@@ -513,8 +461,8 @@ expressionHasSideEffects expr = case expr of
     expressionHasSideEffects falseExpr
   JSCommaExpression left _ right ->
     expressionHasSideEffects left || expressionHasSideEffects right
-  JSExpressionParen _ innerExpr _ ->
-    expressionHasSideEffects innerExpr
+  JSExpressionParen _ parenExpr _ ->
+    expressionHasSideEffects parenExpr
 
   -- Array and object literals might have side effects in their elements
   JSArrayLiteral _ elements _ ->
@@ -523,13 +471,11 @@ expressionHasSideEffects expr = case expr of
     hasObjectPropertyListSideEffects props
 
   -- Modern JavaScript patterns
-  JSSpreadExpression _ expr ->
-    expressionHasSideEffects expr
+  JSSpreadExpression _ spreadExpr ->
+    expressionHasSideEffects spreadExpr
   JSTemplateLiteral maybeTag _ _ parts ->
     maybe False expressionHasSideEffects maybeTag ||
     any hasTemplatePartSideEffects parts
-  JSYieldExpression _ maybeExpr ->
-    maybe False expressionHasSideEffects maybeExpr
 
   -- Pure expressions without side effects
   JSIdentifier {} -> False
@@ -556,40 +502,37 @@ expressionHasSideEffects expr = case expr of
 -- Removes import statements and import specifiers that are not
 -- referenced in the code, while preserving side-effect imports.
 eliminateUnusedImports :: TreeShakeOptions -> UsageMap -> JSImportDeclaration -> Maybe JSImportDeclaration
-eliminateUnusedImports opts usageMap importDecl = case importDecl of
+eliminateUnusedImports _opts uMap importDecl = case importDecl of
   -- Side-effect imports like "import 'module';" should be preserved
   JSImportDeclarationBare {} -> Just importDecl  -- Always preserve bare imports (side effects)
-  JSImportDeclaration {} -> filterUnusedImportSpecifiers usageMap importDecl
+  JSImportDeclaration {} -> filterUnusedImportSpecifiers uMap importDecl
 
 -- | Filter unused import specifiers from import declaration.
 filterUnusedImportSpecifiers :: UsageMap -> JSImportDeclaration -> Maybe JSImportDeclaration
-filterUnusedImportSpecifiers usageMap importDecl = case importDecl of
+filterUnusedImportSpecifiers uMap importDecl = case importDecl of
   JSImportDeclarationBare {} -> Just importDecl  -- Always preserve bare imports
   JSImportDeclaration clause _ source _ -> case clause of
-    JSImportClauseNamed (JSImportsNamed annot imports rightBrace) ->
-      let filteredImports = filterImportSpecifiers usageMap imports
+    JSImportClauseNamed (JSImportsNamed annot importSpecs rightBrace) ->
+      let filteredImports = filterImportSpecifiers uMap importSpecs
       in if isCommaListEmptyAfterFiltering filteredImports
          then Nothing  -- Remove entire import if no specifiers remain
          else Just (JSImportDeclaration (JSImportClauseNamed (JSImportsNamed annot filteredImports rightBrace)) (getSomeKeyword importDecl) source (getSomeSemi importDecl))
     _ -> Just importDecl  -- Preserve default imports, namespace imports, etc.
   where
-    getSomeAnnotation (JSImportClauseNamed (JSImportsNamed annot _ _)) = annot
-    getSomeAnnotation _ = JSNoAnnot
-
     getSomeKeyword (JSImportDeclaration _ kw _ _) = kw
     -- JSImportDeclarationBare doesn't have a fromClause, so create a dummy one
-    getSomeKeyword (JSImportDeclarationBare annot moduleName _ _) = JSFromClause annot annot moduleName
+    getSomeKeyword (JSImportDeclarationBare annot modName _ _) = JSFromClause annot annot modName
     getSomeSemi (JSImportDeclaration _ _ _ semi) = semi
     getSomeSemi (JSImportDeclarationBare _ _ _ semi) = semi
 
 -- | Filter import specifiers based on usage.
 filterImportSpecifiers :: UsageMap -> JSCommaList JSImportSpecifier -> JSCommaList JSImportSpecifier
-filterImportSpecifiers usageMap imports = case imports of
+filterImportSpecifiers uMap importSpecs = case importSpecs of
   JSLNil -> JSLNil
-  JSLOne spec -> if isImportSpecifierUsed usageMap spec then JSLOne spec else JSLNil
+  JSLOne spec -> if isImportSpecifierUsed uMap spec then JSLOne spec else JSLNil
   JSLCons rest comma spec ->
-    let filteredSpec = if isImportSpecifierUsed usageMap spec then Just spec else Nothing
-        filteredRest = filterImportSpecifiers usageMap rest
+    let filteredSpec = if isImportSpecifierUsed uMap spec then Just spec else Nothing
+        filteredRest = filterImportSpecifiers uMap rest
     in case (filteredRest, filteredSpec) of
          (JSLNil, Nothing) -> JSLNil
          (JSLNil, Just s) -> JSLOne s
@@ -598,11 +541,11 @@ filterImportSpecifiers usageMap imports = case imports of
 
 -- | Check if import specifier is used.
 isImportSpecifierUsed :: UsageMap -> JSImportSpecifier -> Bool
-isImportSpecifierUsed usageMap spec = case spec of
-  JSImportSpecifier ident -> isIdentUsed usageMap ident
-  JSImportSpecifierAs ident _ asIdent -> isIdentUsed usageMap asIdent  -- Check the alias name
+isImportSpecifierUsed uMap spec = case spec of
+  JSImportSpecifier _ident -> isIdentUsed uMap _ident
+  JSImportSpecifierAs _ _ asIdent -> isIdentUsed uMap asIdent  -- Check the alias name
   where
-    isIdentUsed usageMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
+    isIdentUsed um (JSIdentName _ name) = Types.isIdentifierUsed (Text.decodeUtf8 name) um
     isIdentUsed _ JSIdentNone = False
 
 -- | Check if comma list is empty after filtering.
@@ -615,65 +558,65 @@ isCommaListEmptyAfterFiltering _ = False
 -- Removes export statements and export specifiers that export
 -- unused identifiers, while preserving configured exports.
 eliminateUnusedExports :: TreeShakeOptions -> UsageMap -> JSExportDeclaration -> Maybe JSExportDeclaration
-eliminateUnusedExports _opts _usageMap exportDecl = Just exportDecl  -- Conservative: preserve all exports
+eliminateUnusedExports _opts _uMap exportDecl = Just exportDecl  -- Conservative: preserve all exports
 
 -- | Optimize module items based on usage analysis.
 --
 -- Comprehensive optimization of module-level items including imports,
 -- exports, and top-level statements.
 optimizeModuleItems :: TreeShakeOptions -> UsageMap -> [JSModuleItem] -> [JSModuleItem]
-optimizeModuleItems opts usageMap items = eliminateModuleItems opts usageMap items
+optimizeModuleItems opts uMap items = eliminateModuleItems opts uMap items
 
 -- | Check if statement is used based on usage map.
 --
 -- Determines whether a statement contains any identifiers or constructs
 -- that are marked as used in the usage analysis.
 isStatementUsed :: UsageMap -> JSStatement -> Bool
-isStatementUsed usageMap stmt = case stmt of
+isStatementUsed uMap stmt = case stmt of
   JSFunction _ ident _ _ _ _ _ ->
     -- Function is used if the function name is referenced
-    isFunctionUsed usageMap ident
+    isFunctionUsed uMap ident
   JSAsyncFunction _ _ ident _ _ _ _ _ ->
     -- Async function is used if the function name is referenced
-    isFunctionUsed usageMap ident
+    isFunctionUsed uMap ident
   JSGenerator _ _ ident _ _ _ _ _ ->
     -- Generator function is used if the function name is referenced
-    isFunctionUsed usageMap ident
-  JSClass _ ident _ _ _ _ _ -> isClassUsed usageMap ident
-  JSVariable _ decls _ -> any (isVariableDeclarationUsed usageMap) (fromCommaList decls)
-  JSLet _ decls _ -> any (isVariableDeclarationUsed usageMap) (fromCommaList decls)
-  JSConstant _ decls _ -> any (isVariableDeclarationUsed usageMap) (fromCommaList decls)
-  JSExpressionStatement expr _ -> isExpressionUsed usageMap expr
-  JSReturn _ (Just expr) _ -> isExpressionUsed usageMap expr
+    isFunctionUsed uMap ident
+  JSClass _ ident _ _ _ _ _ -> isClassUsed uMap ident
+  JSVariable _ decls _ -> any (isVariableDeclarationUsed uMap) (fromCommaList decls)
+  JSLet _ decls _ -> any (isVariableDeclarationUsed uMap) (fromCommaList decls)
+  JSConstant _ decls _ -> any (isVariableDeclarationUsed uMap) (fromCommaList decls)
+  JSExpressionStatement expr _ -> isExpressionUsed uMap expr
+  JSReturn _ (Just expr) _ -> isExpressionUsed uMap expr
   JSReturn _ Nothing _ -> False  -- Empty return can be eliminated
   JSThrow _ _expr _ -> True  -- Always preserve throw statements
-  JSStatementBlock _ stmts _ _ -> any (isStatementUsed usageMap) stmts
+  JSStatementBlock _ stmts _ _ -> any (isStatementUsed uMap) stmts
   JSIf _ _ test _ thenStmt ->
-    isExpressionUsed usageMap test ||
-    isStatementUsed usageMap thenStmt
+    isExpressionUsed uMap test ||
+    isStatementUsed uMap thenStmt
   JSIfElse _ _ test _ thenStmt _ elseStmt ->
-    isExpressionUsed usageMap test ||
-    isStatementUsed usageMap thenStmt ||
-    isStatementUsed usageMap elseStmt
-  JSFor _ _ init _ condition _ increment _ body ->
-    any (isExpressionUsed usageMap) (fromCommaList init) ||
-    any (isExpressionUsed usageMap) (fromCommaList condition) ||
-    any (isExpressionUsed usageMap) (fromCommaList increment) ||
-    isStatementUsed usageMap body
+    isExpressionUsed uMap test ||
+    isStatementUsed uMap thenStmt ||
+    isStatementUsed uMap elseStmt
+  JSFor _ _ initExprs _ condition _ increment _ body ->
+    any (isExpressionUsed uMap) (fromCommaList initExprs) ||
+    any (isExpressionUsed uMap) (fromCommaList condition) ||
+    any (isExpressionUsed uMap) (fromCommaList increment) ||
+    isStatementUsed uMap body
   JSForIn _ _ var _ obj _ body ->
-    isExpressionUsed usageMap var ||
-    isExpressionUsed usageMap obj ||
-    isStatementUsed usageMap body
+    isExpressionUsed uMap var ||
+    isExpressionUsed uMap obj ||
+    isStatementUsed uMap body
   JSForOf _ _ var _ obj _ body ->
-    isExpressionUsed usageMap var ||
-    isExpressionUsed usageMap obj ||
-    isStatementUsed usageMap body
+    isExpressionUsed uMap var ||
+    isExpressionUsed uMap obj ||
+    isStatementUsed uMap body
   JSWhile _ _ condition _ body ->
-    isExpressionUsed usageMap condition ||
-    isStatementUsed usageMap body
+    isExpressionUsed uMap condition ||
+    isStatementUsed uMap body
   JSDoWhile _ body _ _ condition _ _ ->
-    isStatementUsed usageMap body ||
-    isExpressionUsed usageMap condition
+    isStatementUsed uMap body ||
+    isExpressionUsed uMap condition
   _ -> False  -- Other statements default to not used
 
 -- | Check if expression is used based on usage map.
@@ -681,37 +624,37 @@ isStatementUsed usageMap stmt = case stmt of
 -- Analyzes expressions to determine if they contain any used identifiers
 -- or constructs that should be preserved.
 isExpressionUsed :: UsageMap -> JSExpression -> Bool
-isExpressionUsed usageMap expr = case expr of
-  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
-  JSVarInitExpression lhs rhs -> 
-    isExpressionUsed usageMap lhs || isVarInitializerUsed usageMap rhs
+isExpressionUsed uMap expr = case expr of
+  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) uMap
+  JSVarInitExpression lhs rhs ->
+    isExpressionUsed uMap lhs || isVarInitializerUsed uMap rhs
   JSCallExpression target _ args _ ->
-    isExpressionUsed usageMap target || 
-    any (isExpressionUsed usageMap) (fromCommaList args)
+    isExpressionUsed uMap target ||
+    any (isExpressionUsed uMap) (fromCommaList args)
   JSCallExpressionDot target _ prop ->
-    isExpressionUsed usageMap target || isExpressionUsed usageMap prop
+    isExpressionUsed uMap target || isExpressionUsed uMap prop
   JSCallExpressionSquare target _ prop _ ->
-    isExpressionUsed usageMap target || isExpressionUsed usageMap prop
+    isExpressionUsed uMap target || isExpressionUsed uMap prop
   JSAssignExpression lhs _ rhs ->
-    isExpressionUsed usageMap lhs || isExpressionUsed usageMap rhs
+    isExpressionUsed uMap lhs || isExpressionUsed uMap rhs
   JSFunctionExpression _ ident _ _ _ body ->
-    identifierUsed usageMap ident || functionBodyContainsUsedIdentifiers usageMap body
+    identifierUsed uMap ident || functionBodyContainsUsedIdentifiers uMap body
   JSMemberDot target _ prop ->
-    isExpressionUsed usageMap target || isExpressionUsed usageMap prop
+    isExpressionUsed uMap target || isExpressionUsed uMap prop
   JSMemberSquare target _ prop _ ->
-    isExpressionUsed usageMap target || isExpressionUsed usageMap prop
+    isExpressionUsed uMap target || isExpressionUsed uMap prop
   JSExpressionBinary lhs _ rhs ->
-    isExpressionUsed usageMap lhs || isExpressionUsed usageMap rhs
+    isExpressionUsed uMap lhs || isExpressionUsed uMap rhs
   JSExpressionTernary test _ trueExpr _ falseExpr ->
-    isExpressionUsed usageMap test || 
-    isExpressionUsed usageMap trueExpr || 
-    isExpressionUsed usageMap falseExpr
+    isExpressionUsed uMap test ||
+    isExpressionUsed uMap trueExpr ||
+    isExpressionUsed uMap falseExpr
   JSCommaExpression left _ right ->
-    isExpressionUsed usageMap left || isExpressionUsed usageMap right
+    isExpressionUsed uMap left || isExpressionUsed uMap right
   JSArrayLiteral _ elements _ ->
-    any (isArrayElementUsed usageMap) elements
-  JSExpressionParen _ innerExpr _ ->
-    isExpressionUsed usageMap innerExpr
+    any (isArrayElementUsed uMap) elements
+  JSExpressionParen _ parenExpr _ ->
+    isExpressionUsed uMap parenExpr
   -- Literals and constants don't contain used identifiers
   JSDecimal {} -> False
   JSLiteral {} -> False
@@ -726,17 +669,17 @@ isExpressionUsed usageMap expr = case expr of
 
 -- | Helper to check if variable initializer is used.
 isVarInitializerUsed :: UsageMap -> JSVarInitializer -> Bool
-isVarInitializerUsed usageMap (JSVarInit _ expr) = isExpressionUsed usageMap expr
+isVarInitializerUsed uMap (JSVarInit _ expr) = isExpressionUsed uMap expr
 isVarInitializerUsed _ JSVarInitNone = False
 
 -- | Helper to check if identifier is used.
-identifierUsed :: UsageMap -> JSIdent -> Bool  
-identifierUsed usageMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
+identifierUsed :: UsageMap -> JSIdent -> Bool
+identifierUsed uMap (JSIdentName _ name) = Types.isIdentifierUsed (Text.decodeUtf8 name) uMap
 identifierUsed _ JSIdentNone = False
 
 -- | Helper to check if array element is used.
 isArrayElementUsed :: UsageMap -> JSArrayElement -> Bool
-isArrayElementUsed usageMap (JSArrayElement expr) = isExpressionUsed usageMap expr
+isArrayElementUsed uMap (JSArrayElement expr) = isExpressionUsed uMap expr
 isArrayElementUsed _ (JSArrayComma _) = False
 
 -- | Check if statement has observable side effects.
@@ -768,8 +711,8 @@ hasObservableSideEffects stmt = case stmt of
   -- Control flow statements without side effects in their conditions
   JSIf _ _ test _ _ -> expressionHasSideEffects test
   JSIfElse _ _ test _ _ _ _ -> expressionHasSideEffects test
-  JSFor _ _ init _ condition _ increment _ _ ->
-    any expressionHasSideEffects (fromCommaList init) ||
+  JSFor _ _ initExprs _ condition _ increment _ _ ->
+    any expressionHasSideEffects (fromCommaList initExprs) ||
     any expressionHasSideEffects (fromCommaList condition) ||
     any expressionHasSideEffects (fromCommaList increment)
   JSWhile _ _ condition _ _ -> expressionHasSideEffects condition
@@ -783,7 +726,7 @@ hasObservableSideEffects stmt = case stmt of
   _ -> True
   where
     getInitializerFromDecl :: JSExpression -> JSVarInitializer
-    getInitializerFromDecl (JSVarInitExpression _ init) = init
+    getInitializerFromDecl (JSVarInitExpression _ initializer) = initializer
     getInitializerFromDecl _ = JSVarInitNone
 
 -- | Create elimination result from analysis.
@@ -808,69 +751,57 @@ validateTreeShaking _original _optimized = True  -- Minimal implementation: assu
 
 -- Helper functions
 
--- | Extract identifier from simple expressions.
-extractIdentifierFromExpression :: JSExpression -> Maybe Text.Text
-extractIdentifierFromExpression expr = case expr of
-  JSIdentifier _ name -> Just (Text.decodeUtf8 name)
-  _ -> Nothing
-
 -- | Build a comma list from a regular list.
 buildCommaList :: [a] -> JSCommaList a
 buildCommaList [] = JSLNil
 buildCommaList [x] = JSLOne x
 buildCommaList (x:xs) = JSLCons (buildCommaList xs) JSNoAnnot x
 
-
--- | Check if comma list is empty.
-isCommaListEmpty :: JSCommaList a -> Bool
-isCommaListEmpty JSLNil = True
-isCommaListEmpty _ = False
-
 -- | Eliminate individual statement.
 eliminateStatement :: TreeShakeOptions -> UsageMap -> JSStatement -> JSStatement
-eliminateStatement opts usageMap stmt =
+eliminateStatement opts uMap stmt =
   -- Try to eliminate unused parts within statements
   -- The statement-level filtering is handled by eliminateStatements
-  eliminateUnusedDeclarations opts usageMap stmt
+  eliminateUnusedDeclarations opts uMap stmt
 
 -- | Eliminate block statements.
 eliminateBlock :: TreeShakeOptions -> UsageMap -> JSBlock -> JSBlock
-eliminateBlock opts usageMap (JSBlock lb stmts rb) =
-  JSBlock lb (eliminateStatements opts usageMap stmts) rb
+eliminateBlock opts uMap (JSBlock lb stmts rb) =
+  JSBlock lb (eliminateStatements opts uMap stmts) rb
 
 -- | Check if function is used or contains used identifiers.
 isFunctionUsed :: UsageMap -> JSIdent -> Bool
-isFunctionUsed usageMap (JSIdentName _ name) = 
-  Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
+isFunctionUsed uMap (JSIdentName _ name) =
+  Types.isIdentifierUsed (Text.decodeUtf8 name) uMap
 isFunctionUsed _ JSIdentNone = False
 
 -- | Check if function should be preserved (used or contains used variables).
 isFunctionPreserved :: UsageMap -> JSIdent -> JSBlock -> Bool
-isFunctionPreserved usageMap ident body =
-  isFunctionUsed usageMap ident || functionBodyContainsUsedIdentifiers usageMap body
+isFunctionPreserved uMap ident body =
+  isFunctionUsed uMap ident || functionBodyContainsUsedIdentifiers uMap body
 
 -- | Check if function body contains any used identifiers.
 -- This is crucial for preserving functions that define variables used in closures.
 functionBodyContainsUsedIdentifiers :: UsageMap -> JSBlock -> Bool
-functionBodyContainsUsedIdentifiers usageMap (JSBlock _ stmts _) =
-  any (statementContainsUsedIdentifiers usageMap) stmts
+functionBodyContainsUsedIdentifiers uMap (JSBlock _ stmts _) =
+  any (statementContainsUsedIdentifiers uMap) stmts
 
 -- | Check if statement contains any used identifiers.
 statementContainsUsedIdentifiers :: UsageMap -> JSStatement -> Bool
-statementContainsUsedIdentifiers usageMap stmt = case stmt of
-  JSVariable _ decls _ -> any (isVariableDeclarationUsed usageMap) (fromCommaList decls)
-  JSLet _ decls _ -> any (isVariableDeclarationUsed usageMap) (fromCommaList decls)
-  JSConstant _ decls _ -> any (isVariableDeclarationUsed usageMap) (fromCommaList decls)
-  JSFunction _ ident _ _ _ body _ -> isFunctionPreserved usageMap ident body
-  JSExpressionStatement expr _ -> isExpressionUsed usageMap expr
-  JSReturn _ (Just expr) _ -> isExpressionUsed usageMap expr
-  JSStatementBlock _ innerStmts _ _ -> any (statementContainsUsedIdentifiers usageMap) innerStmts
-  JSIf _ _ test _ thenStmt -> 
-    isExpressionUsed usageMap test || statementContainsUsedIdentifiers usageMap thenStmt
+statementContainsUsedIdentifiers uMap stmt = case stmt of
+  JSVariable _ decls _ -> any (isVariableDeclarationUsed uMap) (fromCommaList decls)
+  JSLet _ decls _ -> any (isVariableDeclarationUsed uMap) (fromCommaList decls)
+  JSConstant _ decls _ -> any (isVariableDeclarationUsed uMap) (fromCommaList decls)
+  JSFunction _ ident _ _ _ body _ -> isFunctionPreserved uMap ident body
+  JSExpressionStatement expr _ -> isExpressionUsed uMap expr
+  JSReturn _ (Just expr) _ -> isExpressionUsed uMap expr
+  JSStatementBlock _ innerStmts _ _ -> any (statementContainsUsedIdentifiers uMap) innerStmts
+  JSIf _ _ test _ thenStmt ->
+    isExpressionUsed uMap test || statementContainsUsedIdentifiers uMap thenStmt
   JSIfElse _ _ test _ thenStmt _ elseStmt ->
-    isExpressionUsed usageMap test || 
-    statementContainsUsedIdentifiers usageMap thenStmt ||
-    statementContainsUsedIdentifiers usageMap elseStmt
+    isExpressionUsed uMap test ||
+    statementContainsUsedIdentifiers uMap thenStmt ||
+    statementContainsUsedIdentifiers uMap elseStmt
   _ -> False
 
 -- | Check if class is used.
@@ -879,27 +810,16 @@ isClassUsed = isFunctionUsed
 
 -- | Filter variable declarations based on usage.
 filterVariableDeclarations :: UsageMap -> JSCommaList JSExpression -> JSCommaList JSExpression
-filterVariableDeclarations usageMap decls =
-  buildCommaList $ filter (isVariableDeclarationUsed usageMap) $ fromCommaList decls
+filterVariableDeclarations uMap decls =
+  buildCommaList $ filter (isVariableDeclarationUsed uMap) $ fromCommaList decls
 
 -- | Filter variable declarations with eval awareness.
 filterVariableDeclarationsWithEval :: TreeShakeOptions -> UsageMap -> Bool -> JSCommaList JSExpression -> JSCommaList JSExpression
-filterVariableDeclarationsWithEval opts usageMap hasEval decls
+filterVariableDeclarationsWithEval opts uMap hasEval decls
   | hasEval && not (opts ^. Types.aggressiveShaking) =
       -- Conservative mode with eval: preserve used variables or those with side effects
-      buildCommaList $ filter (isVariableDeclarationUsedOrPotentiallyDynamic usageMap) $ fromCommaList decls
-  | otherwise = filterVariableDeclarations usageMap decls
-
--- | Check if we should be ultra-conservative (many eval calls scenario)
--- This detects scenarios with many variable declarations that might be dynamically accessed
-hasManyEvalCalls :: JSCommaList JSExpression -> Bool
-hasManyEvalCalls decls =
-  let declCount = length (fromCommaList decls)
-  in declCount > 10  -- Use ultra-conservative mode when many variables are declared
-
--- | Ultra-conservative mode: preserve all declared variables
-isUltraConservative :: UsageMap -> JSExpression -> Bool
-isUltraConservative _usageMap _expr = True  -- Preserve ALL variables in ultra-conservative mode
+      buildCommaList $ filter (isVariableDeclarationUsedOrPotentiallyDynamic uMap) $ fromCommaList decls
+  | otherwise = filterVariableDeclarations uMap decls
 
 -- | Check if variable declaration is used or potentially used in dynamic code (conservative mode).
 -- In conservative mode with eval, preserve variables that are either:
@@ -907,20 +827,20 @@ isUltraConservative _usageMap _expr = True  -- Preserve ALL variables in ultra-c
 -- 2. Have side effects in their initializers
 -- The analysis phase marks variables found in eval strings as used, so we still rely on usage analysis.
 isVariableDeclarationUsedOrPotentiallyDynamic :: UsageMap -> JSExpression -> Bool
-isVariableDeclarationUsedOrPotentiallyDynamic usageMap expr =
-  isVariableDeclarationUsed usageMap expr
+isVariableDeclarationUsedOrPotentiallyDynamic uMap expr =
+  isVariableDeclarationUsed uMap expr
 
 -- | Check if variable declaration is used or has side effects.
 isVariableDeclarationUsed :: UsageMap -> JSExpression -> Bool
-isVariableDeclarationUsed usageMap expr = case expr of
-  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
+isVariableDeclarationUsed uMap expr = case expr of
+  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) uMap
   JSVarInitExpression (JSIdentifier _ name) initializer ->
     let varName = Text.decodeUtf8 name
     in -- Preserve if variable is used OR if initializer has side effects OR if initializer references used identifiers OR if variable is assigned an object with dynamic access
-    Types.isIdentifierUsed varName usageMap ||
+    Types.isIdentifierUsed varName uMap ||
     hasUnavoidableSideEffects initializer ||
-    initializerReferencesUsedIdentifiers usageMap initializer ||
-    isDynamicallyAccessedObject usageMap varName
+    initializerReferencesUsedIdentifiers uMap initializer ||
+    isDynamicallyAccessedObject uMap varName
   _ -> True  -- Conservative
 
 -- | Check if a variable initializer references used identifiers.
@@ -929,47 +849,47 @@ isVariableDeclarationUsed usageMap expr = case expr of
 -- However, for safe constructors, we don't preserve unused variables just because
 -- they reference the constructor name.
 initializerReferencesUsedIdentifiers :: UsageMap -> JSVarInitializer -> Bool
-initializerReferencesUsedIdentifiers usageMap initializer = case initializer of
-  JSVarInit _ expr ->
+initializerReferencesUsedIdentifiers uMap initializer = case initializer of
+  JSVarInit _ initExpr ->
     -- For safe constructors, don't preserve unused variables just because they reference the constructor
-    case expr of
+    case initExpr of
       JSMemberNew _ constructor _ _ _ ->
         if isSafeConstructor constructor
         then False  -- Don't preserve unused variables with safe constructors
-        else expressionReferencesUsedIdentifiers usageMap expr
+        else expressionReferencesUsedIdentifiers uMap initExpr
       JSNewExpression _ constructor ->
         if isSafeConstructor constructor
         then False  -- Don't preserve unused variables with safe constructors
-        else expressionReferencesUsedIdentifiers usageMap expr
-      _ -> expressionReferencesUsedIdentifiers usageMap expr
+        else expressionReferencesUsedIdentifiers uMap initExpr
+      _ -> expressionReferencesUsedIdentifiers uMap initExpr
   JSVarInitNone -> False
 
 -- | Check if expression references used identifiers.
 expressionReferencesUsedIdentifiers :: UsageMap -> JSExpression -> Bool
-expressionReferencesUsedIdentifiers usageMap expr = case expr of
-  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) usageMap
-  JSMemberDot obj _ _ -> expressionReferencesUsedIdentifiers usageMap obj
+expressionReferencesUsedIdentifiers uMap expr = case expr of
+  JSIdentifier _ name -> Types.isIdentifierUsed (Text.decodeUtf8 name) uMap
+  JSMemberDot obj _ _ -> expressionReferencesUsedIdentifiers uMap obj
   JSMemberSquare obj _ idx _ ->
-    expressionReferencesUsedIdentifiers usageMap obj ||
-    expressionReferencesUsedIdentifiers usageMap idx
+    expressionReferencesUsedIdentifiers uMap obj ||
+    expressionReferencesUsedIdentifiers uMap idx
   JSCallExpression func _ args _ ->
-    expressionReferencesUsedIdentifiers usageMap func ||
-    any (expressionReferencesUsedIdentifiers usageMap) (fromCommaList args)
+    expressionReferencesUsedIdentifiers uMap func ||
+    any (expressionReferencesUsedIdentifiers uMap) (fromCommaList args)
   JSExpressionBinary lhs _ rhs ->
-    expressionReferencesUsedIdentifiers usageMap lhs ||
-    expressionReferencesUsedIdentifiers usageMap rhs
+    expressionReferencesUsedIdentifiers uMap lhs ||
+    expressionReferencesUsedIdentifiers uMap rhs
   JSExpressionTernary test _ trueExpr _ falseExpr ->
-    expressionReferencesUsedIdentifiers usageMap test ||
-    expressionReferencesUsedIdentifiers usageMap trueExpr ||
-    expressionReferencesUsedIdentifiers usageMap falseExpr
+    expressionReferencesUsedIdentifiers uMap test ||
+    expressionReferencesUsedIdentifiers uMap trueExpr ||
+    expressionReferencesUsedIdentifiers uMap falseExpr
   JSAssignExpression lhs _ rhs ->
-    expressionReferencesUsedIdentifiers usageMap lhs ||
-    expressionReferencesUsedIdentifiers usageMap rhs
+    expressionReferencesUsedIdentifiers uMap lhs ||
+    expressionReferencesUsedIdentifiers uMap rhs
   JSCommaExpression left _ right ->
-    expressionReferencesUsedIdentifiers usageMap left ||
-    expressionReferencesUsedIdentifiers usageMap right
-  JSExpressionParen _ innerExpr _ ->
-    expressionReferencesUsedIdentifiers usageMap innerExpr
+    expressionReferencesUsedIdentifiers uMap left ||
+    expressionReferencesUsedIdentifiers uMap right
+  JSExpressionParen _ parenExpr _ ->
+    expressionReferencesUsedIdentifiers uMap parenExpr
   _ -> False  -- Literals and other expressions don't reference identifiers
 
 -- | Check if a variable initializer has unavoidable side effects.
@@ -977,13 +897,13 @@ expressionReferencesUsedIdentifiers usageMap expr = case expr of
 -- for side effects that cannot be eliminated even if the variable is unused.
 hasUnavoidableSideEffects :: JSVarInitializer -> Bool
 hasUnavoidableSideEffects initializer = case initializer of
-  JSVarInit _ expr -> hasUnavoidableInitializerSideEffects expr
+  JSVarInit _ initExpr -> hasUnavoidableInitializerSideEffects initExpr
   JSVarInitNone -> False  -- No initializer means no side effects
 
 -- | Check if a variable initializer has side effects.
 hasVarInitializerSideEffects :: JSVarInitializer -> Bool
 hasVarInitializerSideEffects initializer = case initializer of
-  JSVarInit _ expr -> hasInitializerSideEffects expr
+  JSVarInit _ initExpr -> hasInitializerSideEffects initExpr
   JSVarInitNone -> False  -- No initializer means no side effects
 
 -- | Check if expression has unavoidable side effects.
@@ -1036,11 +956,11 @@ hasInitializerSideEffects expr = case expr of
   JSGeneratorExpression {} -> False
 
   -- Function calls and constructor calls have side effects, except require()
-  JSCallExpression fn _ args _ -> not (isRequireCall fn)
-  JSCallExpressionDot expr _ _ -> not (isRequireCallExpression expr)
-  JSCallExpressionSquare expr _ _ _ -> not (isRequireCallExpression expr)
-  JSNewExpression _ expr ->
-    not (isSafeConstructor expr)
+  JSCallExpression fn _ _args _ -> not (isRequireCall fn)
+  JSCallExpressionDot callExpr _ _ -> not (isRequireCallExpression callExpr)
+  JSCallExpressionSquare callExpr _ _ _ -> not (isRequireCallExpression callExpr)
+  JSNewExpression _ newExpr ->
+    not (isSafeConstructor newExpr)
 
   -- Assignment operations have side effects
   JSAssignExpression {} -> True
@@ -1065,13 +985,13 @@ hasInitializerSideEffects expr = case expr of
     hasInitializerSideEffects elseExpr
 
   -- Parenthesized expressions depend on inner expression
-  JSExpressionParen _ innerExpr _ -> hasInitializerSideEffects innerExpr
+  JSExpressionParen _ parenExpr _ -> hasInitializerSideEffects parenExpr
 
   -- Conservative: assume unknown expressions have side effects
   _ -> True
 
 -- | Check if array element has side effects.
-hasArrayElementSideEffects :: JSArrayElement -> Bool  
+hasArrayElementSideEffects :: JSArrayElement -> Bool
 hasArrayElementSideEffects element = case element of
   JSArrayElement expr -> hasInitializerSideEffects expr
   JSArrayComma {} -> False  -- Holes/commas are pure
@@ -1081,14 +1001,14 @@ hasObjectPropertyListSideEffects :: JSCommaTrailingList JSObjectProperty -> Bool
 hasObjectPropertyListSideEffects propList = case propList of
   JSCTLComma props _ -> any hasObjectPropertySideEffects (fromCommaList props)
   JSCTLNone props -> any hasObjectPropertySideEffects (fromCommaList props)
-  
+
 -- | Check if object property has side effects.
 hasObjectPropertySideEffects :: JSObjectProperty -> Bool
 hasObjectPropertySideEffects prop = case prop of
   JSPropertyNameandValue _name _ exprs -> any hasInitializerSideEffects exprs
   JSPropertyIdentRef {} -> False  -- Shorthand properties are pure
   JSObjectMethod {} -> True  -- Methods could have side effects
-  JSObjectSpread _ expr -> hasInitializerSideEffects expr  -- Spread depends on expression
+  JSObjectSpread _ spreadExpr -> hasInitializerSideEffects spreadExpr  -- Spread depends on expression
 
 -- | Check if a template part has side effects
 hasTemplatePartSideEffects :: JSTemplatePart -> Bool
@@ -1098,33 +1018,33 @@ hasTemplatePartSideEffects (JSTemplatePart expr _ _) =
 
 -- | Eliminate module items.
 eliminateModuleItems :: TreeShakeOptions -> UsageMap -> [JSModuleItem] -> [JSModuleItem]
-eliminateModuleItems opts usageMap items = 
-  filter (shouldPreserveModuleItem opts usageMap) $ 
-  map (eliminateModuleItem opts usageMap) items
+eliminateModuleItems opts uMap items =
+  filter (shouldPreserveModuleItem opts uMap) $
+  map (eliminateModuleItem opts uMap) items
 
 -- | Eliminate individual module item.
 eliminateModuleItem :: TreeShakeOptions -> UsageMap -> JSModuleItem -> JSModuleItem
-eliminateModuleItem opts usageMap item = case item of
+eliminateModuleItem opts uMap item = case item of
   JSModuleStatementListItem stmt ->
-    JSModuleStatementListItem (eliminateStatement opts usageMap stmt)
+    JSModuleStatementListItem (eliminateStatement opts uMap stmt)
   JSModuleImportDeclaration annot importDecl ->
-    case eliminateUnusedImports opts usageMap importDecl of
+    case eliminateUnusedImports opts uMap importDecl of
       Just newImportDecl -> JSModuleImportDeclaration annot newImportDecl
       Nothing -> JSModuleStatementListItem (JSEmptyStatement annot)  -- Remove import entirely
   _ -> item  -- Preserve exports and other items for now
 
 -- | Check if module item should be preserved.
 shouldPreserveModuleItem :: TreeShakeOptions -> UsageMap -> JSModuleItem -> Bool
-shouldPreserveModuleItem opts usageMap item = case item of
-  JSModuleStatementListItem stmt -> shouldPreserveStatement opts usageMap stmt
+shouldPreserveModuleItem opts uMap item = case item of
+  JSModuleStatementListItem stmt -> shouldPreserveStatement opts uMap stmt
   _ -> True  -- Preserve imports/exports for now
 
 -- | Check if an object is accessed with dynamic property names
 -- For now, we conservatively check if the identifier has side effects,
 -- which will be set by the analysis phase for dynamically accessed objects
 isDynamicallyAccessedObject :: UsageMap -> Text.Text -> Bool
-isDynamicallyAccessedObject usageMap objName =
-  case Map.lookup objName usageMap of
+isDynamicallyAccessedObject uMap objName =
+  case Map.lookup objName uMap of
     Just usageInfo -> usageInfo ^. Types.hasSideEffects
     Nothing -> False
 
@@ -1151,15 +1071,3 @@ isSafeConstructor expr = case expr of
       , "Error", "TypeError", "ReferenceError", "SyntaxError", "RangeError"
       , "EvalError", "URIError"
       ]
-
--- | Check if unary operator has side effects.
-isUnaryOpSideEffect :: JSUnaryOp -> Bool
-isUnaryOpSideEffect op = case op of
-  JSUnaryOpIncr _ -> True
-  JSUnaryOpDecr _ -> True
-  _ -> False
-
--- | Extract properties from object property list.
-fromObjectPropertyList :: JSObjectPropertyList -> [JSObjectProperty]
-fromObjectPropertyList (JSCTLComma props _) = fromCommaList props
-fromObjectPropertyList (JSCTLNone props) = fromCommaList props
