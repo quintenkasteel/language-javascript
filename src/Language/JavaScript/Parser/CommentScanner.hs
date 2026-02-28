@@ -22,7 +22,7 @@
 --   * Returns @[(Int, CommentAnnotation)]@ — byte offset paired with annotation
 --
 -- @since 0.8.0.0
-module Language.JavaScript.Parser.Flatparse.CommentScanner
+module Language.JavaScript.Parser.CommentScanner
   ( -- * Comment Scanning
     scanComments
   , CommentEntry(..)

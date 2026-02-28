@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | Core lexical analysis using flatparse for JavaScript parsing.
 --
@@ -40,7 +41,7 @@
 -- Right "0x1BEEF"
 --
 -- @since 0.8.0.0
-module Language.JavaScript.Parser.Flatparse.Lexer
+module Language.JavaScript.Parser.Lexer
   ( -- * Core Parser Type
     JSParser,
 
@@ -74,29 +75,32 @@ where
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (chr, digitToInt)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import FlatParse.Basic (Pos, (<|>), many, some, satisfy, anyChar, optional, skipMany, empty)
 import qualified FlatParse.Basic as FP
-import qualified Language.JavaScript.Parser.Flatparse.Pos as JSPos
-import Language.JavaScript.Parser.Flatparse.Primitives (JSParser, isIdentifierStart, isIdentifierContinue, isWhitespace, isDecimalDigit, isBinaryDigit, isOctalDigit, isHexDigit)
+import qualified Language.JavaScript.Parser.Pos as JSPos
+import Language.JavaScript.Parser.Primitives (JSParser, isIdentifierStart, isIdentifierContinue, isWhitespace, isDecimalDigit, isBinaryDigit, isOctalDigit, isHexDigit)
 
 -- ---------------------------------------------------------------------
 -- Core Parser Infrastructure
 -- ---------------------------------------------------------------------
 
--- | Parse specific character
+-- | Parse specific ASCII character using native byte comparison.
+-- Avoids UTF-8 decode overhead for the common case of matching ASCII punctuation.
+{-# INLINE parseChar #-}
 parseChar :: Char -> JSParser ()
-parseChar c = do
-  actual <- FP.anyChar
-  if actual == c
-    then pure ()
-    else FP.empty
+parseChar c = FP.word8 (fromIntegral (fromEnum c))
 
--- | Parse specific string
-parseString :: String -> JSParser ()
-parseString str = mapM_ parseChar str
+-- | Parse specific ASCII string using native memcmp.
+-- Takes 'ByteString' directly to avoid runtime 'pack' overhead;
+-- with @OverloadedStrings@, string literals become compile-time constants.
+{-# INLINE parseString #-}
+parseString :: ByteString -> JSParser ()
+parseString = FP.byteString
 
 -- | Parse error with position and context information.
 data ParseError
@@ -319,47 +323,55 @@ identifier = do
 
 -- | Parse specific keyword (backtrackable on mismatch).
 --
--- Parses an identifier-like token and checks it matches the keyword exactly.
--- Uses backtrackable failure so callers can try alternative keywords.
+-- Matches the keyword bytes directly using native memcmp, then checks
+-- that the next character is not an identifier continuation. This fails
+-- on the first non-matching byte instead of reading the entire identifier.
 keyword :: ByteString -> JSParser ()
-keyword kw = do
-  ident <- rawIdentifier
-  if ident == kw
-    then pure ()
-    else empty
+keyword kw = FP.byteString kw *> notIdentCont
+  where
+    notIdentCont = do
+      mc <- optional (FP.lookahead FP.anyChar)
+      case mc of
+        Just c | isIdentifierContinue c -> empty
+        _ -> pure ()
 
 -- | Parse identifier without keyword check as zero-copy ByteString slice.
 rawIdentifier :: JSParser ByteString
 rawIdentifier = FP.byteStringOf (satisfy isIdentifierStart *> skipMany (satisfy isIdentifierContinue))
 
 -- | Check if a ByteString is a JavaScript keyword.
+-- Uses a Set for O(log n) lookup instead of O(n) list membership.
 isKeyword :: ByteString -> Bool
-isKeyword bs = bs `elem` keywords
-  where
-    keywords :: [ByteString]
-    keywords =
-      [ "break", "case", "catch", "class", "const", "continue"
-      , "debugger", "default", "delete", "do", "else", "export"
-      , "extends", "false", "finally", "for", "function", "if"
-      , "import", "in", "instanceof", "new", "null", "return"
-      , "super", "switch", "this", "throw", "true", "try"
-      , "typeof", "var", "void", "while", "with"
-      , "let", "static", "enum", "implements", "package"
-      , "protected", "interface", "private", "public"
-      , "await", "async"
-      ]
+isKeyword bs = Set.member bs keywordSet
+
+-- | Set of all JavaScript keywords for efficient lookup.
+-- Top-level CAF ensures the Set is built once.
+keywordSet :: Set ByteString
+keywordSet = Set.fromList
+  [ "break", "case", "catch", "class", "const", "continue"
+  , "debugger", "default", "delete", "do", "else", "export"
+  , "extends", "false", "finally", "for", "function", "if"
+  , "import", "in", "instanceof", "new", "null", "return"
+  , "super", "switch", "this", "throw", "true", "try"
+  , "typeof", "var", "void", "while", "with"
+  , "let", "static", "enum", "implements", "package"
+  , "protected", "interface", "private", "public"
+  , "await", "async"
+  ]
 
 -- ---------------------------------------------------------------------
 -- Whitespace and Comments
 -- ---------------------------------------------------------------------
 
 -- | Skip whitespace including comments.
+-- Optimized to try ASCII whitespace first (the 99.9% case) before comments
+-- or Unicode whitespace, avoiding UTF-8 decode overhead for common characters.
 whitespace :: JSParser ()
-whitespace = skipMany (whitespaceChar <|> lineComment <|> blockComment)
-
--- | Parse single whitespace character.
-whitespaceChar :: JSParser ()
-whitespaceChar = satisfy isWhitespace *> pure ()
+whitespace = skipMany (asciiWS <|> lineComment <|> blockComment <|> unicodeWS)
+  where
+    asciiWS = FP.skipSatisfyAscii isSimpleWS
+    isSimpleWS c = c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
+    unicodeWS = FP.skipSatisfy (\c -> c > '\x7f' && isWhitespace c)
 
 -- | Parse single-line comment.
 -- Terminates at any ECMAScript line terminator: LF, CR, LS, PS.

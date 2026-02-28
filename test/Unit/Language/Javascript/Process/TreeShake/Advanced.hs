@@ -28,7 +28,7 @@ where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import Control.Lens ((.~), (&))
+import Lens.Micro ((.~), (&))
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Parser (parse, parseModule)
 import Language.JavaScript.Process.TreeShake

@@ -23,7 +23,7 @@ where
 import Data.Text (Text)
 import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.Flatparse.Statement
+import Language.JavaScript.Parser.Grammar
 import Test.Hspec
 import FlatParse.Basic
 

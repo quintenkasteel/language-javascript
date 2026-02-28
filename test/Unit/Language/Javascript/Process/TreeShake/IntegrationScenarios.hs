@@ -23,7 +23,7 @@ module Unit.Language.Javascript.Process.TreeShake.IntegrationScenarios
   )
 where
 
-import Control.Lens ((^.), (&), (.~))
+import Lens.Micro ((^.), (&), (.~))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Language.JavaScript.Parser.Parser (parse)

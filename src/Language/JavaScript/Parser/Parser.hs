@@ -60,17 +60,14 @@ module Language.JavaScript.Parser.Parser
 where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import qualified Data.Text.Encoding as Text
 import qualified Language.JavaScript.Parser.AST as AST
-import qualified Language.JavaScript.Parser.Flatparse.Parser as FlatParser
-import qualified Language.JavaScript.Parser.Flatparse.Statement as Statement
+import qualified Language.JavaScript.Parser.Core as FlatParser
+import qualified Language.JavaScript.Parser.Grammar as Grammar
 import qualified FlatParse.Basic as FP
-import Language.JavaScript.Parser.SrcLocation (tokenPosnEmpty)
-import Language.JavaScript.Parser.Flatparse.Lexer (whitespace)
+import Language.JavaScript.Parser.Lexer (whitespace)
 import System.IO
 
 -- | Parse JavaScript Program (Script)
@@ -334,7 +331,7 @@ parseStatement ::
   Either String AST.JSAST
 parseStatement input _srcName =
   let bs = Text.encodeUtf8 (Text.pack input)
-  in case FP.runParser (whitespace *> Statement.statement) bs of
+  in case FP.runParser (whitespace *> Grammar.statement) bs of
     FP.OK stmt _ ->
       Right (FlatParser.fixPositions bs (AST.JSAstStatement stmt AST.JSNoAnnot))
     FP.Fail ->

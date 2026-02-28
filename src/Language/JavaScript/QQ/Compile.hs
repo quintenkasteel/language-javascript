@@ -30,7 +30,7 @@ where
 import Control.Exception (evaluate)
 import Language.Haskell.TH (Exp, Q)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
-import Language.Haskell.TH.Syntax (lift)
+import Language.Haskell.TH.Syntax (liftData)
 import qualified Language.Haskell.TH as TH
 import qualified Language.JavaScript.Parser.Parser as Parser
 
@@ -39,8 +39,9 @@ import qualified Language.JavaScript.Parser.Parser as Parser
 --
 -- The JavaScript source is parsed using the project's parser at compile
 -- time. On failure, a compile-time error is raised. On success, the
--- parsed 'JSAST' is embedded into the Haskell program using the 'Lift'
--- instance, making it available at runtime without any parsing overhead.
+-- parsed 'JSAST' is embedded into the Haskell program using 'liftData'
+-- (via 'Data' instances), making it available at runtime without any
+-- parsing overhead.
 --
 -- ==== Usage
 --
@@ -71,7 +72,7 @@ compileJS input = do
   result <- TH.runIO (evaluate (Parser.parse input (TH.loc_filename loc)))
   case result of
     Left err -> fail (formatError loc err)
-    Right ast -> lift ast
+    Right ast -> liftData ast
 
 -- | Format a parse error with Haskell source location context.
 formatError :: TH.Loc -> String -> String

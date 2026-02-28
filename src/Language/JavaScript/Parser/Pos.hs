@@ -32,7 +32,7 @@
 -- "1:1"
 --
 -- @since 0.8.0.0
-module Language.JavaScript.Parser.Flatparse.Pos
+module Language.JavaScript.Parser.Pos
   ( Pos (..),
     mkPos,
     posLine,

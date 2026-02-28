@@ -23,7 +23,7 @@ module Unit.Language.Javascript.Process.TreeShake.AdvancedJSEdgeCases
   )
 where
 
-import Control.Lens ((&), (.~))
+import Lens.Micro ((&), (.~))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Language.JavaScript.Parser.Parser (parse)

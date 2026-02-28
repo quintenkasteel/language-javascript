@@ -48,7 +48,7 @@ module Language.JavaScript.Process.TreeShake.Analysis
   )
 where
 
-import Control.Lens ((&), (.~), (%~), (^.), (?~))
+import Lens.Micro ((&), (.~), (%~), (^.))
 import Control.Monad.State.Strict (State, gets, modify, execState)
 import Data.Foldable (traverse_, for_)
 import qualified Data.Map.Strict as Map
@@ -613,7 +613,7 @@ declareIdentifier (JSIdentName annot name) = do
   let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
         & scopeDepth .~ currentDepth
-        & declarationLocation ?~ annotPosition annot
+        & declarationLocation .~ Just (annotPosition annot)
 
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 
@@ -684,7 +684,7 @@ declareImportedIdentifier identifier = do
   let currentInfo = Map.findWithDefault defaultUsageInfo identifier uMap
   let updatedInfo = currentInfo
         & scopeDepth .~ 0  -- Module scope
-        & declarationLocation ?~ TokenPn 0 0 0
+        & declarationLocation .~ Just (TokenPn 0 0 0)
 
   modify $ \s -> s { _analysisUsageMap = Map.insert identifier updatedInfo uMap }
 

@@ -115,7 +115,7 @@ module Language.JavaScript.Process.TreeShake.Types
 where
 
 import Control.DeepSeq (NFData)
-import Control.Lens (makeLenses)
+import Lens.Micro.TH (makeLenses)
 import Data.Data
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set

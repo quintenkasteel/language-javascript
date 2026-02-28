@@ -77,7 +77,7 @@ module Language.JavaScript.Process.TreeShake
   )
 where
 
-import Control.Lens ((^.), (.~), (&))
+import Lens.Micro ((^.), (.~), (&))
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Language.JavaScript.Parser.AST

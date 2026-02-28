@@ -23,7 +23,7 @@ module Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
   )
 where
 
-import Control.Lens ((^.), (&), (.~))
+import Lens.Micro ((^.), (&), (.~))
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.Parser (parse)
 import Language.JavaScript.Pretty.Printer (renderToString)

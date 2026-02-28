@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -O2 -fmax-simplifier-iterations=4 #-}
 
 -- | Combined expression and statement grammar for the flatparse-based
 -- JavaScript parser.
@@ -35,7 +36,7 @@
 --   * With statement
 --
 -- @since 0.8.0.0
-module Language.JavaScript.Parser.Flatparse.Grammar
+module Language.JavaScript.Parser.Grammar
   ( -- * Expression parsers
     expression
   , assignmentExpression
@@ -43,24 +44,11 @@ module Language.JavaScript.Parser.Flatparse.Grammar
   , callMemberExpression
   , unaryExpression
   , binaryExpression
-  , binaryOperator
-  , unaryOperator
-  , assignmentOperator
   , callExpression
-  , literalExpression
   , identifierExpression
-  , listToCommaList
-  , listToCommaTrailingList
   , objectLiteral
   , arrayLiteral
   , argumentList
-  , sepBy
-  , sepBy1
-  , parseChar
-  , parseString
-  , fpPosToAnnot
-  , defaultAnnot
-  , defaultSemi
   , classElement
     -- * Statement parsers
   , statement
@@ -90,249 +78,39 @@ module Language.JavaScript.Parser.Flatparse.Grammar
   , finallyClause
   , labeledStatement
   , withStatementPos
-  , expectStatementEnd
   , isStatementKeyword
     -- * Module items
   , moduleItem
   , moduleItemList
+    -- * Re-exports from Operators
+  , module Language.JavaScript.Parser.Operators
+    -- * Re-exports from Literals
+  , module Language.JavaScript.Parser.Literals
   ) where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import Data.List (foldl')
-import Data.Maybe (fromMaybe)
-import Text.Read (readMaybe)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified FlatParse.Basic as FP
 
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(TokenPn))
 
-import Language.JavaScript.Parser.Flatparse.Lexer
+import Language.JavaScript.Parser.Lexer
   ( whitespace
   , numericLiteral
   , identifier
   , keyword
   , rawIdentifier
   )
-import Language.JavaScript.Parser.Flatparse.Primitives
+import Language.JavaScript.Parser.Literals
+import Language.JavaScript.Parser.Operators
+import Language.JavaScript.Parser.Primitives
 
 -- =====================================================================
--- Helpers
+-- Helpers (imported from Operators module, locally used parsers below)
 -- =====================================================================
-
--- | Convert FlatParse position to JSAnnot.
--- Stores the raw FP.Pos value (remaining bytes) in the TokenPn offset field.
--- The offset is converted to real line/col by 'fixPositions' after parsing.
-fpPosToAnnot :: FP.Pos -> JSAnnot
-fpPosToAnnot fpPos = JSAnnot (TokenPn (FP.unPos fpPos) 0 0) []
-
--- | Default annotation for generated nodes (no position information).
--- Uses -1 as sentinel to distinguish from real positions at offset 0.
-defaultAnnot :: JSAnnot
-defaultAnnot = JSAnnot (TokenPn (-1) 0 0) []
-
--- | Default semicolon.
-defaultSemi :: JSSemi
-defaultSemi = JSSemiAuto
-
--- | Parse specific character.
-parseChar :: Char -> JSParser ()
-parseChar c = do
-  actual <- FP.anyChar
-  if actual == c then pure () else FP.empty
-
--- | Parse specific character and return its annotation with position.
-parseCharAnnot :: Char -> JSParser JSAnnot
-parseCharAnnot c = do
-  pos <- FP.getPos
-  parseChar c
-  pure (fpPosToAnnot pos)
-
--- | Parse specific string.
-parseString :: String -> JSParser ()
-parseString [] = pure ()
-parseString (c:cs) = parseChar c *> parseString cs
-
--- | Parse specific string and return its annotation with position.
-parseStringAnnot :: String -> JSParser JSAnnot
-parseStringAnnot s = do
-  pos <- FP.getPos
-  parseString s
-  pure (fpPosToAnnot pos)
-
--- | Parse a keyword and return its annotation with position.
-keywordAnnot :: ByteString -> JSParser JSAnnot
-keywordAnnot kw = do
-  pos <- FP.getPos
-  keyword kw
-  pure (fpPosToAnnot pos)
-
--- | Parse an identifier and return it as JSIdent with position.
-identName :: JSParser JSIdent
-identName = do
-  pos <- FP.getPos
-  name <- identifier
-  pure (JSIdentName (fpPosToAnnot pos) name)
-
--- | Parse separated list (zero or more).
-sepBy :: JSParser a -> JSParser sep -> JSParser [a]
-sepBy p sep = sepBy1 p sep FP.<|> pure []
-
--- | Parse separated list (one or more).
-sepBy1 :: JSParser a -> JSParser sep -> JSParser [a]
-sepBy1 p sep = do
-  first <- p
-  rest <- FP.many (sep *> p)
-  pure (first : rest)
-
--- | Parse separated list with optional trailing separator.
-sepByTrailing :: JSParser a -> JSParser sep -> JSParser [a]
-sepByTrailing p sep = do
-  items <- sepBy p sep
-  _ <- FP.optional sep
-  pure items
-
--- | Convert list to JSCommaList (no position tracking for commas).
-listToCommaList :: [a] -> JSCommaList a
-listToCommaList [] = JSLNil
-listToCommaList [x] = JSLOne x
-listToCommaList (x:xs) = go (JSLOne x) xs
-  where
-    go acc [] = acc
-    go acc (y:ys) = go (JSLCons acc defaultAnnot y) ys
-
--- | Build JSCommaList from items paired with their preceding comma annotation.
-listToAnnotCommaList :: a -> [(JSAnnot, a)] -> JSCommaList a
-listToAnnotCommaList first rest = go (JSLOne first) rest
-  where
-    go acc [] = acc
-    go acc ((commaA, y):ys) = go (JSLCons acc commaA y) ys
-
--- | Parse comma-separated list with tracked comma positions.
-parseAnnotCommaList :: JSParser a -> JSParser (JSCommaList a)
-parseAnnotCommaList item = do
-  first <- FP.optional item
-  case first of
-    Nothing -> pure JSLNil
-    Just x -> commaLoop x []
-  where
-    commaLoop firstItem acc = do
-      whitespace
-      mc <- FP.optional (parseCharAnnot ',')
-      case mc of
-        Nothing -> pure (listToAnnotCommaList firstItem (reverse acc))
-        Just commaA -> do
-          whitespace
-          next <- item
-          commaLoop firstItem ((commaA, next) : acc)
-
--- | Parse comma-separated list with optional trailing comma, returning
--- the list and trailing comma annotation if present.
-parseAnnotCommaListTrailing :: JSParser a -> JSParser (JSCommaList a, Maybe JSAnnot)
-parseAnnotCommaListTrailing item = do
-  first <- FP.optional item
-  case first of
-    Nothing -> pure (JSLNil, Nothing)
-    Just x -> commaLoop x []
-  where
-    commaLoop firstItem acc = do
-      whitespace
-      mc <- FP.optional (parseCharAnnot ',')
-      case mc of
-        Nothing -> pure (listToAnnotCommaList firstItem (reverse acc), Nothing)
-        Just commaA -> do
-          whitespace
-          mNext <- FP.optional item
-          case mNext of
-            Nothing -> pure (listToAnnotCommaList firstItem (reverse acc), Just commaA)
-            Just next -> commaLoop firstItem ((commaA, next) : acc)
-
--- | Parse comma-separated list with optional trailing comma, discarding
--- the trailing comma annotation. Useful for parameter lists where the AST
--- does not store a trailing comma.
-parseAnnotCommaListDropTrailing :: JSParser a -> JSParser (JSCommaList a)
-parseAnnotCommaListDropTrailing item = fst <$> parseAnnotCommaListTrailing item
-
--- | Convert list to JSCommaTrailingList.
-listToCommaTrailingList :: [a] -> JSCommaTrailingList a
-listToCommaTrailingList xs = JSCTLNone (listToCommaList xs)
-
--- | Ensure next char is NOT the given character (negative lookahead).
-notFollowedBy :: Char -> JSParser ()
-notFollowedBy c = do
-  mc <- FP.optional (parseChar c)
-  case mc of
-    Nothing -> pure ()
-    Just _ -> FP.empty
-
--- | Check if a line terminator exists before the next significant token.
--- Uses lookahead to avoid consuming input. Used for ASI-sensitive keywords
--- like @return@, @break@, @continue@, and @throw@.
-hasLineTerminatorBeforeNext :: JSParser Bool
-hasLineTerminatorBeforeNext = FP.lookahead scanAhead FP.<|> pure True
-  where
-    scanAhead = do
-      skipSpacesAndTabs
-      mc <- FP.optional FP.anyChar
-      pure $ case mc of
-        Nothing   -> True
-        Just '\n' -> True
-        Just '\r' -> True
-        _         -> False
-    skipSpacesAndTabs = FP.skipMany (FP.satisfy (\c -> c == ' ' || c == '\t'))
-
--- | Parse contextual keyword (not in the reserved word list).
-contextualKeyword :: ByteString -> JSParser ()
-contextualKeyword kw = do
-  ident <- rawIdentifier
-  if ident == kw then pure () else FP.empty
-
--- | Parse contextual keyword and return its annotation with position.
-contextualKeywordAnnot :: ByteString -> JSParser JSAnnot
-contextualKeywordAnnot kw = do
-  pos <- FP.getPos
-  contextualKeyword kw
-  pure (fpPosToAnnot pos)
-
--- | Parse raw string literal including quotes.
--- | Parse a string literal preserving raw source bytes (zero-copy).
-stringLiteralRaw :: JSParser ByteString
-stringLiteralRaw = FP.byteStringOf (singleQuotedSkip FP.<|> doubleQuotedSkip)
-  where
-    singleQuotedSkip = do
-      parseChar '\''
-      FP.skipMany (escapeSkip FP.<|> normalCharSkip '\'')
-      parseChar '\''
-    doubleQuotedSkip = do
-      parseChar '"'
-      FP.skipMany (escapeSkip FP.<|> normalCharSkip '"')
-      parseChar '"'
-
--- | Skip a normal character in a string literal.
-normalCharSkip :: Char -> JSParser ()
-normalCharSkip quote =
-  () <$ FP.satisfy (\c -> c /= quote && c /= '\\' && c /= '\n' && c /= '\r')
-
--- | Skip an escape sequence in a string literal.
-escapeSkip :: JSParser ()
-escapeSkip = parseChar '\\' *> (() <$ FP.anyChar)
-
--- | Optionally consume semicolon or newline (returns unit).
-expectSemiOrNewline :: JSParser ()
-expectSemiOrNewline = do
-  whitespace
-  _ <- FP.optional (parseChar ';')
-  pure ()
-
--- | Expect statement termination (semicolon, newline, or end of input).
--- Returns 'JSSemicolon' if an explicit semicolon was consumed,
--- 'JSSemiAuto' otherwise (ASI).
-expectStatementEnd :: JSParser JSSemi
-expectStatementEnd = do
-  whitespace
-  pos <- FP.getPos
-  hasSemi <- FP.optional (parseChar ';')
-  pure (maybe JSSemiAuto (const (JSSemi (fpPosToAnnot pos))) hasSemi)
 
 -- | Parse block body: @{ stmts }@
 blockBody :: JSParser JSBlock
@@ -576,28 +354,6 @@ yieldExpr = yieldFrom FP.<|> yieldSimple
       expr <- FP.optional assignmentExpression
       pure (JSYieldExpression (fpPosToAnnot pos) expr)
 
--- | Parse assignment operator.
-assignmentOperator :: JSParser JSAssignOp
-assignmentOperator = do
-  pos <- FP.getPos
-  let a = fpPosToAnnot pos
-  (parseString ">>>=" *> pure (JSUrshAssign a)) FP.<|>
-    (parseString ">>=" *> pure (JSRshAssign a)) FP.<|>
-    (parseString "<<=" *> pure (JSLshAssign a)) FP.<|>
-    (parseString "**=" *> notFollowedBy '=' *> pure (JSTimesAssign a)) FP.<|>
-    (parseString "&&=" *> pure (JSLogicalAndAssign a)) FP.<|>
-    (parseString "||=" *> pure (JSLogicalOrAssign a)) FP.<|>
-    (parseString "??=" *> pure (JSNullishAssign a)) FP.<|>
-    (parseString "+=" *> pure (JSPlusAssign a)) FP.<|>
-    (parseString "-=" *> pure (JSMinusAssign a)) FP.<|>
-    (parseString "*=" *> pure (JSTimesAssign a)) FP.<|>
-    (parseString "/=" *> pure (JSDivideAssign a)) FP.<|>
-    (parseString "%=" *> pure (JSModAssign a)) FP.<|>
-    (parseString "&=" *> pure (JSBwAndAssign a)) FP.<|>
-    (parseString "^=" *> pure (JSBwXorAssign a)) FP.<|>
-    (parseString "|=" *> pure (JSBwOrAssign a)) FP.<|>
-    (parseChar '=' *> notFollowedBy '=' *> notFollowedBy '>' *> pure (JSAssign a))
-
 -- ---------------------------------------------------------------------
 -- Conditional (Ternary) Expression
 -- ---------------------------------------------------------------------
@@ -659,51 +415,6 @@ binaryLoop minPrec left = do
       right <- binaryExpression nextPrec
       binaryLoop minPrec (JSExpressionBinary left op right)
 
--- | Try to parse a binary operator at or above the minimum precedence.
--- Returns (precedence, is-right-associative, operator).
-binaryOperatorAtPrec :: Int -> JSParser (Int, Bool, JSBinOp)
-binaryOperatorAtPrec minPrec = do
-  pos <- FP.getPos
-  let a = fpPosToAnnot pos
-  tryOps a
-  where
-    tryOps a =
-      tryOp 11 True  (parseString "**" *> notFollowedBy '=') (JSBinOpExponentiation a) FP.<|>
-      tryOp 10 False (parseChar '*' *> notFollowedBy '*' *> notFollowedBy '=') (JSBinOpTimes a) FP.<|>
-      tryOp 10 False (parseChar '/' *> notFollowedBy '=') (JSBinOpDivide a) FP.<|>
-      tryOp 10 False (parseChar '%' *> notFollowedBy '=') (JSBinOpMod a) FP.<|>
-      tryOp 9  False (parseChar '+' *> notFollowedBy '+' *> notFollowedBy '=') (JSBinOpPlus a) FP.<|>
-      tryOp 9  False (parseChar '-' *> notFollowedBy '-' *> notFollowedBy '=') (JSBinOpMinus a) FP.<|>
-      tryOp 8  False (parseString ">>>" *> notFollowedBy '=') (JSBinOpUrsh a) FP.<|>
-      tryOp 8  False (parseString ">>" *> notFollowedBy '>' *> notFollowedBy '=') (JSBinOpRsh a) FP.<|>
-      tryOp 8  False (parseString "<<" *> notFollowedBy '=') (JSBinOpLsh a) FP.<|>
-      tryOp 7  False (parseString "<=" ) (JSBinOpLe a) FP.<|>
-      tryOp 7  False (parseString ">=" ) (JSBinOpGe a) FP.<|>
-      tryOp 7  False (parseChar '<' *> notFollowedBy '<' *> notFollowedBy '=') (JSBinOpLt a) FP.<|>
-      tryOp 7  False (parseChar '>' *> notFollowedBy '>' *> notFollowedBy '=') (JSBinOpGt a) FP.<|>
-      tryOp 7  False (keyword "instanceof") (JSBinOpInstanceOf a) FP.<|>
-      tryOp 7  False (keyword "in") (JSBinOpIn a) FP.<|>
-      tryOp 6  False (parseString "===" ) (JSBinOpStrictEq a) FP.<|>
-      tryOp 6  False (parseString "!==" ) (JSBinOpStrictNeq a) FP.<|>
-      tryOp 6  False (parseString "==" *> notFollowedBy '=') (JSBinOpEq a) FP.<|>
-      tryOp 6  False (parseString "!=" *> notFollowedBy '=') (JSBinOpNeq a) FP.<|>
-      tryOp 5  False (parseChar '&' *> notFollowedBy '&' *> notFollowedBy '=') (JSBinOpBitAnd a) FP.<|>
-      tryOp 4  False (parseChar '^' *> notFollowedBy '=') (JSBinOpBitXor a) FP.<|>
-      tryOp 3  False (parseChar '|' *> notFollowedBy '|' *> notFollowedBy '=') (JSBinOpBitOr a) FP.<|>
-      tryOp 2  False (parseString "&&" *> notFollowedBy '=') (JSBinOpAnd a) FP.<|>
-      tryOp 1  False (parseString "??" *> notFollowedBy '=') (JSBinOpNullishCoalescing a) FP.<|>
-      tryOp 0  False (parseString "||" *> notFollowedBy '=') (JSBinOpOr a)
-
-    tryOp prec isRight parser op
-      | prec >= minPrec = parser *> pure (prec, isRight, op)
-      | otherwise = FP.empty
-
--- | Parse binary operator (for export compatibility).
-binaryOperator :: JSParser JSBinOp
-binaryOperator = do
-  (_, _, op) <- binaryOperatorAtPrec 0
-  pure op
-
 -- ---------------------------------------------------------------------
 -- Unary Expressions
 -- ---------------------------------------------------------------------
@@ -754,16 +465,6 @@ keywordUnary = do
   whitespace
   expr <- unaryExpression
   pure (JSUnaryExpression op expr)
-
--- | Parse unary operator (symbol-based only).
-unaryOperator :: JSParser JSUnaryOp
-unaryOperator = do
-  pos <- FP.getPos
-  let a = fpPosToAnnot pos
-  (parseChar '!' *> notFollowedBy '=' *> pure (JSUnaryOpNot a)) FP.<|>
-    (parseChar '~' *> pure (JSUnaryOpTilde a)) FP.<|>
-    (parseChar '+' *> notFollowedBy '+' *> notFollowedBy '=' *> pure (JSUnaryOpPlus a)) FP.<|>
-    (parseChar '-' *> notFollowedBy '-' *> notFollowedBy '=' *> pure (JSUnaryOpMinus a))
 
 -- | Parse postfix expression: @x++@ or @x--@
 postfixExpression :: JSParser JSExpression
@@ -1046,162 +747,6 @@ primaryExpression =
   objectLiteral FP.<|>
   parenthesizedExpression FP.<|>
   identifierExpression
-
--- | Parse @this@ literal.
-thisLiteral :: JSParser JSExpression
-thisLiteral = do
-  pos <- FP.getPos
-  keyword "this"
-  pure (JSLiteral (fpPosToAnnot pos) "this")
-
--- | Parse @super@ literal.
-superLiteral :: JSParser JSExpression
-superLiteral = do
-  pos <- FP.getPos
-  keyword "super"
-  pure (JSLiteral (fpPosToAnnot pos) "super")
-
--- | Parse @null@ literal.
-nullLiteral :: JSParser JSExpression
-nullLiteral = do
-  pos <- FP.getPos
-  keyword "null"
-  pure (JSLiteral (fpPosToAnnot pos) "null")
-
--- | Parse boolean literal.
-booleanLiteral :: JSParser JSExpression
-booleanLiteral = do
-  pos <- FP.getPos
-  val <- (keyword "true" *> pure "true") FP.<|> (keyword "false" *> pure "false")
-  pure (JSLiteral (fpPosToAnnot pos) val)
-
--- | Parse string or numeric literal.
-literalExpression :: JSParser JSExpression
-literalExpression = stringLit FP.<|> numericLit
-
--- | Parse string literal preserving raw source form (with quotes).
-stringLit :: JSParser JSExpression
-stringLit = do
-  pos <- FP.getPos
-  raw <- stringLiteralRaw
-  pure (JSStringLiteral (fpPosToAnnot pos) raw)
-
--- | Parse numeric literal, detecting format.
-numericLit :: JSParser JSExpression
-numericLit = do
-  pos <- FP.getPos
-  raw <- numericLiteral
-  pure (classifyNumeric (fpPosToAnnot pos) raw)
-
--- | Classify numeric literal by format and parse into proper numeric type.
--- Decimal literals become 'Double', all integer formats become 'Integer'.
-classifyNumeric :: JSAnnot -> ByteString -> JSExpression
-classifyNumeric a s
-  | hasBigIntSuffix = JSBigIntLiteral a (parseBigIntValue s)
-  | hasPrefix "0x" || hasPrefix "0X" = JSHexInteger a (parseHexValue s)
-  | hasPrefix "0b" || hasPrefix "0B" = JSBinaryInteger a (parseBinaryValue s)
-  | hasOctalPrefix = JSOctal a (parseOctalValue s)
-  | otherwise = JSDecimal a (parseDecimalValue s)
-  where
-    hasBigIntSuffix = not (BS8.null s) && BS8.last s == 'n'
-    hasPrefix p = p `BS8.isPrefixOf` s
-    hasOctalPrefix
-      | BS8.length s >= 2
-      , BS8.index s 0 == '0' =
-          let c = BS8.index s 1
-          in c == 'o' || c == 'O' || (c >= '0' && c <= '7')
-      | otherwise = False
-
--- | Parse a decimal numeric string to Double, stripping numeric separators.
--- Handles leading-dot decimals like @.5@ which Haskell's 'read' rejects.
--- Returns 0 for malformed input rather than crashing.
-parseDecimalValue :: ByteString -> Double
-parseDecimalValue bs = fromMaybe 0 (readMaybe cleaned)
-  where
-    cleaned = prependZero (filter (/= '_') (BS8.unpack bs))
-    prependZero ('.':rest) = '0' : '.' : rest
-    prependZero s = s
-
--- | Parse a hex numeric string (with 0x prefix) to Integer.
--- Returns 0 for malformed input rather than crashing.
-parseHexValue :: ByteString -> Integer
-parseHexValue bs = fromMaybe 0 (readMaybe ("0x" <> filter (/= '_') (BS8.unpack (BS8.drop 2 bs))))
-
--- | Parse a binary numeric string (with 0b prefix) to Integer.
-parseBinaryValue :: ByteString -> Integer
-parseBinaryValue bs = foldl' (\acc c -> acc * 2 + binDigitVal c) 0 digits
-  where
-    digits = filter (/= '_') (BS8.unpack (BS8.drop 2 bs))
-    binDigitVal '0' = 0
-    binDigitVal '1' = 1
-    binDigitVal _ = 0
-
--- | Parse an octal numeric string to Integer.
--- Returns 0 for malformed input rather than crashing.
-parseOctalValue :: ByteString -> Integer
-parseOctalValue bs
-  | BS8.length bs >= 2, c == 'o' || c == 'O' =
-      fromMaybe 0 (readMaybe ("0o" <> filter (/= '_') (BS8.unpack (BS8.drop 2 bs))))
-  | otherwise =
-      fromMaybe 0 (readMaybe ("0o" <> filter (/= '_') (BS8.unpack (BS8.drop 1 bs))))
-  where
-    c = BS8.index bs 1
-
--- | Parse a BigInt literal to Integer (strip trailing 'n' and classify base).
--- Handles edge cases like @123.456n@ (truncates to integer) and @123e4n@
--- (evaluates scientific notation then truncates) for parser tolerance.
--- Returns 0 for malformed input rather than crashing.
-parseBigIntValue :: ByteString -> Integer
-parseBigIntValue bs = classifyAndParse (BS8.init bs)
-  where
-    classifyAndParse s
-      | "0x" `BS8.isPrefixOf` s || "0X" `BS8.isPrefixOf` s = parseHexValue s
-      | "0b" `BS8.isPrefixOf` s || "0B" `BS8.isPrefixOf` s = parseBinaryValue s
-      | "0o" `BS8.isPrefixOf` s || "0O" `BS8.isPrefixOf` s = parseOctalValue s
-      | otherwise = parseDecimalAsInteger (filter (/= '_') (BS8.unpack s))
-    parseDecimalAsInteger str
-      | any (`elem` (".eE" :: String)) str =
-          truncate (fromMaybe 0 (readMaybe (prependZero str) :: Maybe Double))
-      | otherwise = fromMaybe 0 (readMaybe str)
-    prependZero ('.':rest) = '0' : '.' : rest
-    prependZero s = s
-
--- | Parse regex literal: @/pattern/flags@ (zero-copy).
-regexLiteral :: JSParser JSExpression
-regexLiteral = do
-  pos <- FP.getPos
-  raw <- FP.byteStringOf regexSkip
-  pure (JSRegEx (fpPosToAnnot pos) raw)
-  where
-    regexSkip = do
-      parseChar '/'
-      regexBodySkip
-      FP.skipMany (FP.satisfy isRegexFlag)
-    isRegexFlag c = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
-
--- | Skip regex body up to the closing @/@.
-regexBodySkip :: JSParser ()
-regexBodySkip = goNormal
-  where
-    goNormal = do
-      c <- FP.anyChar
-      handleNormal c
-    handleNormal '/' = pure ()
-    handleNormal '\\' = FP.anyChar *> goNormal
-    handleNormal '[' = goClass
-    handleNormal '\n' = FP.empty
-    handleNormal '\r' = FP.empty
-    handleNormal _ = goNormal
-    goClass = do
-      c <- FP.anyChar
-      handleClass c
-    handleClass ']' = goNormal
-    handleClass '\\' = FP.anyChar >>= handleClassEscape
-    handleClass '\n' = FP.empty
-    handleClass '\r' = FP.empty
-    handleClass _ = goClass
-    handleClassEscape ']' = goNormal
-    handleClassEscape _ = goClass
 
 -- | Parse template literal: @\`hello ${name}\`@
 templateLiteral :: JSParser JSExpression
@@ -2861,15 +2406,16 @@ withStatementPos parser = do
 
 -- | Check if a ByteString is a statement keyword.
 isStatementKeyword :: ByteString -> Bool
-isStatementKeyword kw = kw `elem` kws
-  where
-    kws :: [ByteString]
-    kws =
-      [ "var", "let", "const"
-      , "function", "class"
-      , "if", "else", "while", "do", "for", "switch", "case", "default"
-      , "return", "break", "continue", "throw"
-      , "try", "catch", "finally"
-      , "import", "export"
-      , "with", "debugger"
-      ]
+isStatementKeyword kw = Set.member kw statementKeywords
+
+-- | Set of JavaScript statement keywords for O(log n) lookup.
+statementKeywords :: Set ByteString
+statementKeywords = Set.fromList
+  [ "var", "let", "const"
+  , "function", "class"
+  , "if", "else", "while", "do", "for", "switch", "case", "default"
+  , "return", "break", "continue", "throw"
+  , "try", "catch", "finally"
+  , "import", "export"
+  , "with", "debugger"
+  ]

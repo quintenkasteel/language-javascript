@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -----------------------------------------------------------------------------
@@ -57,7 +56,6 @@ import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import Data.Data
 import GHC.Generics (Generic)
-import Language.Haskell.TH.Syntax (Lift)
 import Language.JavaScript.Parser.SrcLocation
 import qualified Data.Text as Text
 import Data.Text (Text)
@@ -90,7 +88,7 @@ data JSDocComment = JSDocComment
   , jsDocTags :: ![JSDocTag]
     -- ^ List of JSDoc tags (@@param@, @@returns@, etc.)
   }
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Individual JSDoc tag representation.
 --
@@ -132,7 +130,7 @@ data JSDocTag = JSDocTag
   , jsDocTagSpecific :: !(Maybe JSDocTagSpecific)
     -- ^ Tag-specific structured information
   }
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Tag-specific information for standard JSDoc tags.
 --
@@ -323,7 +321,7 @@ data JSDocTagSpecific
   | JSDocFinalTag
   | JSDocGeneratorTag
   | JSDocAsyncTag
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Access levels for JSDoc
 data JSDocAccess
@@ -331,7 +329,7 @@ data JSDocAccess
   | JSDocPrivate
   | JSDocProtected
   | JSDocPackage
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Property definition for complex types
 data JSDocProperty = JSDocProperty
@@ -340,7 +338,7 @@ data JSDocProperty = JSDocProperty
     jsDocPropertyOptional :: !Bool,
     jsDocPropertyDescription :: !(Maybe Text)
   }
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Enum value specification in JSDoc @enum tags
 data JSDocEnumValue = JSDocEnumValue
@@ -348,7 +346,7 @@ data JSDocEnumValue = JSDocEnumValue
     jsDocEnumValueLiteral :: !(Maybe Text),  -- String or numeric literal
     jsDocEnumValueDescription :: !(Maybe Text)
   }
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | JSDoc type expressions.
 --
@@ -403,7 +401,7 @@ data JSDocType
   | JSDocNullableType !JSDocType
   | JSDocNonNullableType !JSDocType
   | JSDocEnumType !Text ![JSDocEnumValue]
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Object field in JSDoc type specification
 data JSDocObjectField = JSDocObjectField
@@ -411,7 +409,7 @@ data JSDocObjectField = JSDocObjectField
     jsDocFieldType :: !JSDocType,
     jsDocFieldOptional :: !Bool
   }
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Inline JSDoc tags that can appear within description text.
 --
@@ -452,7 +450,7 @@ data JSDocInlineTag
       { jsDocInlineCodeText :: !Text
         -- ^ Code to display inline
       }
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Rich text that can contain inline JSDoc tags.
 --
@@ -467,7 +465,7 @@ data JSDocRichText
     -- ^ Inline JSDoc tag
   | JSDocRichTextList ![JSDocRichText]
     -- ^ Sequence of rich text elements
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | JSDoc validation errors.
 --
@@ -497,7 +495,7 @@ data JSDocValidationError
     -- ^ Parameter type/name mismatch
   | JSDocDeprecatedWithoutReplacement
     -- ^ @deprecated tag without replacement suggestion
-  deriving (Eq, Show, Generic, Lift, NFData, Typeable, Data, Read)
+  deriving (Eq, Show, Generic, NFData, Typeable, Data, Read)
 
 -- | Result of JSDoc validation.
 --
@@ -512,7 +510,7 @@ data CommentAnnotation
   | WhiteSpace TokenPosn ByteString
   | JSDocA TokenPosn JSDocComment
   | NoComment
-  deriving (Eq, Generic, Lift, NFData, Show, Typeable, Data, Read)
+  deriving (Eq, Generic, NFData, Show, Typeable, Data, Read)
 
 -- | Lexical tokens.
 -- Each may be annotated with any comment occurring between the prior token and this one
@@ -669,7 +667,7 @@ data Token
     TailToken {tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]}
   | -- | End of file
     EOFToken {tokenSpan :: !TokenPosn, tokenComment :: ![CommentAnnotation]}
-  deriving (Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Eq, Generic, NFData, Show, Typeable)
 
 -- | Produce a string from a token containing detailed information. Mainly intended for debugging.
 debugTokenString :: Token -> String

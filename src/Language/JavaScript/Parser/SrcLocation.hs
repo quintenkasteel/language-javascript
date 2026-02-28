@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveLift #-}
 
 -- | Source location tracking for JavaScript parsing.
 --
@@ -73,7 +72,6 @@ where
 import Control.DeepSeq (NFData)
 import Data.Data
 import GHC.Generics (Generic)
-import Language.Haskell.TH.Syntax (Lift)
 
 -- | `TokenPosn' records the location of a token in the input text.  It has three
 -- fields: the address (number of characters preceding the token), line number
@@ -84,7 +82,7 @@ data TokenPosn
       !Int -- address (number of characters preceding the token)
       !Int -- line number
       !Int -- column
-  deriving (Eq, Generic, Lift, NFData, Show, Read, Data, Typeable)
+  deriving (Eq, Generic, NFData, Show, Read, Data, Typeable)
 
 -- | Empty position at the start of input.
 --

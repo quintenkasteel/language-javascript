@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -79,6 +78,7 @@ module Language.JavaScript.Parser.AST
     JSExportDeclaration (..),
     JSExportClause (..),
     JSExportSpecifier (..),
+    HasAnnot (..),
     binOpEq,
     showStripped,
     fromCommaList,
@@ -98,7 +98,6 @@ import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import GHC.Generics (Generic)
-import Language.Haskell.TH.Syntax (Lift)
 import Language.JavaScript.Parser.SrcLocation (TokenPosn (..))
 import Language.JavaScript.Parser.Token
 import Numeric (showHex, showIntAtBase)
@@ -117,7 +116,7 @@ data JSAnnot
     JSAnnotSpace
   | -- | No annotation
     JSNoAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- | Top-level JavaScript AST with optimized memory layout.
 --
@@ -134,7 +133,7 @@ data JSAST
     JSAstExpression !JSExpression !JSAnnot
   | -- | Individual literal with annotation
     JSAstLiteral !JSExpression !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- Shift AST
 -- https://github.com/shapesecurity/shift-spec/blob/83498b92c436180cc0e2115b225a68c08f43c53e/spec.idl#L229-L234
@@ -144,24 +143,24 @@ data JSModuleItem
   | -- | export,decl
     JSModuleExportDeclaration !JSAnnot !JSExportDeclaration
   | JSModuleStatementListItem !JSStatement
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSImportDeclaration
   = -- | imports, module, optional attributes, semi
     JSImportDeclaration !JSImportClause !JSFromClause !(Maybe JSImportAttributes) !JSSemi
   | -- | import, module, optional attributes, semi
     JSImportDeclarationBare !JSAnnot !ByteString !(Maybe JSImportAttributes) !JSSemi
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSImportAttributes
   = -- | {, attributes, }
     JSImportAttributes !JSAnnot !(JSCommaList JSImportAttribute) !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSImportAttribute
   = -- | key, :, value
     JSImportAttribute !JSIdent !JSAnnot !JSExpression
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSImportClause
   = -- | default
@@ -174,24 +173,24 @@ data JSImportClause
     JSImportClauseDefaultNameSpace !JSIdent !JSAnnot !JSImportNameSpace
   | -- | default, comma, named imports
     JSImportClauseDefaultNamed !JSIdent !JSAnnot !JSImportsNamed
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSFromClause
   = -- | from, string literal, string literal contents
     JSFromClause !JSAnnot !JSAnnot !ByteString
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- | Import namespace, e.g. '* as whatever'
 data JSImportNameSpace
   = -- | *, as, ident
     JSImportNameSpace !JSBinOp !JSAnnot !JSIdent
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- | Named imports, e.g. '{ foo, bar, baz as quux }'
 data JSImportsNamed
   = -- | lb, specifiers, rb
     JSImportsNamed !JSAnnot !(JSCommaList JSImportSpecifier) !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 -- |
 -- Note that this data type is separate from ExportSpecifier because the
@@ -201,7 +200,7 @@ data JSImportSpecifier
     JSImportSpecifier !JSIdent
   | -- | ident, as, ident
     JSImportSpecifierAs !JSIdent !JSAnnot !JSIdent
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSExportDeclaration
   = -- | star, module, semi
@@ -216,19 +215,19 @@ data JSExportDeclaration
     JSExportDefault !JSAnnot !JSStatement !JSSemi
   | -- | body, autosemi
     JSExport !JSStatement !JSSemi
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSExportClause
   = -- | lb, specifiers, rb
     JSExportClause !JSAnnot !(JSCommaList JSExportSpecifier) !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSExportSpecifier
   = -- | ident
     JSExportSpecifier !JSIdent
   | -- | ident1, as, ident2
     JSExportSpecifierAs !JSIdent !JSAnnot !JSIdent
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSStatement
   = -- | lbrace, stmts, rbrace, autosemi
@@ -312,7 +311,7 @@ data JSStatement
     JSForAwaitLetOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
   | -- | for, await, lb, const, expr, of, iter, rb, stmt
     JSForAwaitConstOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSExpression
   = -- | Terminals
@@ -397,17 +396,17 @@ data JSExpression
     JSImportMeta !JSAnnot !JSAnnot
   | -- | import, lb, expr, rb
     JSImportCall !JSAnnot !JSAnnot !JSExpression !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSArrowParameterList
   = JSUnparenthesizedArrowParameter !JSIdent
   | JSParenthesizedArrowParameterList !JSAnnot !(JSCommaList JSExpression) !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSConciseBody
   = JSConciseFunctionBody !JSBlock
   | JSConciseExpressionBody !JSExpression
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSBinOp
   = JSBinOpAnd !JSAnnot
@@ -436,7 +435,7 @@ data JSBinOp
   | JSBinOpStrictNeq !JSAnnot
   | JSBinOpTimes !JSAnnot
   | JSBinOpUrsh !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSUnaryOp
   = JSUnaryOpDecr !JSAnnot
@@ -448,12 +447,12 @@ data JSUnaryOp
   | JSUnaryOpTilde !JSAnnot
   | JSUnaryOpTypeof !JSAnnot
   | JSUnaryOpVoid !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSSemi
   = JSSemi !JSAnnot
   | JSSemiAuto
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSAssignOp
   = JSAssign !JSAnnot
@@ -472,38 +471,38 @@ data JSAssignOp
   | JSLogicalOrAssign !JSAnnot
   | -- | |=
     JSNullishAssign !JSAnnot -- ??=
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSTryCatch
   = -- | catch,lb,ident,rb,block
     JSCatch !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSBlock
   | -- | catch,lb,ident,if,expr,rb,block
     JSCatchIf !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSExpression !JSAnnot !JSBlock
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSTryFinally
   = -- | finally,block
     JSFinally !JSAnnot !JSBlock
   | JSNoFinally
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSBlock
   = -- | lbrace, stmts, rbrace
     JSBlock !JSAnnot ![JSStatement] !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSSwitchParts
   = -- | expr,colon,stmtlist
     JSCase !JSAnnot !JSExpression !JSAnnot ![JSStatement]
   | -- | colon,stmtlist
     JSDefault !JSAnnot !JSAnnot ![JSStatement]
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSVarInitializer
   = -- | assignop, initializer
     JSVarInit !JSAnnot !JSExpression
   | JSVarInitNone
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSObjectProperty
   = -- | name, colon, value
@@ -512,7 +511,7 @@ data JSObjectProperty
   | JSObjectMethod !JSMethodDefinition
   | -- | ..., expression
     JSObjectSpread !JSAnnot !JSExpression
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSMethodDefinition
   = JSMethodDefinition !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- name, lb, params, rb, block
@@ -522,7 +521,7 @@ data JSMethodDefinition
     JSAsyncMethodDefinition !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   | -- | get/set, name, lb, params, rb, block
     JSPropertyAccessor !JSAccessor !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSPropertyName
   = JSPropertyIdent !JSAnnot !ByteString
@@ -530,7 +529,7 @@ data JSPropertyName
   | JSPropertyNumber !JSAnnot !ByteString
   | -- | lb, expr, rb
     JSPropertyComputed !JSAnnot !JSExpression !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 type JSObjectPropertyList = JSCommaTrailingList JSObjectProperty
 
@@ -538,17 +537,17 @@ type JSObjectPropertyList = JSCommaTrailingList JSObjectProperty
 data JSAccessor
   = JSAccessorGet !JSAnnot
   | JSAccessorSet !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSIdent
   = JSIdentName !JSAnnot !ByteString
   | JSIdentNone
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSArrayElement
   = JSArrayElement !JSExpression
   | JSArrayComma !JSAnnot
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSCommaList a
   = -- | head, comma, a
@@ -556,24 +555,24 @@ data JSCommaList a
   | -- | single element (no comma)
     JSLOne !a
   | JSLNil
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSCommaTrailingList a
   = -- | list, trailing comma
     JSCTLComma !(JSCommaList a) !JSAnnot
   | -- | list
     JSCTLNone !(JSCommaList a)
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSTemplatePart
   = -- | expr, rb, suffix
     JSTemplatePart !JSExpression !JSAnnot !ByteString
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSClassHeritage
   = JSExtends !JSAnnot !JSExpression
   | JSExtendsNone
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSClassElement
   = JSClassInstanceMethod !JSMethodDefinition
@@ -593,7 +592,532 @@ data JSClassElement
     JSClassStaticBlock !JSAnnot !JSBlock
   | -- | async, *, name, lb, params, rb, block
     JSAsyncGeneratorMethodDefinition !JSAnnot !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  deriving (Data, Eq, Generic, Lift, NFData, Show, Typeable)
+  deriving (Data, Eq, Generic, NFData, Show, Typeable)
+
+-- -----------------------------------------------------------------------------
+-- HasAnnot typeclass
+
+-- | Typeclass for types containing JSAnnot annotations.
+-- Provides direct-dispatch traversal, replacing SYB generic traversals.
+class HasAnnot a where
+  -- | Apply a function to every JSAnnot in the structure.
+  mapAnnot :: (JSAnnot -> JSAnnot) -> a -> a
+  -- | Collect values from every JSAnnot in the structure.
+  foldAnnot :: (JSAnnot -> [b]) -> a -> [b]
+
+instance HasAnnot JSAnnot where
+  mapAnnot f a = f a
+  foldAnnot f a = f a
+
+instance HasAnnot JSSemi where
+  mapAnnot f (JSSemi a) = JSSemi (f a)
+  mapAnnot _ JSSemiAuto = JSSemiAuto
+  foldAnnot f (JSSemi a) = f a
+  foldAnnot _ JSSemiAuto = []
+
+instance HasAnnot JSBinOp where
+  mapAnnot f (JSBinOpAnd a) = JSBinOpAnd (f a)
+  mapAnnot f (JSBinOpBitAnd a) = JSBinOpBitAnd (f a)
+  mapAnnot f (JSBinOpBitOr a) = JSBinOpBitOr (f a)
+  mapAnnot f (JSBinOpBitXor a) = JSBinOpBitXor (f a)
+  mapAnnot f (JSBinOpDivide a) = JSBinOpDivide (f a)
+  mapAnnot f (JSBinOpEq a) = JSBinOpEq (f a)
+  mapAnnot f (JSBinOpExponentiation a) = JSBinOpExponentiation (f a)
+  mapAnnot f (JSBinOpGe a) = JSBinOpGe (f a)
+  mapAnnot f (JSBinOpGt a) = JSBinOpGt (f a)
+  mapAnnot f (JSBinOpIn a) = JSBinOpIn (f a)
+  mapAnnot f (JSBinOpInstanceOf a) = JSBinOpInstanceOf (f a)
+  mapAnnot f (JSBinOpLe a) = JSBinOpLe (f a)
+  mapAnnot f (JSBinOpLsh a) = JSBinOpLsh (f a)
+  mapAnnot f (JSBinOpLt a) = JSBinOpLt (f a)
+  mapAnnot f (JSBinOpMinus a) = JSBinOpMinus (f a)
+  mapAnnot f (JSBinOpMod a) = JSBinOpMod (f a)
+  mapAnnot f (JSBinOpNeq a) = JSBinOpNeq (f a)
+  mapAnnot f (JSBinOpOf a) = JSBinOpOf (f a)
+  mapAnnot f (JSBinOpOr a) = JSBinOpOr (f a)
+  mapAnnot f (JSBinOpNullishCoalescing a) = JSBinOpNullishCoalescing (f a)
+  mapAnnot f (JSBinOpPlus a) = JSBinOpPlus (f a)
+  mapAnnot f (JSBinOpRsh a) = JSBinOpRsh (f a)
+  mapAnnot f (JSBinOpStrictEq a) = JSBinOpStrictEq (f a)
+  mapAnnot f (JSBinOpStrictNeq a) = JSBinOpStrictNeq (f a)
+  mapAnnot f (JSBinOpTimes a) = JSBinOpTimes (f a)
+  mapAnnot f (JSBinOpUrsh a) = JSBinOpUrsh (f a)
+  foldAnnot f (JSBinOpAnd a) = f a
+  foldAnnot f (JSBinOpBitAnd a) = f a
+  foldAnnot f (JSBinOpBitOr a) = f a
+  foldAnnot f (JSBinOpBitXor a) = f a
+  foldAnnot f (JSBinOpDivide a) = f a
+  foldAnnot f (JSBinOpEq a) = f a
+  foldAnnot f (JSBinOpExponentiation a) = f a
+  foldAnnot f (JSBinOpGe a) = f a
+  foldAnnot f (JSBinOpGt a) = f a
+  foldAnnot f (JSBinOpIn a) = f a
+  foldAnnot f (JSBinOpInstanceOf a) = f a
+  foldAnnot f (JSBinOpLe a) = f a
+  foldAnnot f (JSBinOpLsh a) = f a
+  foldAnnot f (JSBinOpLt a) = f a
+  foldAnnot f (JSBinOpMinus a) = f a
+  foldAnnot f (JSBinOpMod a) = f a
+  foldAnnot f (JSBinOpNeq a) = f a
+  foldAnnot f (JSBinOpOf a) = f a
+  foldAnnot f (JSBinOpOr a) = f a
+  foldAnnot f (JSBinOpNullishCoalescing a) = f a
+  foldAnnot f (JSBinOpPlus a) = f a
+  foldAnnot f (JSBinOpRsh a) = f a
+  foldAnnot f (JSBinOpStrictEq a) = f a
+  foldAnnot f (JSBinOpStrictNeq a) = f a
+  foldAnnot f (JSBinOpTimes a) = f a
+  foldAnnot f (JSBinOpUrsh a) = f a
+
+instance HasAnnot JSUnaryOp where
+  mapAnnot f (JSUnaryOpDecr a) = JSUnaryOpDecr (f a)
+  mapAnnot f (JSUnaryOpDelete a) = JSUnaryOpDelete (f a)
+  mapAnnot f (JSUnaryOpIncr a) = JSUnaryOpIncr (f a)
+  mapAnnot f (JSUnaryOpMinus a) = JSUnaryOpMinus (f a)
+  mapAnnot f (JSUnaryOpNot a) = JSUnaryOpNot (f a)
+  mapAnnot f (JSUnaryOpPlus a) = JSUnaryOpPlus (f a)
+  mapAnnot f (JSUnaryOpTilde a) = JSUnaryOpTilde (f a)
+  mapAnnot f (JSUnaryOpTypeof a) = JSUnaryOpTypeof (f a)
+  mapAnnot f (JSUnaryOpVoid a) = JSUnaryOpVoid (f a)
+  foldAnnot f (JSUnaryOpDecr a) = f a
+  foldAnnot f (JSUnaryOpDelete a) = f a
+  foldAnnot f (JSUnaryOpIncr a) = f a
+  foldAnnot f (JSUnaryOpMinus a) = f a
+  foldAnnot f (JSUnaryOpNot a) = f a
+  foldAnnot f (JSUnaryOpPlus a) = f a
+  foldAnnot f (JSUnaryOpTilde a) = f a
+  foldAnnot f (JSUnaryOpTypeof a) = f a
+  foldAnnot f (JSUnaryOpVoid a) = f a
+
+instance HasAnnot JSAccessor where
+  mapAnnot f (JSAccessorGet a) = JSAccessorGet (f a)
+  mapAnnot f (JSAccessorSet a) = JSAccessorSet (f a)
+  foldAnnot f (JSAccessorGet a) = f a
+  foldAnnot f (JSAccessorSet a) = f a
+
+instance HasAnnot JSAssignOp where
+  mapAnnot f (JSAssign a) = JSAssign (f a)
+  mapAnnot f (JSTimesAssign a) = JSTimesAssign (f a)
+  mapAnnot f (JSDivideAssign a) = JSDivideAssign (f a)
+  mapAnnot f (JSModAssign a) = JSModAssign (f a)
+  mapAnnot f (JSPlusAssign a) = JSPlusAssign (f a)
+  mapAnnot f (JSMinusAssign a) = JSMinusAssign (f a)
+  mapAnnot f (JSLshAssign a) = JSLshAssign (f a)
+  mapAnnot f (JSRshAssign a) = JSRshAssign (f a)
+  mapAnnot f (JSUrshAssign a) = JSUrshAssign (f a)
+  mapAnnot f (JSBwAndAssign a) = JSBwAndAssign (f a)
+  mapAnnot f (JSBwXorAssign a) = JSBwXorAssign (f a)
+  mapAnnot f (JSBwOrAssign a) = JSBwOrAssign (f a)
+  mapAnnot f (JSLogicalAndAssign a) = JSLogicalAndAssign (f a)
+  mapAnnot f (JSLogicalOrAssign a) = JSLogicalOrAssign (f a)
+  mapAnnot f (JSNullishAssign a) = JSNullishAssign (f a)
+  foldAnnot f (JSAssign a) = f a
+  foldAnnot f (JSTimesAssign a) = f a
+  foldAnnot f (JSDivideAssign a) = f a
+  foldAnnot f (JSModAssign a) = f a
+  foldAnnot f (JSPlusAssign a) = f a
+  foldAnnot f (JSMinusAssign a) = f a
+  foldAnnot f (JSLshAssign a) = f a
+  foldAnnot f (JSRshAssign a) = f a
+  foldAnnot f (JSUrshAssign a) = f a
+  foldAnnot f (JSBwAndAssign a) = f a
+  foldAnnot f (JSBwXorAssign a) = f a
+  foldAnnot f (JSBwOrAssign a) = f a
+  foldAnnot f (JSLogicalAndAssign a) = f a
+  foldAnnot f (JSLogicalOrAssign a) = f a
+  foldAnnot f (JSNullishAssign a) = f a
+
+instance HasAnnot JSIdent where
+  mapAnnot f (JSIdentName a s) = JSIdentName (f a) s
+  mapAnnot _ JSIdentNone = JSIdentNone
+  foldAnnot f (JSIdentName a _) = f a
+  foldAnnot _ JSIdentNone = []
+
+instance HasAnnot JSVarInitializer where
+  mapAnnot f (JSVarInit a e) = JSVarInit (f a) (mapAnnot f e)
+  mapAnnot _ JSVarInitNone = JSVarInitNone
+  foldAnnot f (JSVarInit a e) = f a ++ foldAnnot f e
+  foldAnnot _ JSVarInitNone = []
+
+instance HasAnnot JSClassHeritage where
+  mapAnnot f (JSExtends a e) = JSExtends (f a) (mapAnnot f e)
+  mapAnnot _ JSExtendsNone = JSExtendsNone
+  foldAnnot f (JSExtends a e) = f a ++ foldAnnot f e
+  foldAnnot _ JSExtendsNone = []
+
+instance HasAnnot JSTryFinally where
+  mapAnnot f (JSFinally a b) = JSFinally (f a) (mapAnnot f b)
+  mapAnnot _ JSNoFinally = JSNoFinally
+  foldAnnot f (JSFinally a b) = f a ++ foldAnnot f b
+  foldAnnot _ JSNoFinally = []
+
+instance HasAnnot JSBlock where
+  mapAnnot f (JSBlock a1 stmts a2) = JSBlock (f a1) (map (mapAnnot f) stmts) (f a2)
+  foldAnnot f (JSBlock a1 stmts a2) = f a1 ++ concatMap (foldAnnot f) stmts ++ f a2
+
+instance HasAnnot a => HasAnnot (JSCommaList a) where
+  mapAnnot f (JSLCons xs a x) = JSLCons (mapAnnot f xs) (f a) (mapAnnot f x)
+  mapAnnot f (JSLOne x) = JSLOne (mapAnnot f x)
+  mapAnnot _ JSLNil = JSLNil
+  foldAnnot f (JSLCons xs a x) = foldAnnot f xs ++ f a ++ foldAnnot f x
+  foldAnnot f (JSLOne x) = foldAnnot f x
+  foldAnnot _ JSLNil = []
+
+instance HasAnnot a => HasAnnot (JSCommaTrailingList a) where
+  mapAnnot f (JSCTLComma xs a) = JSCTLComma (mapAnnot f xs) (f a)
+  mapAnnot f (JSCTLNone xs) = JSCTLNone (mapAnnot f xs)
+  foldAnnot f (JSCTLComma xs a) = foldAnnot f xs ++ f a
+  foldAnnot f (JSCTLNone xs) = foldAnnot f xs
+
+instance HasAnnot JSArrayElement where
+  mapAnnot f (JSArrayElement e) = JSArrayElement (mapAnnot f e)
+  mapAnnot f (JSArrayComma a) = JSArrayComma (f a)
+  foldAnnot f (JSArrayElement e) = foldAnnot f e
+  foldAnnot f (JSArrayComma a) = f a
+
+instance HasAnnot JSTemplatePart where
+  mapAnnot f (JSTemplatePart e a s) = JSTemplatePart (mapAnnot f e) (f a) s
+  foldAnnot f (JSTemplatePart e a _) = foldAnnot f e ++ f a
+
+instance HasAnnot JSSwitchParts where
+  mapAnnot f (JSCase a1 e a2 stmts) = JSCase (f a1) (mapAnnot f e) (f a2) (map (mapAnnot f) stmts)
+  mapAnnot f (JSDefault a1 a2 stmts) = JSDefault (f a1) (f a2) (map (mapAnnot f) stmts)
+  foldAnnot f (JSCase a1 e a2 stmts) = f a1 ++ foldAnnot f e ++ f a2 ++ concatMap (foldAnnot f) stmts
+  foldAnnot f (JSDefault a1 a2 stmts) = f a1 ++ f a2 ++ concatMap (foldAnnot f) stmts
+
+instance HasAnnot JSTryCatch where
+  mapAnnot f (JSCatch a1 a2 e a3 b) = JSCatch (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f b)
+  mapAnnot f (JSCatchIf a1 a2 e1 a3 e2 a4 b) = JSCatchIf (f a1) (f a2) (mapAnnot f e1) (f a3) (mapAnnot f e2) (f a4) (mapAnnot f b)
+  foldAnnot f (JSCatch a1 a2 e a3 b) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f b
+  foldAnnot f (JSCatchIf a1 a2 e1 a3 e2 a4 b) = f a1 ++ f a2 ++ foldAnnot f e1 ++ f a3 ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f b
+
+instance HasAnnot JSPropertyName where
+  mapAnnot f (JSPropertyIdent a s) = JSPropertyIdent (f a) s
+  mapAnnot f (JSPropertyString a s) = JSPropertyString (f a) s
+  mapAnnot f (JSPropertyNumber a s) = JSPropertyNumber (f a) s
+  mapAnnot f (JSPropertyComputed a1 e a2) = JSPropertyComputed (f a1) (mapAnnot f e) (f a2)
+  foldAnnot f (JSPropertyIdent a _) = f a
+  foldAnnot f (JSPropertyString a _) = f a
+  foldAnnot f (JSPropertyNumber a _) = f a
+  foldAnnot f (JSPropertyComputed a1 e a2) = f a1 ++ foldAnnot f e ++ f a2
+
+instance HasAnnot JSObjectProperty where
+  mapAnnot f (JSPropertyNameandValue n a es) = JSPropertyNameandValue (mapAnnot f n) (f a) (map (mapAnnot f) es)
+  mapAnnot f (JSPropertyIdentRef a s) = JSPropertyIdentRef (f a) s
+  mapAnnot f (JSObjectMethod m) = JSObjectMethod (mapAnnot f m)
+  mapAnnot f (JSObjectSpread a e) = JSObjectSpread (f a) (mapAnnot f e)
+  foldAnnot f (JSPropertyNameandValue n a es) = foldAnnot f n ++ f a ++ concatMap (foldAnnot f) es
+  foldAnnot f (JSPropertyIdentRef a _) = f a
+  foldAnnot f (JSObjectMethod m) = foldAnnot f m
+  foldAnnot f (JSObjectSpread a e) = f a ++ foldAnnot f e
+
+instance HasAnnot JSMethodDefinition where
+  mapAnnot f (JSMethodDefinition n a1 ps a2 b) = JSMethodDefinition (mapAnnot f n) (f a1) (mapAnnot f ps) (f a2) (mapAnnot f b)
+  mapAnnot f (JSGeneratorMethodDefinition a1 n a2 ps a3 b) = JSGeneratorMethodDefinition (f a1) (mapAnnot f n) (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
+  mapAnnot f (JSAsyncMethodDefinition a1 n a2 ps a3 b) = JSAsyncMethodDefinition (f a1) (mapAnnot f n) (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
+  mapAnnot f (JSPropertyAccessor acc n a1 ps a2 b) = JSPropertyAccessor (mapAnnot f acc) (mapAnnot f n) (f a1) (mapAnnot f ps) (f a2) (mapAnnot f b)
+  foldAnnot f (JSMethodDefinition n a1 ps a2 b) = foldAnnot f n ++ f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
+  foldAnnot f (JSGeneratorMethodDefinition a1 n a2 ps a3 b) = f a1 ++ foldAnnot f n ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
+  foldAnnot f (JSAsyncMethodDefinition a1 n a2 ps a3 b) = f a1 ++ foldAnnot f n ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
+  foldAnnot f (JSPropertyAccessor acc n a1 ps a2 b) = foldAnnot f acc ++ foldAnnot f n ++ f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
+
+instance HasAnnot JSClassElement where
+  mapAnnot f (JSClassInstanceMethod m) = JSClassInstanceMethod (mapAnnot f m)
+  mapAnnot f (JSClassStaticMethod a m) = JSClassStaticMethod (f a) (mapAnnot f m)
+  mapAnnot f (JSClassSemi a) = JSClassSemi (f a)
+  mapAnnot f (JSPrivateField a1 s a2 mi semi) = JSPrivateField (f a1) s (f a2) (fmap (mapAnnot f) mi) (mapAnnot f semi)
+  mapAnnot f (JSPrivateMethod a1 s a2 ps a3 b) = JSPrivateMethod (f a1) s (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
+  mapAnnot f (JSPrivateAccessor acc a1 s a2 ps a3 b) = JSPrivateAccessor (mapAnnot f acc) (f a1) s (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
+  mapAnnot f (JSClassField n a mi semi) = JSClassField (mapAnnot f n) (f a) (fmap (mapAnnot f) mi) (mapAnnot f semi)
+  mapAnnot f (JSClassStaticField a1 n a2 mi semi) = JSClassStaticField (f a1) (mapAnnot f n) (f a2) (fmap (mapAnnot f) mi) (mapAnnot f semi)
+  mapAnnot f (JSClassStaticBlock a b) = JSClassStaticBlock (f a) (mapAnnot f b)
+  mapAnnot f (JSAsyncGeneratorMethodDefinition a1 a2 n a3 ps a4 b) = JSAsyncGeneratorMethodDefinition (f a1) (f a2) (mapAnnot f n) (f a3) (mapAnnot f ps) (f a4) (mapAnnot f b)
+  foldAnnot f (JSClassInstanceMethod m) = foldAnnot f m
+  foldAnnot f (JSClassStaticMethod a m) = f a ++ foldAnnot f m
+  foldAnnot f (JSClassSemi a) = f a
+  foldAnnot f (JSPrivateField a1 _ a2 mi semi) = f a1 ++ f a2 ++ maybe [] (foldAnnot f) mi ++ foldAnnot f semi
+  foldAnnot f (JSPrivateMethod a1 _ a2 ps a3 b) = f a1 ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
+  foldAnnot f (JSPrivateAccessor acc a1 _ a2 ps a3 b) = foldAnnot f acc ++ f a1 ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
+  foldAnnot f (JSClassField n a mi semi) = foldAnnot f n ++ f a ++ maybe [] (foldAnnot f) mi ++ foldAnnot f semi
+  foldAnnot f (JSClassStaticField a1 n a2 mi semi) = f a1 ++ foldAnnot f n ++ f a2 ++ maybe [] (foldAnnot f) mi ++ foldAnnot f semi
+  foldAnnot f (JSClassStaticBlock a b) = f a ++ foldAnnot f b
+  foldAnnot f (JSAsyncGeneratorMethodDefinition a1 a2 n a3 ps a4 b) = f a1 ++ f a2 ++ foldAnnot f n ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b
+
+instance HasAnnot JSArrowParameterList where
+  mapAnnot f (JSUnparenthesizedArrowParameter i) = JSUnparenthesizedArrowParameter (mapAnnot f i)
+  mapAnnot f (JSParenthesizedArrowParameterList a1 ps a2) = JSParenthesizedArrowParameterList (f a1) (mapAnnot f ps) (f a2)
+  foldAnnot f (JSUnparenthesizedArrowParameter i) = foldAnnot f i
+  foldAnnot f (JSParenthesizedArrowParameterList a1 ps a2) = f a1 ++ foldAnnot f ps ++ f a2
+
+instance HasAnnot JSConciseBody where
+  mapAnnot f (JSConciseFunctionBody b) = JSConciseFunctionBody (mapAnnot f b)
+  mapAnnot f (JSConciseExpressionBody e) = JSConciseExpressionBody (mapAnnot f e)
+  foldAnnot f (JSConciseFunctionBody b) = foldAnnot f b
+  foldAnnot f (JSConciseExpressionBody e) = foldAnnot f e
+
+instance HasAnnot JSFromClause where
+  mapAnnot f (JSFromClause a1 a2 s) = JSFromClause (f a1) (f a2) s
+  foldAnnot f (JSFromClause a1 a2 _) = f a1 ++ f a2
+
+instance HasAnnot JSImportNameSpace where
+  mapAnnot f (JSImportNameSpace op a i) = JSImportNameSpace (mapAnnot f op) (f a) (mapAnnot f i)
+  foldAnnot f (JSImportNameSpace op a i) = foldAnnot f op ++ f a ++ foldAnnot f i
+
+instance HasAnnot JSImportsNamed where
+  mapAnnot f (JSImportsNamed a1 specs a2) = JSImportsNamed (f a1) (mapAnnot f specs) (f a2)
+  foldAnnot f (JSImportsNamed a1 specs a2) = f a1 ++ foldAnnot f specs ++ f a2
+
+instance HasAnnot JSImportSpecifier where
+  mapAnnot f (JSImportSpecifier i) = JSImportSpecifier (mapAnnot f i)
+  mapAnnot f (JSImportSpecifierAs i1 a i2) = JSImportSpecifierAs (mapAnnot f i1) (f a) (mapAnnot f i2)
+  foldAnnot f (JSImportSpecifier i) = foldAnnot f i
+  foldAnnot f (JSImportSpecifierAs i1 a i2) = foldAnnot f i1 ++ f a ++ foldAnnot f i2
+
+instance HasAnnot JSImportAttributes where
+  mapAnnot f (JSImportAttributes a1 attrs a2) = JSImportAttributes (f a1) (mapAnnot f attrs) (f a2)
+  foldAnnot f (JSImportAttributes a1 attrs a2) = f a1 ++ foldAnnot f attrs ++ f a2
+
+instance HasAnnot JSImportAttribute where
+  mapAnnot f (JSImportAttribute key a val) = JSImportAttribute (mapAnnot f key) (f a) (mapAnnot f val)
+  foldAnnot f (JSImportAttribute key a val) = foldAnnot f key ++ f a ++ foldAnnot f val
+
+instance HasAnnot JSImportClause where
+  mapAnnot f (JSImportClauseDefault i) = JSImportClauseDefault (mapAnnot f i)
+  mapAnnot f (JSImportClauseNameSpace ns) = JSImportClauseNameSpace (mapAnnot f ns)
+  mapAnnot f (JSImportClauseNamed n) = JSImportClauseNamed (mapAnnot f n)
+  mapAnnot f (JSImportClauseDefaultNameSpace i a ns) = JSImportClauseDefaultNameSpace (mapAnnot f i) (f a) (mapAnnot f ns)
+  mapAnnot f (JSImportClauseDefaultNamed i a n) = JSImportClauseDefaultNamed (mapAnnot f i) (f a) (mapAnnot f n)
+  foldAnnot f (JSImportClauseDefault i) = foldAnnot f i
+  foldAnnot f (JSImportClauseNameSpace ns) = foldAnnot f ns
+  foldAnnot f (JSImportClauseNamed n) = foldAnnot f n
+  foldAnnot f (JSImportClauseDefaultNameSpace i a ns) = foldAnnot f i ++ f a ++ foldAnnot f ns
+  foldAnnot f (JSImportClauseDefaultNamed i a n) = foldAnnot f i ++ f a ++ foldAnnot f n
+
+instance HasAnnot JSImportDeclaration where
+  mapAnnot f (JSImportDeclaration cl from attrs semi) = JSImportDeclaration (mapAnnot f cl) (mapAnnot f from) (fmap (mapAnnot f) attrs) (mapAnnot f semi)
+  mapAnnot f (JSImportDeclarationBare a s attrs semi) = JSImportDeclarationBare (f a) s (fmap (mapAnnot f) attrs) (mapAnnot f semi)
+  foldAnnot f (JSImportDeclaration cl from attrs semi) = foldAnnot f cl ++ foldAnnot f from ++ maybe [] (foldAnnot f) attrs ++ foldAnnot f semi
+  foldAnnot f (JSImportDeclarationBare a _ attrs semi) = f a ++ maybe [] (foldAnnot f) attrs ++ foldAnnot f semi
+
+instance HasAnnot JSExportSpecifier where
+  mapAnnot f (JSExportSpecifier i) = JSExportSpecifier (mapAnnot f i)
+  mapAnnot f (JSExportSpecifierAs i1 a i2) = JSExportSpecifierAs (mapAnnot f i1) (f a) (mapAnnot f i2)
+  foldAnnot f (JSExportSpecifier i) = foldAnnot f i
+  foldAnnot f (JSExportSpecifierAs i1 a i2) = foldAnnot f i1 ++ f a ++ foldAnnot f i2
+
+instance HasAnnot JSExportClause where
+  mapAnnot f (JSExportClause a1 specs a2) = JSExportClause (f a1) (mapAnnot f specs) (f a2)
+  foldAnnot f (JSExportClause a1 specs a2) = f a1 ++ foldAnnot f specs ++ f a2
+
+instance HasAnnot JSExportDeclaration where
+  mapAnnot f (JSExportAllFrom star from semi) = JSExportAllFrom (mapAnnot f star) (mapAnnot f from) (mapAnnot f semi)
+  mapAnnot f (JSExportAllAsFrom star a i from semi) = JSExportAllAsFrom (mapAnnot f star) (f a) (mapAnnot f i) (mapAnnot f from) (mapAnnot f semi)
+  mapAnnot f (JSExportFrom cl from semi) = JSExportFrom (mapAnnot f cl) (mapAnnot f from) (mapAnnot f semi)
+  mapAnnot f (JSExportLocals cl semi) = JSExportLocals (mapAnnot f cl) (mapAnnot f semi)
+  mapAnnot f (JSExportDefault a stmt semi) = JSExportDefault (f a) (mapAnnot f stmt) (mapAnnot f semi)
+  mapAnnot f (JSExport stmt semi) = JSExport (mapAnnot f stmt) (mapAnnot f semi)
+  foldAnnot f (JSExportAllFrom star from semi) = foldAnnot f star ++ foldAnnot f from ++ foldAnnot f semi
+  foldAnnot f (JSExportAllAsFrom star a i from semi) = foldAnnot f star ++ f a ++ foldAnnot f i ++ foldAnnot f from ++ foldAnnot f semi
+  foldAnnot f (JSExportFrom cl from semi) = foldAnnot f cl ++ foldAnnot f from ++ foldAnnot f semi
+  foldAnnot f (JSExportLocals cl semi) = foldAnnot f cl ++ foldAnnot f semi
+  foldAnnot f (JSExportDefault a stmt semi) = f a ++ foldAnnot f stmt ++ foldAnnot f semi
+  foldAnnot f (JSExport stmt semi) = foldAnnot f stmt ++ foldAnnot f semi
+
+instance HasAnnot JSModuleItem where
+  mapAnnot f (JSModuleImportDeclaration a d) = JSModuleImportDeclaration (f a) (mapAnnot f d)
+  mapAnnot f (JSModuleExportDeclaration a d) = JSModuleExportDeclaration (f a) (mapAnnot f d)
+  mapAnnot f (JSModuleStatementListItem s) = JSModuleStatementListItem (mapAnnot f s)
+  foldAnnot f (JSModuleImportDeclaration a d) = f a ++ foldAnnot f d
+  foldAnnot f (JSModuleExportDeclaration a d) = f a ++ foldAnnot f d
+  foldAnnot f (JSModuleStatementListItem s) = foldAnnot f s
+
+instance HasAnnot JSExpression where
+  mapAnnot f (JSIdentifier a s) = JSIdentifier (f a) s
+  mapAnnot f (JSDecimal a d) = JSDecimal (f a) d
+  mapAnnot f (JSLiteral a s) = JSLiteral (f a) s
+  mapAnnot f (JSHexInteger a n) = JSHexInteger (f a) n
+  mapAnnot f (JSBinaryInteger a n) = JSBinaryInteger (f a) n
+  mapAnnot f (JSOctal a n) = JSOctal (f a) n
+  mapAnnot f (JSBigIntLiteral a n) = JSBigIntLiteral (f a) n
+  mapAnnot f (JSStringLiteral a s) = JSStringLiteral (f a) s
+  mapAnnot f (JSRegEx a s) = JSRegEx (f a) s
+  mapAnnot f (JSArrayLiteral a1 es a2) = JSArrayLiteral (f a1) (map (mapAnnot f) es) (f a2)
+  mapAnnot f (JSAssignExpression e1 op e2) = JSAssignExpression (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2)
+  mapAnnot f (JSAwaitExpression a e) = JSAwaitExpression (f a) (mapAnnot f e)
+  mapAnnot f (JSCallExpression e a1 args a2) = JSCallExpression (mapAnnot f e) (f a1) (mapAnnot f args) (f a2)
+  mapAnnot f (JSCallExpressionDot e a x) = JSCallExpressionDot (mapAnnot f e) (f a) (mapAnnot f x)
+  mapAnnot f (JSCallExpressionSquare e a1 x a2) = JSCallExpressionSquare (mapAnnot f e) (f a1) (mapAnnot f x) (f a2)
+  mapAnnot f (JSClassExpression a1 i h a2 es a3) = JSClassExpression (f a1) (mapAnnot f i) (mapAnnot f h) (f a2) (map (mapAnnot f) es) (f a3)
+  mapAnnot f (JSCommaExpression e1 a e2) = JSCommaExpression (mapAnnot f e1) (f a) (mapAnnot f e2)
+  mapAnnot f (JSExpressionBinary e1 op e2) = JSExpressionBinary (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2)
+  mapAnnot f (JSExpressionParen a1 e a2) = JSExpressionParen (f a1) (mapAnnot f e) (f a2)
+  mapAnnot f (JSExpressionPostfix e op) = JSExpressionPostfix (mapAnnot f e) (mapAnnot f op)
+  mapAnnot f (JSExpressionTernary e1 a1 e2 a2 e3) = JSExpressionTernary (mapAnnot f e1) (f a1) (mapAnnot f e2) (f a2) (mapAnnot f e3)
+  mapAnnot f (JSArrowExpression ps a b) = JSArrowExpression (mapAnnot f ps) (f a) (mapAnnot f b)
+  mapAnnot f (JSFunctionExpression a1 i a2 ps a3 b) = JSFunctionExpression (f a1) (mapAnnot f i) (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
+  mapAnnot f (JSGeneratorExpression a1 a2 i a3 ps a4 b) = JSGeneratorExpression (f a1) (f a2) (mapAnnot f i) (f a3) (mapAnnot f ps) (f a4) (mapAnnot f b)
+  mapAnnot f (JSAsyncFunctionExpression a1 a2 i a3 ps a4 b) = JSAsyncFunctionExpression (f a1) (f a2) (mapAnnot f i) (f a3) (mapAnnot f ps) (f a4) (mapAnnot f b)
+  mapAnnot f (JSAsyncArrowExpression a1 ps a2 b) = JSAsyncArrowExpression (f a1) (mapAnnot f ps) (f a2) (mapAnnot f b)
+  mapAnnot f (JSAsyncGeneratorExpression a1 a2 a3 i a4 ps a5 b) = JSAsyncGeneratorExpression (f a1) (f a2) (f a3) (mapAnnot f i) (f a4) (mapAnnot f ps) (f a5) (mapAnnot f b)
+  mapAnnot f (JSMemberDot e1 a e2) = JSMemberDot (mapAnnot f e1) (f a) (mapAnnot f e2)
+  mapAnnot f (JSMemberExpression e a1 args a2) = JSMemberExpression (mapAnnot f e) (f a1) (mapAnnot f args) (f a2)
+  mapAnnot f (JSMemberNew a1 e a2 args a3) = JSMemberNew (f a1) (mapAnnot f e) (f a2) (mapAnnot f args) (f a3)
+  mapAnnot f (JSMemberSquare e a1 x a2) = JSMemberSquare (mapAnnot f e) (f a1) (mapAnnot f x) (f a2)
+  mapAnnot f (JSNewExpression a e) = JSNewExpression (f a) (mapAnnot f e)
+  mapAnnot f (JSOptionalMemberDot e1 a e2) = JSOptionalMemberDot (mapAnnot f e1) (f a) (mapAnnot f e2)
+  mapAnnot f (JSOptionalMemberSquare e1 a1 e2 a2) = JSOptionalMemberSquare (mapAnnot f e1) (f a1) (mapAnnot f e2) (f a2)
+  mapAnnot f (JSOptionalCallExpression e a1 args a2) = JSOptionalCallExpression (mapAnnot f e) (f a1) (mapAnnot f args) (f a2)
+  mapAnnot f (JSObjectLiteral a1 props a2) = JSObjectLiteral (f a1) (mapAnnot f props) (f a2)
+  mapAnnot f (JSSpreadExpression a e) = JSSpreadExpression (f a) (mapAnnot f e)
+  mapAnnot f (JSTemplateLiteral mt a s ps) = JSTemplateLiteral (fmap (mapAnnot f) mt) (f a) s (map (mapAnnot f) ps)
+  mapAnnot f (JSUnaryExpression op e) = JSUnaryExpression (mapAnnot f op) (mapAnnot f e)
+  mapAnnot f (JSVarInitExpression e vi) = JSVarInitExpression (mapAnnot f e) (mapAnnot f vi)
+  mapAnnot f (JSYieldExpression a me) = JSYieldExpression (f a) (fmap (mapAnnot f) me)
+  mapAnnot f (JSYieldFromExpression a1 a2 e) = JSYieldFromExpression (f a1) (f a2) (mapAnnot f e)
+  mapAnnot f (JSImportMeta a1 a2) = JSImportMeta (f a1) (f a2)
+  mapAnnot f (JSImportCall a1 a2 e a3) = JSImportCall (f a1) (f a2) (mapAnnot f e) (f a3)
+  foldAnnot f (JSIdentifier a _) = f a
+  foldAnnot f (JSDecimal a _) = f a
+  foldAnnot f (JSLiteral a _) = f a
+  foldAnnot f (JSHexInteger a _) = f a
+  foldAnnot f (JSBinaryInteger a _) = f a
+  foldAnnot f (JSOctal a _) = f a
+  foldAnnot f (JSBigIntLiteral a _) = f a
+  foldAnnot f (JSStringLiteral a _) = f a
+  foldAnnot f (JSRegEx a _) = f a
+  foldAnnot f (JSArrayLiteral a1 es a2) = f a1 ++ concatMap (foldAnnot f) es ++ f a2
+  foldAnnot f (JSAssignExpression e1 op e2) = foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2
+  foldAnnot f (JSAwaitExpression a e) = f a ++ foldAnnot f e
+  foldAnnot f (JSCallExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
+  foldAnnot f (JSCallExpressionDot e a x) = foldAnnot f e ++ f a ++ foldAnnot f x
+  foldAnnot f (JSCallExpressionSquare e a1 x a2) = foldAnnot f e ++ f a1 ++ foldAnnot f x ++ f a2
+  foldAnnot f (JSClassExpression a1 i h a2 es a3) = f a1 ++ foldAnnot f i ++ foldAnnot f h ++ f a2 ++ concatMap (foldAnnot f) es ++ f a3
+  foldAnnot f (JSCommaExpression e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
+  foldAnnot f (JSExpressionBinary e1 op e2) = foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2
+  foldAnnot f (JSExpressionParen a1 e a2) = f a1 ++ foldAnnot f e ++ f a2
+  foldAnnot f (JSExpressionPostfix e op) = foldAnnot f e ++ foldAnnot f op
+  foldAnnot f (JSExpressionTernary e1 a1 e2 a2 e3) = foldAnnot f e1 ++ f a1 ++ foldAnnot f e2 ++ f a2 ++ foldAnnot f e3
+  foldAnnot f (JSArrowExpression ps a b) = foldAnnot f ps ++ f a ++ foldAnnot f b
+  foldAnnot f (JSFunctionExpression a1 i a2 ps a3 b) = f a1 ++ foldAnnot f i ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
+  foldAnnot f (JSGeneratorExpression a1 a2 i a3 ps a4 b) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b
+  foldAnnot f (JSAsyncFunctionExpression a1 a2 i a3 ps a4 b) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b
+  foldAnnot f (JSAsyncArrowExpression a1 ps a2 b) = f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
+  foldAnnot f (JSAsyncGeneratorExpression a1 a2 a3 i a4 ps a5 b) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f i ++ f a4 ++ foldAnnot f ps ++ f a5 ++ foldAnnot f b
+  foldAnnot f (JSMemberDot e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
+  foldAnnot f (JSMemberExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
+  foldAnnot f (JSMemberNew a1 e a2 args a3) = f a1 ++ foldAnnot f e ++ f a2 ++ foldAnnot f args ++ f a3
+  foldAnnot f (JSMemberSquare e a1 x a2) = foldAnnot f e ++ f a1 ++ foldAnnot f x ++ f a2
+  foldAnnot f (JSNewExpression a e) = f a ++ foldAnnot f e
+  foldAnnot f (JSOptionalMemberDot e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
+  foldAnnot f (JSOptionalMemberSquare e1 a1 e2 a2) = foldAnnot f e1 ++ f a1 ++ foldAnnot f e2 ++ f a2
+  foldAnnot f (JSOptionalCallExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
+  foldAnnot f (JSObjectLiteral a1 props a2) = f a1 ++ foldAnnot f props ++ f a2
+  foldAnnot f (JSSpreadExpression a e) = f a ++ foldAnnot f e
+  foldAnnot f (JSTemplateLiteral mt a _ ps) = maybe [] (foldAnnot f) mt ++ f a ++ concatMap (foldAnnot f) ps
+  foldAnnot f (JSUnaryExpression op e) = foldAnnot f op ++ foldAnnot f e
+  foldAnnot f (JSVarInitExpression e vi) = foldAnnot f e ++ foldAnnot f vi
+  foldAnnot f (JSYieldExpression a me) = f a ++ maybe [] (foldAnnot f) me
+  foldAnnot f (JSYieldFromExpression a1 a2 e) = f a1 ++ f a2 ++ foldAnnot f e
+  foldAnnot f (JSImportMeta a1 a2) = f a1 ++ f a2
+  foldAnnot f (JSImportCall a1 a2 e a3) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3
+
+instance HasAnnot JSStatement where
+  mapAnnot f (JSStatementBlock a1 stmts a2 semi) = JSStatementBlock (f a1) (map (mapAnnot f) stmts) (f a2) (mapAnnot f semi)
+  mapAnnot f (JSBreak a i semi) = JSBreak (f a) (mapAnnot f i) (mapAnnot f semi)
+  mapAnnot f (JSLet a es semi) = JSLet (f a) (mapAnnot f es) (mapAnnot f semi)
+  mapAnnot f (JSClass a1 i h a2 es a3 semi) = JSClass (f a1) (mapAnnot f i) (mapAnnot f h) (f a2) (map (mapAnnot f) es) (f a3) (mapAnnot f semi)
+  mapAnnot f (JSConstant a es semi) = JSConstant (f a) (mapAnnot f es) (mapAnnot f semi)
+  mapAnnot f (JSContinue a i semi) = JSContinue (f a) (mapAnnot f i) (mapAnnot f semi)
+  mapAnnot f (JSDoWhile a1 s a2 a3 e a4 semi) = JSDoWhile (f a1) (mapAnnot f s) (f a2) (f a3) (mapAnnot f e) (f a4) (mapAnnot f semi)
+  mapAnnot f (JSFor a1 a2 es1 a3 es2 a4 es3 a5 s) = JSFor (f a1) (f a2) (mapAnnot f es1) (f a3) (mapAnnot f es2) (f a4) (mapAnnot f es3) (f a5) (mapAnnot f s)
+  mapAnnot f (JSForIn a1 a2 e1 op e2 a3 s) = JSForIn (f a1) (f a2) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a3) (mapAnnot f s)
+  mapAnnot f (JSForVar a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = JSForVar (f a1) (f a2) (f a3) (mapAnnot f es1) (f a4) (mapAnnot f es2) (f a5) (mapAnnot f es3) (f a6) (mapAnnot f s)
+  mapAnnot f (JSForVarIn a1 a2 a3 e1 op e2 a4 s) = JSForVarIn (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSForLet a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = JSForLet (f a1) (f a2) (f a3) (mapAnnot f es1) (f a4) (mapAnnot f es2) (f a5) (mapAnnot f es3) (f a6) (mapAnnot f s)
+  mapAnnot f (JSForLetIn a1 a2 a3 e1 op e2 a4 s) = JSForLetIn (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSForLetOf a1 a2 a3 e1 op e2 a4 s) = JSForLetOf (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSForConst a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = JSForConst (f a1) (f a2) (f a3) (mapAnnot f es1) (f a4) (mapAnnot f es2) (f a5) (mapAnnot f es3) (f a6) (mapAnnot f s)
+  mapAnnot f (JSForConstIn a1 a2 a3 e1 op e2 a4 s) = JSForConstIn (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSForConstOf a1 a2 a3 e1 op e2 a4 s) = JSForConstOf (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSForOf a1 a2 e1 op e2 a3 s) = JSForOf (f a1) (f a2) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a3) (mapAnnot f s)
+  mapAnnot f (JSForVarOf a1 a2 a3 e1 op e2 a4 s) = JSForVarOf (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSAsyncFunction a1 a2 i a3 ps a4 b semi) = JSAsyncFunction (f a1) (f a2) (mapAnnot f i) (f a3) (mapAnnot f ps) (f a4) (mapAnnot f b) (mapAnnot f semi)
+  mapAnnot f (JSFunction a1 i a2 ps a3 b semi) = JSFunction (f a1) (mapAnnot f i) (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b) (mapAnnot f semi)
+  mapAnnot f (JSGenerator a1 a2 i a3 ps a4 b semi) = JSGenerator (f a1) (f a2) (mapAnnot f i) (f a3) (mapAnnot f ps) (f a4) (mapAnnot f b) (mapAnnot f semi)
+  mapAnnot f (JSIf a1 a2 e a3 s) = JSIf (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f s)
+  mapAnnot f (JSIfElse a1 a2 e a3 s1 a4 s2) = JSIfElse (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f s1) (f a4) (mapAnnot f s2)
+  mapAnnot f (JSLabelled i a s) = JSLabelled (mapAnnot f i) (f a) (mapAnnot f s)
+  mapAnnot f (JSEmptyStatement a) = JSEmptyStatement (f a)
+  mapAnnot f (JSExpressionStatement e semi) = JSExpressionStatement (mapAnnot f e) (mapAnnot f semi)
+  mapAnnot f (JSAssignStatement e1 op e2 semi) = JSAssignStatement (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (mapAnnot f semi)
+  mapAnnot f (JSMethodCall e a1 args a2 semi) = JSMethodCall (mapAnnot f e) (f a1) (mapAnnot f args) (f a2) (mapAnnot f semi)
+  mapAnnot f (JSReturn a me semi) = JSReturn (f a) (fmap (mapAnnot f) me) (mapAnnot f semi)
+  mapAnnot f (JSSwitch a1 a2 e a3 a4 parts a5 semi) = JSSwitch (f a1) (f a2) (mapAnnot f e) (f a3) (f a4) (map (mapAnnot f) parts) (f a5) (mapAnnot f semi)
+  mapAnnot f (JSThrow a e semi) = JSThrow (f a) (mapAnnot f e) (mapAnnot f semi)
+  mapAnnot f (JSTry a b catches fin) = JSTry (f a) (mapAnnot f b) (map (mapAnnot f) catches) (mapAnnot f fin)
+  mapAnnot f (JSVariable a es semi) = JSVariable (f a) (mapAnnot f es) (mapAnnot f semi)
+  mapAnnot f (JSWhile a1 a2 e a3 s) = JSWhile (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f s)
+  mapAnnot f (JSWith a1 a2 e a3 s semi) = JSWith (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f s) (mapAnnot f semi)
+  mapAnnot f (JSDebugger a semi) = JSDebugger (f a) (mapAnnot f semi)
+  mapAnnot f (JSAsyncGenerator a1 a2 a3 i a4 ps a5 b semi) = JSAsyncGenerator (f a1) (f a2) (f a3) (mapAnnot f i) (f a4) (mapAnnot f ps) (f a5) (mapAnnot f b) (mapAnnot f semi)
+  mapAnnot f (JSForAwaitOf a1 a2 a3 e1 op e2 a4 s) = JSForAwaitOf (f a1) (f a2) (f a3) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a4) (mapAnnot f s)
+  mapAnnot f (JSForAwaitVarOf a1 a2 a3 a4 e1 op e2 a5 s) = JSForAwaitVarOf (f a1) (f a2) (f a3) (f a4) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a5) (mapAnnot f s)
+  mapAnnot f (JSForAwaitLetOf a1 a2 a3 a4 e1 op e2 a5 s) = JSForAwaitLetOf (f a1) (f a2) (f a3) (f a4) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a5) (mapAnnot f s)
+  mapAnnot f (JSForAwaitConstOf a1 a2 a3 a4 e1 op e2 a5 s) = JSForAwaitConstOf (f a1) (f a2) (f a3) (f a4) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a5) (mapAnnot f s)
+  foldAnnot f (JSStatementBlock a1 stmts a2 semi) = f a1 ++ concatMap (foldAnnot f) stmts ++ f a2 ++ foldAnnot f semi
+  foldAnnot f (JSBreak a i semi) = f a ++ foldAnnot f i ++ foldAnnot f semi
+  foldAnnot f (JSLet a es semi) = f a ++ foldAnnot f es ++ foldAnnot f semi
+  foldAnnot f (JSClass a1 i h a2 es a3 semi) = f a1 ++ foldAnnot f i ++ foldAnnot f h ++ f a2 ++ concatMap (foldAnnot f) es ++ f a3 ++ foldAnnot f semi
+  foldAnnot f (JSConstant a es semi) = f a ++ foldAnnot f es ++ foldAnnot f semi
+  foldAnnot f (JSContinue a i semi) = f a ++ foldAnnot f i ++ foldAnnot f semi
+  foldAnnot f (JSDoWhile a1 s a2 a3 e a4 semi) = f a1 ++ foldAnnot f s ++ f a2 ++ f a3 ++ foldAnnot f e ++ f a4 ++ foldAnnot f semi
+  foldAnnot f (JSFor a1 a2 es1 a3 es2 a4 es3 a5 s) = f a1 ++ f a2 ++ foldAnnot f es1 ++ f a3 ++ foldAnnot f es2 ++ f a4 ++ foldAnnot f es3 ++ f a5 ++ foldAnnot f s
+  foldAnnot f (JSForIn a1 a2 e1 op e2 a3 s) = f a1 ++ f a2 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a3 ++ foldAnnot f s
+  foldAnnot f (JSForVar a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f es1 ++ f a4 ++ foldAnnot f es2 ++ f a5 ++ foldAnnot f es3 ++ f a6 ++ foldAnnot f s
+  foldAnnot f (JSForVarIn a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSForLet a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f es1 ++ f a4 ++ foldAnnot f es2 ++ f a5 ++ foldAnnot f es3 ++ f a6 ++ foldAnnot f s
+  foldAnnot f (JSForLetIn a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSForLetOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSForConst a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f es1 ++ f a4 ++ foldAnnot f es2 ++ f a5 ++ foldAnnot f es3 ++ f a6 ++ foldAnnot f s
+  foldAnnot f (JSForConstIn a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSForConstOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSForOf a1 a2 e1 op e2 a3 s) = f a1 ++ f a2 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a3 ++ foldAnnot f s
+  foldAnnot f (JSForVarOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSAsyncFunction a1 a2 i a3 ps a4 b semi) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b ++ foldAnnot f semi
+  foldAnnot f (JSFunction a1 i a2 ps a3 b semi) = f a1 ++ foldAnnot f i ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b ++ foldAnnot f semi
+  foldAnnot f (JSGenerator a1 a2 i a3 ps a4 b semi) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b ++ foldAnnot f semi
+  foldAnnot f (JSIf a1 a2 e a3 s) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s
+  foldAnnot f (JSIfElse a1 a2 e a3 s1 a4 s2) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s1 ++ f a4 ++ foldAnnot f s2
+  foldAnnot f (JSLabelled i a s) = foldAnnot f i ++ f a ++ foldAnnot f s
+  foldAnnot f (JSEmptyStatement a) = f a
+  foldAnnot f (JSExpressionStatement e semi) = foldAnnot f e ++ foldAnnot f semi
+  foldAnnot f (JSAssignStatement e1 op e2 semi) = foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ foldAnnot f semi
+  foldAnnot f (JSMethodCall e a1 args a2 semi) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2 ++ foldAnnot f semi
+  foldAnnot f (JSReturn a me semi) = f a ++ maybe [] (foldAnnot f) me ++ foldAnnot f semi
+  foldAnnot f (JSSwitch a1 a2 e a3 a4 parts a5 semi) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ f a4 ++ concatMap (foldAnnot f) parts ++ f a5 ++ foldAnnot f semi
+  foldAnnot f (JSThrow a e semi) = f a ++ foldAnnot f e ++ foldAnnot f semi
+  foldAnnot f (JSTry a b catches fin) = f a ++ foldAnnot f b ++ concatMap (foldAnnot f) catches ++ foldAnnot f fin
+  foldAnnot f (JSVariable a es semi) = f a ++ foldAnnot f es ++ foldAnnot f semi
+  foldAnnot f (JSWhile a1 a2 e a3 s) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s
+  foldAnnot f (JSWith a1 a2 e a3 s semi) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s ++ foldAnnot f semi
+  foldAnnot f (JSDebugger a semi) = f a ++ foldAnnot f semi
+  foldAnnot f (JSAsyncGenerator a1 a2 a3 i a4 ps a5 b semi) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f i ++ f a4 ++ foldAnnot f ps ++ f a5 ++ foldAnnot f b ++ foldAnnot f semi
+  foldAnnot f (JSForAwaitOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
+  foldAnnot f (JSForAwaitVarOf a1 a2 a3 a4 e1 op e2 a5 s) = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a5 ++ foldAnnot f s
+  foldAnnot f (JSForAwaitLetOf a1 a2 a3 a4 e1 op e2 a5 s) = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a5 ++ foldAnnot f s
+  foldAnnot f (JSForAwaitConstOf a1 a2 a3 a4 e1 op e2 a5 s) = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a5 ++ foldAnnot f s
+
+instance HasAnnot JSAST where
+  mapAnnot f (JSAstProgram stmts a) = JSAstProgram (map (mapAnnot f) stmts) (f a)
+  mapAnnot f (JSAstModule items a) = JSAstModule (map (mapAnnot f) items) (f a)
+  mapAnnot f (JSAstStatement s a) = JSAstStatement (mapAnnot f s) (f a)
+  mapAnnot f (JSAstExpression e a) = JSAstExpression (mapAnnot f e) (f a)
+  mapAnnot f (JSAstLiteral e a) = JSAstLiteral (mapAnnot f e) (f a)
+  foldAnnot f (JSAstProgram stmts a) = concatMap (foldAnnot f) stmts ++ f a
+  foldAnnot f (JSAstModule items a) = concatMap (foldAnnot f) items ++ f a
+  foldAnnot f (JSAstStatement s a) = foldAnnot f s ++ f a
+  foldAnnot f (JSAstExpression e a) = foldAnnot f e ++ f a
+  foldAnnot f (JSAstLiteral e a) = foldAnnot f e ++ f a
 
 -- -----------------------------------------------------------------------------
 

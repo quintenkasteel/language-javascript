@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | Main parser interface for JavaScript using flatparse.
 --
@@ -43,7 +44,7 @@
 -- Right (JSLiteral pos (JSStringLiteral "hello world"))
 --
 -- @since 0.8.0.0
-module Language.JavaScript.Parser.Flatparse.Parser
+module Language.JavaScript.Parser.Core
   ( -- * Main Parsing Interface
     parseProgram,
     parseProgramText,
@@ -82,7 +83,7 @@ import qualified Data.ByteString as BS
 import Data.Data (Data)
 import Data.Generics (everywhere, everything, mkT, mkQ)
 import qualified Data.IntMap.Strict as IntMap
-import Data.List (sortOn)
+import qualified Data.IntSet as IntSet
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -95,15 +96,13 @@ import Language.JavaScript.Parser.SrcLocation (TokenPosn(TokenPn))
 import Language.JavaScript.Parser.Token (CommentAnnotation(..))
 
 -- Comment scanner for two-pass comment restoration
-import Language.JavaScript.Parser.Flatparse.CommentScanner (CommentEntry(..), scanComments)
+import Language.JavaScript.Parser.CommentScanner (CommentEntry(..), scanComments)
 
--- Flatparse specific imports
-import Language.JavaScript.Parser.Flatparse.Expression
-import Language.JavaScript.Parser.Flatparse.Lexer (ParseError(..))
-import qualified Language.JavaScript.Parser.Flatparse.Lexer as Lexer
-import qualified Language.JavaScript.Parser.Flatparse.Pos as JSPos
-import Language.JavaScript.Parser.Flatparse.Primitives
-import Language.JavaScript.Parser.Flatparse.Statement (statementList, moduleItemList)
+import Language.JavaScript.Parser.Grammar (expression, statementList, moduleItemList)
+import Language.JavaScript.Parser.Lexer (ParseError(..))
+import qualified Language.JavaScript.Parser.Lexer as Lexer
+import qualified Language.JavaScript.Parser.Pos as JSPos
+import Language.JavaScript.Parser.Primitives
 
 -- ---------------------------------------------------------------------
 -- Parse Result Types
@@ -297,14 +296,9 @@ runJSParserWithPos parser input = runJSParser (Lexer.withPos parser) input
 
 -- | Build a line-starts table from input ByteString.
 -- Returns a vector where index i is the byte offset where line i starts.
+-- Uses 'BS.elemIndices' which delegates to C-level memchr for fast scanning.
 buildLineStarts :: ByteString -> VU.Vector Int
-buildLineStarts bs = VU.fromList (reverse (go 0 [0]))
-  where
-    len = BS.length bs
-    go !i !acc
-      | i >= len = acc
-      | BS.index bs i == 0x0A = go (i + 1) ((i + 1) : acc)
-      | otherwise = go (i + 1) acc
+buildLineStarts bs = VU.fromList (0 : map (+ 1) (BS.elemIndices 0x0A bs))
 
 -- | Convert a byte offset to (line, column) using line-starts table.
 -- Returns 1-based line and column numbers.
@@ -322,45 +316,38 @@ offsetToLineCol lineStarts offset = (line, col)
 
 -- | Post-process a parsed AST: fix positions and reattach comments.
 --
--- Merges position fixing and comment reattachment into a minimal number
--- of traversals. Instead of three separate SYB traversals (fixPositions,
--- collectAnnotOffsets, reattachComments), this performs only two:
+-- Uses two SYB traversals:
 --
---   1. Fix positions and collect byte offsets in a single pass
---   2. Attach comments using the collected offsets
+--   1. A read-only fold ('everything') to collect annotation byte offsets
+--      from the raw remaining-bytes positions. This is cheap because it
+--      does not allocate a new AST.
+--   2. A single write pass ('everywhere') that both fixes positions
+--      (remaining bytes -> line:col) and attaches comments.
+--
+-- Computing offsets from raw positions (offset = inputLen - remaining)
+-- avoids needing a separate fix-then-collect approach.
 --
 -- @since 0.8.0.0
 postProcessAST :: Data a => ByteString -> a -> a
-postProcessAST input ast = everywhere (mkT attachToAnnot) fixedAst
+postProcessAST input ast = everywhere (mkT fixAndAttach) ast
   where
     inputLen = BS.length input
     lineStarts = buildLineStarts input
-    -- Pass 1: fix positions and collect offsets simultaneously
-    (fixedAst, fixedOffsets) = fixAndCollect inputLen lineStarts ast
-    -- Build comment map from scanned comments and fixed offsets
     entries = scanComments input
-    commentMap = buildCommentMap entries (sortedOffsets fixedOffsets)
-    -- Pass 2: attach comments
-    attachToAnnot (JSAnnot pos@(TokenPn offset _ _) []) =
-      JSAnnot pos (IntMap.findWithDefault [] offset commentMap)
-    attachToAnnot annot = annot
-
--- | Fix positions and collect byte offsets in a single traversal.
--- Returns the AST with fixed positions and the list of all annotation offsets.
-fixAndCollect :: Data a => Int -> VU.Vector Int -> a -> (a, [Int])
-fixAndCollect inputLen lineStarts ast = (fixedAst, offsets)
-  where
-    fixedAst = everywhere (mkT fixAnnot) ast
-    offsets = everything (++) (mkQ [] extractOffset) fixedAst
-    fixAnnot (JSAnnot (TokenPn remainingBytes 0 0) comments)
+    -- Read-only fold to collect annotation byte offsets into IntSet.
+    offsetSet = everything IntSet.union (mkQ IntSet.empty getRawOffsetSet) ast
+    commentMap = buildCommentMap entries offsetSet
+    getRawOffsetSet (JSAnnot (TokenPn rem 0 0) _)
+      | rem >= 0 && rem <= inputLen = IntSet.singleton (inputLen - rem)
+    getRawOffsetSet _ = IntSet.empty
+    -- Single write pass: fix positions and attach comments
+    fixAndAttach (JSAnnot (TokenPn remainingBytes 0 0) _)
       | remainingBytes >= 0 && remainingBytes <= inputLen =
           let offset = inputLen - remainingBytes
               (line, col) = offsetToLineCol lineStarts offset
+              comments = IntMap.findWithDefault [] offset commentMap
           in JSAnnot (TokenPn offset line col) comments
-    fixAnnot annot = annot
-    extractOffset (JSAnnot (TokenPn offset _ _) _) = [offset]
-    extractOffset JSNoAnnot = []
-    extractOffset JSAnnotSpace = []
+    fixAndAttach annot = annot
 
 -- | Fix all positions in a parsed AST without comment reattachment.
 -- Used for parsing individual statements where comments are not needed.
@@ -376,62 +363,43 @@ fixPositions input = everywhere (mkT fixTokenPosn)
           in TokenPn offset line col
     fixTokenPosn tp = tp
 
--- | Sort and deduplicate offsets for binary search.
-sortedOffsets :: [Int] -> VU.Vector Int
-sortedOffsets = VU.fromList . dedup . sortOn id
-  where
-    dedup [] = []
-    dedup [x] = [x]
-    dedup (x:y:rest)
-      | x == y = dedup (y : rest)
-      | otherwise = x : dedup (y : rest)
-
 -- | Build a map from annotation offset to the comments that precede it.
 --
 -- For each comment entry, finds the smallest annotation offset that is
--- greater than or equal to the end of the comment, and groups comments
--- by their target annotation.
-buildCommentMap :: [CommentEntry] -> VU.Vector Int -> IntMap.IntMap [CommentAnnotation]
+-- greater than or equal to the end of the comment (via 'IntSet.lookupGE'),
+-- and groups comments by their target annotation.
+buildCommentMap :: [CommentEntry] -> IntSet.IntSet -> IntMap.IntMap [CommentAnnotation]
 buildCommentMap entries offsets = IntMap.map reverse (go entries IntMap.empty)
   where
     go [] !acc = acc
     go (CommentEntry offset ann : rest) !acc =
-      case findNextOffset offsets (commentEndOffset offset ann) of
-        Just target -> go rest (IntMap.insertWith (++) target [ann] acc)
+      case IntSet.lookupGE (commentEndOffset offset ann) offsets of
+        Just target -> go rest (prependComment target ann acc)
         Nothing -> handleTrailing (CommentEntry offset ann : rest) acc
 
-    -- Comments/whitespace after the last token: attach to the last offset.
     handleTrailing [] !acc = acc
     handleTrailing remaining !acc =
       case lastOffset of
         Nothing -> acc
         Just target ->
-          IntMap.insertWith (++) target (map ceAnnotation remaining) acc
+          foldl (\m ce -> prependComment target (ceAnnotation ce) m) acc remaining
       where
         lastOffset
-          | VU.null offsets = Nothing
-          | otherwise = Just (VU.last offsets)
+          | IntSet.null offsets = Nothing
+          | otherwise = Just (IntSet.findMax offsets)
+
+    -- O(1) cons instead of O(n) list concatenation via (++)
+    prependComment target ann =
+      IntMap.alter (Just . maybe [ann] (ann :)) target
 
 -- | Calculate the end byte offset of a comment annotation.
+-- Note: 'JSDocA' is never produced by the comment scanner, but handled
+-- for exhaustiveness by falling through to the start offset.
 commentEndOffset :: Int -> CommentAnnotation -> Int
 commentEndOffset start (CommentA _ s) = start + BS.length s
 commentEndOffset start (WhiteSpace _ s) = start + BS.length s
+commentEndOffset start (JSDocA _ _) = start
 commentEndOffset start NoComment = start
-
--- | Binary search for the smallest offset >= target.
-findNextOffset :: VU.Vector Int -> Int -> Maybe Int
-findNextOffset vec target
-  | VU.null vec = Nothing
-  | otherwise = bsearch 0 (VU.length vec - 1)
-  where
-    bsearch !lo !hi
-      | lo > hi = Nothing
-      | (VU.!) vec mid >= target =
-          case bsearch lo (mid - 1) of
-            Just smaller -> Just smaller
-            Nothing -> Just ((VU.!) vec mid)
-      | otherwise = bsearch (mid + 1) hi
-      where mid = (lo + hi) `div` 2
 
 -- ---------------------------------------------------------------------
 -- Core Parser Functions

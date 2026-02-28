@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | Core parsing primitives and character classification for JavaScript parsing.
 --
@@ -29,7 +29,7 @@
 -- True
 --
 -- @since 0.8.0.0
-module Language.JavaScript.Parser.Flatparse.Primitives
+module Language.JavaScript.Parser.Primitives
   ( -- * Parser Type
     JSParser,
 
@@ -62,7 +62,7 @@ import Data.ByteString (ByteString)
 import Data.Char (GeneralCategory(..), generalCategory, isLetter, toLower)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import FlatParse.Basic (Parser, anyChar, many, empty, satisfy, some)
+import FlatParse.Basic (Parser, many, empty, satisfy, some)
 
 -- ---------------------------------------------------------------------
 -- Core Parser Infrastructure
@@ -77,24 +77,26 @@ type JSParser = Parser ByteString
 
 -- | Check if character can start a JavaScript identifier.
 -- Follows ECMAScript specification for IdentifierStart production.
+-- Uses ASCII fast path to avoid expensive 'generalCategory' calls for common chars.
+{-# INLINE isIdentifierStart #-}
 isIdentifierStart :: Char -> Bool
-isIdentifierStart c =
-  isLetter c ||
-  c == '$' ||
-  c == '_' ||
-  -- Unicode categories: Lowercase Letter, Modifier Letter, Other Letter,
-  -- Titlecase Letter, Uppercase Letter, Letter Number
-  generalCategory c `elem` [LowercaseLetter, ModifierLetter, OtherLetter,
-                           TitlecaseLetter, UppercaseLetter, LetterNumber]
+isIdentifierStart c
+  | c <= '\x7f' = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '$' || c == '_'
+  | otherwise = isLetter c || generalCategory c == LetterNumber
 
 -- | Check if character can continue a JavaScript identifier.
 -- Follows ECMAScript specification for IdentifierPart production.
+-- Uses ASCII fast path to avoid expensive 'generalCategory' calls for common chars.
+{-# INLINE isIdentifierContinue #-}
 isIdentifierContinue :: Char -> Bool
-isIdentifierContinue c =
-  isIdentifierStart c || isDecimalDigit c ||
-  -- Additional Unicode categories for identifier continuation
-  generalCategory c `elem` [NonSpacingMark, SpacingCombiningMark, DecimalNumber,
-                           ConnectorPunctuation, Format]
+isIdentifierContinue c
+  | c <= '\x7f' = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || c == '$' || c == '_' || (c >= '0' && c <= '9')
+  | otherwise = isLetter c
+             || let cat = generalCategory c
+                in cat == LetterNumber || cat == NonSpacingMark
+                || cat == SpacingCombiningMark || cat == DecimalNumber
+                || cat == ConnectorPunctuation || cat == Format
 
 -- | Check if character is a decimal digit (0-9).
 isDecimalDigit :: Char -> Bool
@@ -116,14 +118,21 @@ isHexDigit c = isDecimalDigit c || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= '
 -- Includes all ECMAScript whitespace and line terminator characters.
 -- Line terminators are included because the whitespace lexer must skip
 -- both whitespace and newlines between tokens.
+-- Uses ASCII fast path since >99.9% of whitespace is ASCII space/tab/newline.
+{-# INLINE isWhitespace #-}
 isWhitespace :: Char -> Bool
-isWhitespace c = c `elem` [' ', '\t', '\v', '\f', '\n', '\r', '\160', '\65279', '\8232', '\8233', '\6158'] ||
-                 generalCategory c == Space
+isWhitespace c
+  | c <= '\x7f' = c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
+  | otherwise = c == '\160' || c == '\65279' || c == '\8232' || c == '\8233' || c == '\6158'
+             || generalCategory c == Space
 
 -- | Check if character is a line terminator.
--- ECMAScript line terminator characters.
+-- ECMAScript line terminator characters: LF, CR, LS (U+2028), PS (U+2029).
+{-# INLINE isLineTerminator #-}
 isLineTerminator :: Char -> Bool
-isLineTerminator c = c `elem` ['\n', '\r', '\8232', '\8233']
+isLineTerminator c
+  | c <= '\x7f' = c == '\n' || c == '\r'
+  | otherwise = c == '\x2028' || c == '\x2029'
 
 -- ---------------------------------------------------------------------
 -- String Matching

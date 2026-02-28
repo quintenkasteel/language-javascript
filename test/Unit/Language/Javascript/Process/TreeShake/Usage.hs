@@ -20,7 +20,7 @@ module Unit.Language.Javascript.Process.TreeShake.Usage
   )
 where
 
-import Control.Lens ((^.))
+import Lens.Micro ((^.))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
