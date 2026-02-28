@@ -99,9 +99,6 @@ module Language.JavaScript.Parser.Flatparse.Grammar
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 import qualified FlatParse.Basic as FP
 import Control.Applicative (pure, (*>), (<*>), (<$>))
 
@@ -110,7 +107,6 @@ import Language.JavaScript.Parser.SrcLocation (TokenPosn(TokenPn))
 
 import Language.JavaScript.Parser.Flatparse.Lexer
   ( whitespace
-  , stringLiteral
   , numericLiteral
   , identifier
   , keyword
@@ -165,7 +161,7 @@ parseStringAnnot s = do
   pure (fpPosToAnnot pos)
 
 -- | Parse a keyword and return its annotation with position.
-keywordAnnot :: Text -> JSParser JSAnnot
+keywordAnnot :: ByteString -> JSParser JSAnnot
 keywordAnnot kw = do
   pos <- FP.getPos
   keyword kw
@@ -176,7 +172,7 @@ identName :: JSParser JSIdent
 identName = do
   pos <- FP.getPos
   name <- identifier
-  pure (JSIdentName (fpPosToAnnot pos) (Text.encodeUtf8 name))
+  pure (JSIdentName (fpPosToAnnot pos) name)
 
 -- | Parse separated list (zero or more).
 sepBy :: JSParser a -> JSParser sep -> JSParser [a]
@@ -286,13 +282,13 @@ hasLineTerminatorBeforeNext = FP.lookahead scanAhead FP.<|> pure True
     skipSpacesAndTabs = FP.skipMany (FP.satisfy (\c -> c == ' ' || c == '\t'))
 
 -- | Parse contextual keyword (not in the reserved word list).
-contextualKeyword :: Text -> JSParser ()
+contextualKeyword :: ByteString -> JSParser ()
 contextualKeyword kw = do
   ident <- rawIdentifier
   if ident == kw then pure () else FP.empty
 
 -- | Parse contextual keyword and return its annotation with position.
-contextualKeywordAnnot :: Text -> JSParser JSAnnot
+contextualKeywordAnnot :: ByteString -> JSParser JSAnnot
 contextualKeywordAnnot kw = do
   pos <- FP.getPos
   contextualKeyword kw
@@ -373,12 +369,12 @@ functionParam = restParam FP.<|> destructuringDefaultParam FP.<|> defaultParam F
       eqA <- parseCharAnnot '='
       whitespace
       val <- assignmentExpression
-      pure (JSAssignExpression (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 name)) (JSAssign eqA) val)
+      pure (JSAssignExpression (JSIdentifier (fpPosToAnnot pos) name) (JSAssign eqA) val)
     destructuringParam = arrayLiteral FP.<|> objectLiteral
     simpleParam = do
       pos <- FP.getPos
       name <- identifier
-      pure (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 name))
+      pure (JSIdentifier (fpPosToAnnot pos) name)
 
 -- | Parse property name (identifier, string, number, or computed).
 propertyName :: JSParser JSPropertyName
@@ -399,11 +395,11 @@ propertyName = computedProp FP.<|> stringProp FP.<|> numericProp FP.<|> identPro
     numericProp = do
       pos <- FP.getPos
       num <- numericLiteral
-      pure (JSPropertyNumber (fpPosToAnnot pos) (Text.encodeUtf8 num))
+      pure (JSPropertyNumber (fpPosToAnnot pos) num)
     identProp = do
       pos <- FP.getPos
       name <- rawIdentifier
-      pure (JSPropertyIdent (fpPosToAnnot pos) (Text.encodeUtf8 name))
+      pure (JSPropertyIdent (fpPosToAnnot pos) name)
 
 -- =====================================================================
 -- Expression Parsing
@@ -486,7 +482,7 @@ asyncSingleParamArrow = do
   whitespace
   body <- arrowBody
   pure (JSAsyncArrowExpression (fpPosToAnnot asyncPos)
-    (JSUnparenthesizedArrowParameter (JSIdentName (fpPosToAnnot pos) (Text.encodeUtf8 name)))
+    (JSUnparenthesizedArrowParameter (JSIdentName (fpPosToAnnot pos) name))
     arrowA body)
 
 -- | Parse arrow function: @(params) => body@ or @x => body@
@@ -520,7 +516,7 @@ singleParamArrow = do
   whitespace
   body <- arrowBody
   pure (JSArrowExpression
-    (JSUnparenthesizedArrowParameter (JSIdentName (fpPosToAnnot pos) (Text.encodeUtf8 name)))
+    (JSUnparenthesizedArrowParameter (JSIdentName (fpPosToAnnot pos) name))
     arrowA body)
 
 -- | Parse arrow function parameter.
@@ -547,12 +543,12 @@ arrowParam = spreadParam FP.<|> destructuringDefaultArrow FP.<|> defaultParamArr
       eqA <- parseCharAnnot '='
       whitespace
       val <- assignmentExpression
-      pure (JSAssignExpression (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 name)) (JSAssign eqA) val)
+      pure (JSAssignExpression (JSIdentifier (fpPosToAnnot pos) name) (JSAssign eqA) val)
     destructuringParamArrow = arrayLiteral FP.<|> objectLiteral
     simpleParamArrow = do
       pos <- FP.getPos
       name <- identifier
-      pure (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 name))
+      pure (JSIdentifier (fpPosToAnnot pos) name)
 
 -- | Parse arrow function body: block or concise expression.
 arrowBody :: JSParser JSConciseBody
@@ -841,7 +837,7 @@ dotAccessResult expr = do
   notFollowedBy '.'
   whitespace
   prop <- rawIdentifier
-  pure (JSMemberDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 prop)), False)
+  pure (JSMemberDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) prop), False)
 
 -- | Parse bracket access: @obj[expr]@ (before any call).
 bracketAccessResult :: JSExpression -> JSParser (JSExpression, Bool)
@@ -902,7 +898,7 @@ callChainDot expr = do
   notFollowedBy '.'
   whitespace
   prop <- rawIdentifier
-  pure (JSCallExpressionDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 prop)))
+  pure (JSCallExpressionDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) prop))
 
 -- | Parse bracket access after a call: @fn()[expr]@. Uses 'JSCallExpressionSquare'.
 callChainBracket :: JSExpression -> JSParser JSExpression
@@ -933,7 +929,7 @@ optionalChainAccess expr = do
     optDot e p = do
       propPos <- FP.getPos
       prop <- rawIdentifier
-      pure (JSOptionalMemberDot e (fpPosToAnnot p) (JSIdentifier (fpPosToAnnot propPos) (Text.encodeUtf8 prop)))
+      pure (JSOptionalMemberDot e (fpPosToAnnot p) (JSIdentifier (fpPosToAnnot propPos) prop))
     optBracket e p = do
       parseChar '['
       whitespace
@@ -981,7 +977,7 @@ memberOnlyExpression = do
       notFollowedBy '.'
       whitespace
       prop <- rawIdentifier
-      pure (JSMemberDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 prop)))
+      pure (JSMemberDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) prop))
     memberOnlyBracket expr = do
       pos <- FP.getPos
       parseChar '['
@@ -1095,8 +1091,7 @@ numericLit :: JSParser JSExpression
 numericLit = do
   pos <- FP.getPos
   raw <- numericLiteral
-  let str = Text.encodeUtf8 raw
-  pure (classifyNumeric (fpPosToAnnot pos) str)
+  pure (classifyNumeric (fpPosToAnnot pos) raw)
 
 -- | Classify numeric literal by format.
 classifyNumeric :: JSAnnot -> ByteString -> JSExpression
@@ -1339,7 +1334,7 @@ identifierExpression :: JSParser JSExpression
 identifierExpression = do
   pos <- FP.getPos
   ident <- identifier
-  pure (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 ident))
+  pure (JSIdentifier (fpPosToAnnot pos) ident)
 
 -- | Parse parenthesized expression: @(expr)@
 parenthesizedExpression :: JSParser JSExpression
@@ -1517,7 +1512,7 @@ shorthandProp :: JSParser JSObjectProperty
 shorthandProp = do
   pos <- FP.getPos
   name <- rawIdentifier
-  pure (JSPropertyIdentRef (fpPosToAnnot pos) (Text.encodeUtf8 name))
+  pure (JSPropertyIdentRef (fpPosToAnnot pos) name)
 
 -- ---------------------------------------------------------------------
 -- Class Elements
@@ -1561,7 +1556,7 @@ classElement = do
       whitespace
       initExpr <- FP.optional (parseCharAnnot '=' *> whitespace *> assignmentExpression)
       expectSemiOrNewline
-      pure (JSPrivateField (fpPosToAnnot pos) (Text.encodeUtf8 name) (fpPosToAnnot pos) initExpr defaultSemi)
+      pure (JSPrivateField (fpPosToAnnot pos) name (fpPosToAnnot pos) initExpr defaultSemi)
     privateMethod = do
       pos <- FP.getPos
       parseChar '#'
@@ -1574,7 +1569,7 @@ classElement = do
       rp <- parseCharAnnot ')'
       whitespace
       body <- blockBody
-      pure (JSPrivateMethod (fpPosToAnnot pos) (Text.encodeUtf8 name) lp paramList rp body)
+      pure (JSPrivateMethod (fpPosToAnnot pos) name lp paramList rp body)
     privateAccessor = privateGetter FP.<|> privateSetter
     privateGetter = do
       pos <- FP.getPos
@@ -1588,7 +1583,7 @@ classElement = do
       rp <- parseCharAnnot ')'
       whitespace
       body <- blockBody
-      pure (JSPrivateAccessor (JSAccessorGet (fpPosToAnnot pos)) (fpPosToAnnot pos) (Text.encodeUtf8 name) lp JSLNil rp body)
+      pure (JSPrivateAccessor (JSAccessorGet (fpPosToAnnot pos)) (fpPosToAnnot pos) name lp JSLNil rp body)
     privateSetter = do
       pos <- FP.getPos
       keyword "set"
@@ -1603,7 +1598,7 @@ classElement = do
       rp <- parseCharAnnot ')'
       whitespace
       body <- blockBody
-      pure (JSPrivateAccessor (JSAccessorSet (fpPosToAnnot pos)) (fpPosToAnnot pos) (Text.encodeUtf8 name) lp paramList rp body)
+      pure (JSPrivateAccessor (JSAccessorSet (fpPosToAnnot pos)) (fpPosToAnnot pos) name lp paramList rp body)
     instanceElement = asyncGeneratorMethod FP.<|> FP.try instanceMethod FP.<|> publicField
     asyncGeneratorMethod = do
       pos <- FP.getPos
@@ -1856,7 +1851,7 @@ variableDeclarator = do
     identTarget = do
       pos <- FP.getPos
       name <- identifier
-      pure (JSIdentifier (fpPosToAnnot pos) (Text.encodeUtf8 name))
+      pure (JSIdentifier (fpPosToAnnot pos) name)
     destructuringTarget = arrayLiteral FP.<|> objectLiteral
     initExpr = do
       eqA <- parseCharAnnot '='
@@ -2529,7 +2524,7 @@ catchClause = do
       rp <- parseCharAnnot ')'
       whitespace
       body <- blockBody
-      pure (JSCatchIf ca lp (JSIdentifier (fpPosToAnnot pPos) (Text.encodeUtf8 p)) ifA guard rp body)
+      pure (JSCatchIf ca lp (JSIdentifier (fpPosToAnnot pPos) p) ifA guard rp body)
     catchSimple ca = do
       lp <- parseCharAnnot '('
       whitespace
@@ -2544,7 +2539,7 @@ catchClause = do
     catchIdentifier = do
       pPos <- FP.getPos
       p <- identifier
-      pure (JSIdentifier (fpPosToAnnot pPos) (Text.encodeUtf8 p))
+      pure (JSIdentifier (fpPosToAnnot pPos) p)
     catchNoParam ca = do
       body <- blockBody
       pure (JSCatch ca defaultAnnot (JSIdentifier defaultAnnot "e") defaultAnnot body)
@@ -2570,7 +2565,7 @@ labeledStatement = do
   colon <- parseCharAnnot ':'
   whitespace
   stmt <- statement
-  pure (JSLabelled (JSIdentName (fpPosToAnnot pos) (Text.encodeUtf8 label)) colon stmt)
+  pure (JSLabelled (JSIdentName (fpPosToAnnot pos) label) colon stmt)
 
 -- ---------------------------------------------------------------------
 -- Import/Export Statements
@@ -2675,7 +2670,7 @@ importSpec = do
   name <- rawIdentifier
   whitespace
   alias <- FP.optional (do asA <- contextualKeywordAnnot "as"; whitespace; a <- identName; pure (asA, a))
-  let ident = JSIdentName (fpPosToAnnot namePos) (Text.encodeUtf8 name)
+  let ident = JSIdentName (fpPosToAnnot namePos) name
   maybe (pure (JSImportSpecifier ident))
         (\(asA, a) -> pure (JSImportSpecifierAs ident asA a))
         alias
@@ -2711,7 +2706,7 @@ importAttributes = FP.optional parseAttrs
       colonA <- parseCharAnnot ':'
       whitespace
       val <- assignmentExpression
-      pure (JSImportAttribute (JSIdentName (fpPosToAnnot keyPos) (Text.encodeUtf8 key)) colonA val)
+      pure (JSImportAttribute (JSIdentName (fpPosToAnnot keyPos) key) colonA val)
 
 -- | Parse export as a module item.
 exportModuleItem :: JSParser JSModuleItem
@@ -2749,7 +2744,7 @@ exportDecl =
       from <- fromClause
       semi <- expectStatementEnd
       let star = JSBinOpTimes starA
-          ident = JSIdentName (fpPosToAnnot namePos) (Text.encodeUtf8 name)
+          ident = JSIdentName (fpPosToAnnot namePos) name
       pure (JSExportAllAsFrom star asA ident from semi)
 
     exportAllFrom = do
@@ -2793,10 +2788,10 @@ exportSpec = do
   name <- rawIdentifier
   whitespace
   alias <- FP.optional (do asA <- do { p <- FP.getPos; contextualKeyword "as"; pure (fpPosToAnnot p) }; whitespace; aPos <- FP.getPos; a <- rawIdentifier; pure (asA, aPos, a))
-  let ident = JSIdentName (fpPosToAnnot namePos) (Text.encodeUtf8 name)
+  let ident = JSIdentName (fpPosToAnnot namePos) name
   case alias of
     Nothing -> pure (JSExportSpecifier ident)
-    Just (asA, aPos, a) -> pure (JSExportSpecifierAs ident asA (JSIdentName (fpPosToAnnot aPos) (Text.encodeUtf8 a)))
+    Just (asA, aPos, a) -> pure (JSExportSpecifierAs ident asA (JSIdentName (fpPosToAnnot aPos) a))
 
 -- ---------------------------------------------------------------------
 -- Utilities
@@ -2809,14 +2804,17 @@ withStatementPos parser = do
   result <- parser
   pure (pos, result)
 
--- | Check if text is a statement keyword.
-isStatementKeyword :: Text -> Bool
-isStatementKeyword kw = kw `elem`
-  [ "var", "let", "const"
-  , "function", "class"
-  , "if", "else", "while", "do", "for", "switch", "case", "default"
-  , "return", "break", "continue", "throw"
-  , "try", "catch", "finally"
-  , "import", "export"
-  , "with", "debugger"
-  ]
+-- | Check if a ByteString is a statement keyword.
+isStatementKeyword :: ByteString -> Bool
+isStatementKeyword kw = kw `elem` kws
+  where
+    kws :: [ByteString]
+    kws =
+      [ "var", "let", "const"
+      , "function", "class"
+      , "if", "else", "while", "do", "for", "switch", "case", "default"
+      , "return", "break", "continue", "throw"
+      , "try", "catch", "finally"
+      , "import", "export"
+      , "with", "debugger"
+      ]

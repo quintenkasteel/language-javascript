@@ -46,20 +46,9 @@ module Language.JavaScript.Parser.Flatparse.Lexer
 
     -- * String Literals
     stringLiteral,
-    singleQuotedString,
-    doubleQuotedString,
-    escapeSequence,
-    unicodeEscape,
-    hexEscape,
 
     -- * Numeric Literals
     numericLiteral,
-    decimalLiteral,
-    hexLiteral,
-    binaryLiteral,
-    octalLiteral,
-    bigIntLiteral,
-    scientificNotation,
 
     -- * Identifiers and Keywords
     identifier,
@@ -82,20 +71,18 @@ module Language.JavaScript.Parser.Flatparse.Lexer
   )
 where
 
-import qualified Control.Applicative as Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
-import Data.Char (toLower, chr, ord, digitToInt)
+import Data.Char (chr, digitToInt)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import FlatParse.Basic (Parser, Pos, char, string, (<|>), many, some, satisfy, anyChar, try, optional, skipMany, empty)
+import FlatParse.Basic (Pos, (<|>), many, some, satisfy, anyChar, optional, skipMany, empty)
 import Control.Applicative (pure, (*>))
 import Control.Monad (mapM_)
 import qualified FlatParse.Basic as FP
 import qualified Language.JavaScript.Parser.Flatparse.Pos as JSPos
 import Language.JavaScript.Parser.Flatparse.Primitives (JSParser, isIdentifierStart, isIdentifierContinue, isWhitespace, isDecimalDigit, isBinaryDigit, isOctalDigit, isHexDigit)
-import qualified Language.JavaScript.Parser.Flatparse.Primitives as Prim
 
 -- ---------------------------------------------------------------------
 -- Core Parser Infrastructure
@@ -141,12 +128,13 @@ withPos parser = do
 -- String Literals
 -- ---------------------------------------------------------------------
 
--- | Parse any JavaScript string literal.
+-- | Parse any JavaScript string literal with escape processing.
 --
 -- Handles both single and double quoted strings with full escape
--- sequence support including Unicode escapes.
-stringLiteral :: JSParser Text
-stringLiteral = singleQuotedString <|> doubleQuotedString
+-- sequence support including Unicode escapes. Returns processed content
+-- as UTF-8 encoded ByteString.
+stringLiteral :: JSParser ByteString
+stringLiteral = Text.encodeUtf8 <$> (singleQuotedString <|> doubleQuotedString)
 
 -- | Parse single-quoted string literal.
 singleQuotedString :: JSParser Text
@@ -232,18 +220,52 @@ hexToInt = foldl (\acc c -> acc * 16 + digitToInt c) 0
 -- Numeric Literals
 -- ---------------------------------------------------------------------
 
--- | Parse any JavaScript numeric literal.
+-- | Parse any JavaScript numeric literal as zero-copy ByteString slice.
 --
--- Supports all numeric formats: decimal, hex, binary, octal, BigInt,
--- and scientific notation.
-numericLiteral :: JSParser Text
-numericLiteral =
-  bigIntLiteral <|>
-  hexLiteral <|>
-  binaryLiteral <|>
-  octalLiteral <|>
-  decimalLiteral <|>
-  dotDecimalLiteral
+-- Uses 'FP.byteStringOf' to capture the raw numeric literal directly from
+-- the input buffer. Supports all numeric formats: decimal, hex, binary,
+-- octal, BigInt, and scientific notation.
+numericLiteral :: JSParser ByteString
+numericLiteral = FP.byteStringOf numericLiteralConsume
+
+-- | Consume a numeric literal (internal, result discarded by byteStringOf).
+numericLiteralConsume :: JSParser ()
+numericLiteralConsume =
+  consumeBigInt <|>
+  consumeHex <|>
+  consumeBinary <|>
+  consumeOctal <|>
+  consumeDecimal <|>
+  consumeDotDecimal
+  where
+    consumeBigInt = (consumeHex <|> consumeBinary <|> consumeOctal <|> consumeDecimal) *> parseChar 'n'
+    consumeHex = parseChar '0' *> (parseChar 'x' <|> parseChar 'X') *> skipSome hexDigitWithSeparator
+    consumeBinary = parseChar '0' *> (parseChar 'b' <|> parseChar 'B') *> skipSome binaryDigitWithSeparator
+    consumeOctal = parseChar '0' *> (parseChar 'o' <|> parseChar 'O') *> skipSome octalDigitWithSeparator
+    consumeDecimal = do
+      _ <- digitChar
+      skipMany_ digitCharWithSeparator
+      _ <- optional (parseChar '.' *> skipMany_ digitCharWithSeparator)
+      _ <- optional consumeExponent
+      pure ()
+    consumeDotDecimal = do
+      parseChar '.'
+      _ <- FP.lookahead digitChar
+      skipSome digitCharWithSeparator
+      _ <- optional consumeExponent
+      pure ()
+    consumeExponent = do
+      _ <- parseChar 'e' <|> parseChar 'E'
+      _ <- optional (satisfy (\c -> c == '+' || c == '-'))
+      skipSome digitChar
+
+-- | Skip one or more occurrences.
+skipSome :: JSParser a -> JSParser ()
+skipSome p = p *> skipMany p *> pure ()
+
+-- | Skip zero or more occurrences (discarding results).
+skipMany_ :: JSParser a -> JSParser ()
+skipMany_ p = skipMany p *> pure ()
 
 -- | Parse decimal literal with optional fractional and exponent parts.
 -- Supports ES2021 numeric separators (underscores) - preserves original format.
@@ -263,7 +285,7 @@ decimalLiteral = do
 dotDecimalLiteral :: JSParser Text
 dotDecimalLiteral = do
   parseChar '.'
-  FP.lookahead digitChar
+  _ <- FP.lookahead digitChar
   digits <- some digitCharWithSeparator
   exponent <- optional exponentPart
   pure ("." <> Text.pack digits <> maybe "" id exponent)
@@ -352,23 +374,21 @@ hexDigitWithSeparator = hexDigit <|> separatorBeforeDigit isHexDigit
 separatorBeforeDigit :: (Char -> Bool) -> JSParser Char
 separatorBeforeDigit isDigitType = do
   parseChar '_'
-  FP.lookahead (satisfy isDigitType)
+  _ <- FP.lookahead (satisfy isDigitType)
   pure '_'
 
 -- ---------------------------------------------------------------------
 -- Identifiers and Keywords
 -- ---------------------------------------------------------------------
 
--- | Parse JavaScript identifier (rejects keywords with backtrackable failure).
+-- | Parse JavaScript identifier as zero-copy ByteString slice.
 --
--- Follows ECMAScript specification for identifier names including
--- Unicode support and proper start/continue character classes.
--- Uses backtrackable failure so callers can try alternative parsers.
-identifier :: JSParser Text
+-- Uses 'FP.byteStringOf' to capture the identifier directly from the input
+-- buffer without intermediate allocation. Rejects keywords with
+-- backtrackable failure so callers can try alternative parsers.
+identifier :: JSParser ByteString
 identifier = do
-  first <- satisfy isIdentifierStart
-  rest <- many (satisfy isIdentifierContinue)
-  let ident = Text.pack (first : rest)
+  ident <- FP.byteStringOf (satisfy isIdentifierStart *> skipMany (satisfy isIdentifierContinue))
   if isKeyword ident
     then empty
     else pure ident
@@ -377,24 +397,22 @@ identifier = do
 --
 -- Parses an identifier-like token and checks it matches the keyword exactly.
 -- Uses backtrackable failure so callers can try alternative keywords.
-keyword :: Text -> JSParser ()
+keyword :: ByteString -> JSParser ()
 keyword kw = do
   ident <- rawIdentifier
   if ident == kw
     then pure ()
     else empty
 
--- | Parse identifier without keyword check.
-rawIdentifier :: JSParser Text
-rawIdentifier = do
-  first <- satisfy isIdentifierStart
-  rest <- many (satisfy isIdentifierContinue)
-  pure (Text.pack (first : rest))
+-- | Parse identifier without keyword check as zero-copy ByteString slice.
+rawIdentifier :: JSParser ByteString
+rawIdentifier = FP.byteStringOf (satisfy isIdentifierStart *> skipMany (satisfy isIdentifierContinue))
 
--- | Check if text is a JavaScript keyword.
-isKeyword :: Text -> Bool
-isKeyword txt = txt `elem` keywords
+-- | Check if a ByteString is a JavaScript keyword.
+isKeyword :: ByteString -> Bool
+isKeyword bs = bs `elem` keywords
   where
+    keywords :: [ByteString]
     keywords =
       [ "break", "case", "catch", "class", "const", "continue"
       , "debugger", "default", "delete", "do", "else", "export"
