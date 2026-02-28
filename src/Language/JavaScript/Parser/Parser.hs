@@ -23,7 +23,7 @@
 --
 -- @since 0.8.0.0
 module Language.JavaScript.Parser.Parser
-  ( -- * Parsing
+  ( -- * String-based Parsing (backward compatible)
     parse,
     parseModule,
     readJs,
@@ -33,11 +33,25 @@ module Language.JavaScript.Parser.Parser
     parseFile,
     parseFileUtf8,
 
-    -- * Parsing expressions
+    -- * ByteString Parsing (zero-copy, highest performance)
+    parseBS,
+    parseModuleBS,
+    parseSafeBS,
+    parseModuleSafeBS,
+
+    -- * Text Parsing (convenience for Text-based applications)
+    parseText,
+    parseModuleText,
+    parseSafeText,
+    parseModuleSafeText,
+
+    -- * Expression and Statement Parsing
     parseProgram,
     parseExpression,
     parseStatement,
     parseUsing,
+
+    -- * Display Utilities
     showStripped,
     showStrippedMaybe,
     showStrippedString,
@@ -45,6 +59,9 @@ module Language.JavaScript.Parser.Parser
   )
 where
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Text.Encoding as Text
@@ -90,29 +107,99 @@ parseModule input _srcName = parseFlatparseModule input
 
 -- | Internal function to parse JavaScript module using flatparse.
 parseFlatparseModule :: String -> Either String AST.JSAST
-parseFlatparseModule input =
-  case FlatParser.parseModuleProgram (Text.pack input) of
-    FlatParser.ParseOK success ->
-      Right (FlatParser.parseResult success)
-    FlatParser.ParseError failure ->
-      Left (show (FlatParser.parseError failure))
-
--- ---------------------------------------------------------------------
--- Core flatparse integration
--- ---------------------------------------------------------------------
+parseFlatparseModule = parseModuleText . Text.pack
 
 -- | Internal function to parse JavaScript using flatparse and convert to original AST.
---
--- This function provides the bridge between the main Parser module and the flatparse
--- implementation, converting String input to the required Text format and handling
--- the result conversion.
 parseFlatparse :: String -> Either String AST.JSAST
-parseFlatparse input =
-  case FlatParser.parseProgram (Text.pack input) of
-    FlatParser.ParseOK success ->
-      Right (FlatParser.parseResult success)
-    FlatParser.ParseError failure ->
-      Left (show (FlatParser.parseError failure))
+parseFlatparse = parseText . Text.pack
+
+-- ---------------------------------------------------------------------
+-- ByteString API (zero-copy, highest performance)
+-- ---------------------------------------------------------------------
+
+-- | Parse a JavaScript program from a UTF-8 encoded 'ByteString'.
+--
+-- This is the highest-performance parsing path, avoiding all intermediate
+-- String/Text conversions. The input must be valid UTF-8 encoded JavaScript.
+-- Uses FlatParse's zero-copy slicing internally for minimal allocation.
+--
+-- ==== Examples
+--
+-- >>> parseBS "var x = 42;"
+-- Right (JSAstProgram ...)
+--
+-- >>> parseBS "invalid {"
+-- Left "..."
+--
+-- @since 0.8.0.0
+parseBS :: ByteString -> Either String AST.JSAST
+parseBS = handleResult . FlatParser.parseProgramByteString
+
+-- | Parse a JavaScript ES6 module from a UTF-8 encoded 'ByteString'.
+--
+-- Like 'parseBS' but expects module-level syntax (import/export declarations).
+--
+-- @since 0.8.0.0
+parseModuleBS :: ByteString -> Either String AST.JSAST
+parseModuleBS = handleResult . FlatParser.parseModuleProgramByteString
+
+-- | Safe variant of 'parseBS' — identical behavior, provided for naming
+-- consistency with the String-based API ('readJsSafe').
+--
+-- @since 0.8.0.0
+parseSafeBS :: ByteString -> Either String AST.JSAST
+parseSafeBS = parseBS
+
+-- | Safe variant of 'parseModuleBS' — identical behavior, provided for
+-- naming consistency with the String-based API ('readJsModuleSafe').
+--
+-- @since 0.8.0.0
+parseModuleSafeBS :: ByteString -> Either String AST.JSAST
+parseModuleSafeBS = parseModuleBS
+
+-- ---------------------------------------------------------------------
+-- Text API (convenience for Text-based applications)
+-- ---------------------------------------------------------------------
+
+-- | Parse a JavaScript program from 'Text'.
+--
+-- Encodes the Text to UTF-8 and delegates to 'parseBS'. Useful for
+-- applications that already work with 'Text' values.
+--
+-- @since 0.8.0.0
+parseText :: Text -> Either String AST.JSAST
+parseText = parseBS . Text.encodeUtf8
+
+-- | Parse a JavaScript ES6 module from 'Text'.
+--
+-- @since 0.8.0.0
+parseModuleText :: Text -> Either String AST.JSAST
+parseModuleText = parseModuleBS . Text.encodeUtf8
+
+-- | Safe variant of 'parseText' — identical behavior, provided for
+-- naming consistency.
+--
+-- @since 0.8.0.0
+parseSafeText :: Text -> Either String AST.JSAST
+parseSafeText = parseText
+
+-- | Safe variant of 'parseModuleText' — identical behavior, provided for
+-- naming consistency.
+--
+-- @since 0.8.0.0
+parseModuleSafeText :: Text -> Either String AST.JSAST
+parseModuleSafeText = parseModuleText
+
+-- | Convert a 'ParseResult' to 'Either String a'.
+handleResult :: FlatParser.ParseResult a -> Either String a
+handleResult (FlatParser.ParseOK success) =
+  Right (FlatParser.parseResult success)
+handleResult (FlatParser.ParseError failure) =
+  Left (show (FlatParser.parseError failure))
+
+-- ---------------------------------------------------------------------
+-- String-based API (backward compatible)
+-- ---------------------------------------------------------------------
 
 -- | Parse JavaScript source, returning the raw AST or an error string.
 --
@@ -212,11 +299,7 @@ parseExpression ::
   -- | An error or the abstract syntax tree (AST) of the expression.
   Either String AST.JSAST
 parseExpression input _srcName =
-  case FlatParser.parseExpression (Text.pack input) of
-    FlatParser.ParseOK success ->
-      Right (wrapExpressionResult (FlatParser.parseResult success))
-    FlatParser.ParseError failure ->
-      Left (show (FlatParser.parseError failure))
+  fmap wrapExpressionResult (handleResult (FlatParser.parseExpression (Text.pack input)))
 
 -- | Wrap expression result as JSAstLiteral or JSAstExpression.
 -- Literals (null, true, false, numbers, strings) use JSAstLiteral.

@@ -1,5 +1,6 @@
 module Language.JavaScript.Parser
-  ( PA.parse,
+  ( -- * String-based Parsing (backward compatible)
+    PA.parse,
     PA.parseModule,
     PA.readJs,
     PA.readJsModule,
@@ -7,10 +8,24 @@ module Language.JavaScript.Parser
     PA.readJsModuleSafe,
     PA.parseFile,
     PA.parseFileUtf8,
+
+    -- * ByteString Parsing (zero-copy, highest performance)
+    PA.parseBS,
+    PA.parseModuleBS,
+    PA.parseSafeBS,
+    PA.parseModuleSafeBS,
+
+    -- * Text Parsing (convenience for Text-based applications)
+    PA.parseText,
+    PA.parseModuleText,
+    PA.parseSafeText,
+    PA.parseModuleSafeText,
+
+    -- * Display Utilities
     PA.showStripped,
     PA.showStrippedMaybe,
 
-    -- * AST elements
+    -- * AST Elements
     JSExpression (..),
     JSAnnot (..),
     JSBinOp (..),
@@ -24,8 +39,8 @@ module Language.JavaScript.Parser
     JSSwitchParts (..),
     JSAST (..),
     CommentAnnotation (..),
-    -- , ParseError(..)
-    -- Source locations
+
+    -- * Source Locations
     TokenPosn (..),
     tokenPosnEmpty,
 
