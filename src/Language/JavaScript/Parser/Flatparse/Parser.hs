@@ -69,11 +69,9 @@ module Language.JavaScript.Parser.Flatparse.Parser
     runJSParser,
     runJSParserWithPos,
 
-    -- * Position Fixing
+    -- * AST Post-Processing
+    postProcessAST,
     fixPositions,
-
-    -- * Comment Restoration
-    reattachComments,
 
   )
 where
@@ -175,7 +173,7 @@ parseProgramByteString :: ByteString -> ParseResult JSAST
 parseProgramByteString input =
   case runJSParser (Lexer.whitespace *> program) input of
     Right (result, remaining, consumed) ->
-      ParseOK (ParseSuccess (reattachComments input (fixPositions input result)) remaining consumed)
+      ParseOK (ParseSuccess (postProcessAST input result) remaining consumed)
     Left err ->
       ParseError (ParseFailure err input 0)
 
@@ -207,7 +205,7 @@ parseModuleProgramByteString :: ByteString -> ParseResult JSAST
 parseModuleProgramByteString input =
   case runJSParser (Lexer.whitespace *> moduleProgram) input of
     Right (result, remaining, consumed) ->
-      ParseOK (ParseSuccess (reattachComments input (fixPositions input result)) remaining consumed)
+      ParseOK (ParseSuccess (postProcessAST input result) remaining consumed)
     Left err ->
       ParseError (ParseFailure err input 0)
 
@@ -223,7 +221,7 @@ parseExpressionByteString :: ByteString -> ParseResult JSExpression
 parseExpressionByteString input =
   case runJSParser (Lexer.whitespace *> expression) input of
     Right (result, remaining, consumed) ->
-      ParseOK (ParseSuccess (reattachComments input (fixPositions input result)) remaining consumed)
+      ParseOK (ParseSuccess (postProcessAST input result) remaining consumed)
     Left err ->
       ParseError (ParseFailure err input 0)
 
@@ -323,9 +321,50 @@ offsetToLineCol lineStarts offset = (line, col)
       | otherwise = bsearch lo mid
       where mid = (lo + hi) `div` 2
 
--- | Fix all positions in a parsed AST.
--- Converts raw remaining-byte positions (stored by fpPosToAnnot during parsing)
--- to proper (offset, line, col) positions using the original input.
+-- | Post-process a parsed AST: fix positions and reattach comments.
+--
+-- Merges position fixing and comment reattachment into a minimal number
+-- of traversals. Instead of three separate SYB traversals (fixPositions,
+-- collectAnnotOffsets, reattachComments), this performs only two:
+--
+--   1. Fix positions and collect byte offsets in a single pass
+--   2. Attach comments using the collected offsets
+--
+-- @since 0.8.0.0
+postProcessAST :: Data a => ByteString -> a -> a
+postProcessAST input ast = everywhere (mkT attachToAnnot) fixedAst
+  where
+    inputLen = BS.length input
+    lineStarts = buildLineStarts input
+    -- Pass 1: fix positions and collect offsets simultaneously
+    (fixedAst, fixedOffsets) = fixAndCollect inputLen lineStarts ast
+    -- Build comment map from scanned comments and fixed offsets
+    entries = scanComments input
+    commentMap = buildCommentMap entries (sortedOffsets fixedOffsets)
+    -- Pass 2: attach comments
+    attachToAnnot (JSAnnot pos@(TokenPn offset _ _) []) =
+      JSAnnot pos (IntMap.findWithDefault [] offset commentMap)
+    attachToAnnot annot = annot
+
+-- | Fix positions and collect byte offsets in a single traversal.
+-- Returns the AST with fixed positions and the list of all annotation offsets.
+fixAndCollect :: Data a => Int -> VU.Vector Int -> a -> (a, [Int])
+fixAndCollect inputLen lineStarts ast = (fixedAst, offsets)
+  where
+    fixedAst = everywhere (mkT fixAnnot) ast
+    offsets = everything (++) (mkQ [] extractOffset) fixedAst
+    fixAnnot (JSAnnot (TokenPn remainingBytes 0 0) comments)
+      | remainingBytes >= 0 && remainingBytes <= inputLen =
+          let offset = inputLen - remainingBytes
+              (line, col) = offsetToLineCol lineStarts offset
+          in JSAnnot (TokenPn offset line col) comments
+    fixAnnot annot = annot
+    extractOffset (JSAnnot (TokenPn offset _ _) _) = [offset]
+    extractOffset JSNoAnnot = []
+    extractOffset JSAnnotSpace = []
+
+-- | Fix all positions in a parsed AST without comment reattachment.
+-- Used for parsing individual statements where comments are not needed.
 fixPositions :: Data a => ByteString -> a -> a
 fixPositions input = everywhere (mkT fixTokenPosn)
   where
@@ -337,33 +376,6 @@ fixPositions input = everywhere (mkT fixTokenPosn)
               (line, col) = offsetToLineCol lineStarts offset
           in TokenPn offset line col
     fixTokenPosn tp = tp
-
--- ---------------------------------------------------------------------
--- Comment Reattachment
--- ---------------------------------------------------------------------
-
--- | Reattach scanned comments to AST annotations by matching byte offsets.
---
--- After parsing (which discards comments) and position fixing, this function
--- scans the original source for comments and whitespace, then attaches them
--- to the nearest following AST annotation. This restores round-trip fidelity.
-reattachComments :: Data a => ByteString -> a -> a
-reattachComments source ast = everywhere (mkT attachToAnnot) ast
-  where
-    entries = scanComments source
-    annotOffsets = collectAnnotOffsets ast
-    commentMap = buildCommentMap entries (sortedOffsets annotOffsets)
-    attachToAnnot (JSAnnot pos@(TokenPn offset _ _) []) =
-      JSAnnot pos (IntMap.findWithDefault [] offset commentMap)
-    attachToAnnot annot = annot
-
--- | Collect all annotation byte offsets from an AST.
-collectAnnotOffsets :: Data a => a -> [Int]
-collectAnnotOffsets = everything (++) (mkQ [] extractOffset)
-  where
-    extractOffset (JSAnnot (TokenPn offset _ _) _) = [offset]
-    extractOffset JSNoAnnot = []
-    extractOffset JSAnnotSpace = []
 
 -- | Sort and deduplicate offsets for binary search.
 sortedOffsets :: [Int] -> VU.Vector Int
