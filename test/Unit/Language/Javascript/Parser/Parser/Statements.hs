@@ -369,7 +369,7 @@ testStatementParser = describe "Parse statements:" $ do
 
 -- | Original function for existing string-based tests
 testStmt :: String -> String
-testStmt str = showStrippedMaybeString (parseUsing parseStatement str "src")
+testStmt str = showStrippedMaybe (parseUsing parseStatement str "src")
 
 -- | New function for proper structural validation tests
 testStatement :: String -> Either String JSAST

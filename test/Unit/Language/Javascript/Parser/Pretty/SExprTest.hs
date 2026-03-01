@@ -325,16 +325,53 @@ testStatementSerialization = describe "Statement Serialization" $ do
 testModuleSystemSerialization :: Spec
 testModuleSystemSerialization = describe "Module System Serialization" $ do
   describe "import declarations" $ do
-    it "handles import declarations gracefully" $ do
-      -- Since import/export declarations are complex and not fully implemented,
-      -- we test that they don't crash and produce some S-expression output
-      let sexpr = PSExpr.renderImportDeclarationToSExpr undefined
+    it "serializes bare import declarations" $ do
+      let decl = AST.JSImportDeclarationBare testAnnot "'./module'" Nothing AST.JSSemiAuto
+      let sexpr = PSExpr.renderImportDeclarationToSExpr decl
+      sexpr `shouldSatisfy` Text.isPrefixOf "(JSImportDeclarationBare"
+      sexpr `shouldSatisfy` Text.isInfixOf "'./module'"
+
+    it "serializes default import declarations" $ do
+      let clause = AST.JSImportClauseDefault (AST.JSIdentName testAnnot "foo")
+      let fromClause = AST.JSFromClause testAnnot testAnnot "'./foo'"
+      let decl = AST.JSImportDeclaration clause fromClause Nothing AST.JSSemiAuto
+      let sexpr = PSExpr.renderImportDeclarationToSExpr decl
       sexpr `shouldSatisfy` Text.isPrefixOf "(JSImportDeclaration"
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSImportClauseDefault"
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSFromClause"
+
+    it "serializes named import declarations" $ do
+      let spec1 = AST.JSImportSpecifier (AST.JSIdentName testAnnot "bar")
+      let imports = AST.JSImportsNamed testAnnot (AST.JSLOne spec1) testAnnot
+      let clause = AST.JSImportClauseNamed imports
+      let fromClause = AST.JSFromClause testAnnot testAnnot "'./bar'"
+      let decl = AST.JSImportDeclaration clause fromClause Nothing AST.JSSemiAuto
+      let sexpr = PSExpr.renderImportDeclarationToSExpr decl
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSImportClauseNamed"
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSImportsNamed"
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSImportSpecifier"
 
   describe "export declarations" $ do
-    it "handles export declarations gracefully" $ do
-      let sexpr = PSExpr.renderExportDeclarationToSExpr undefined
-      sexpr `shouldSatisfy` Text.isPrefixOf "(JSExportDeclaration"
+    it "serializes export statement declarations" $ do
+      let stmt = AST.JSExpressionStatement (AST.JSDecimal testAnnot 42) AST.JSSemiAuto
+      let decl = AST.JSExport stmt AST.JSSemiAuto
+      let sexpr = PSExpr.renderExportDeclarationToSExpr decl
+      sexpr `shouldSatisfy` Text.isPrefixOf "(JSExport"
+
+    it "serializes export default declarations" $ do
+      let stmt = AST.JSExpressionStatement (AST.JSDecimal testAnnot 42) AST.JSSemiAuto
+      let decl = AST.JSExportDefault testAnnot stmt AST.JSSemiAuto
+      let sexpr = PSExpr.renderExportDeclarationToSExpr decl
+      sexpr `shouldSatisfy` Text.isPrefixOf "(JSExportDefault"
+
+    it "serializes export locals declarations" $ do
+      let spec1 = AST.JSExportSpecifier (AST.JSIdentName testAnnot "foo")
+      let clause = AST.JSExportClause testAnnot (AST.JSLOne spec1) testAnnot
+      let decl = AST.JSExportLocals clause AST.JSSemiAuto
+      let sexpr = PSExpr.renderExportDeclarationToSExpr decl
+      sexpr `shouldSatisfy` Text.isPrefixOf "(JSExportLocals"
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSExportClause"
+      sexpr `shouldSatisfy` Text.isInfixOf "(JSExportSpecifier"
 
 -- | Test annotation serialization
 testAnnotationSerialization :: Spec

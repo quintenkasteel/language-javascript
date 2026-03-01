@@ -74,9 +74,9 @@ import Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
 import Integration.Language.Javascript.Process.TreeShake
 import Test.Language.Javascript.JSDocTest
 import Unit.Language.Javascript.Runtime.ValidatorTest
--- import qualified Unit.Language.Javascript.Parser.QQ.Validate   -- Temporarily disabled: flatparse+TH bytecode compatibility
--- import qualified Unit.Language.Javascript.Parser.QQ.Compile    -- Temporarily disabled: flatparse+TH bytecode compatibility
--- import qualified Unit.Language.Javascript.Parser.QQ.Antiquote  -- Temporarily disabled: flatparse+TH bytecode compatibility
+import qualified Unit.Language.Javascript.Parser.QQ.Validate
+import qualified Unit.Language.Javascript.Parser.QQ.Compile
+import qualified Unit.Language.Javascript.Parser.QQ.Antiquote
 
 main :: IO ()
 main = do
@@ -148,9 +148,9 @@ testAll = do
   Unit.Language.Javascript.Runtime.ValidatorTest.validatorTests
 
   -- Unit Tests - Quasi-Quoters
-  -- Unit.Language.Javascript.Parser.QQ.Validate.tests     -- Temporarily disabled
-  -- Unit.Language.Javascript.Parser.QQ.Compile.tests      -- Temporarily disabled
-  -- Unit.Language.Javascript.Parser.QQ.Antiquote.tests     -- Temporarily disabled
+  Unit.Language.Javascript.Parser.QQ.Validate.tests
+  Unit.Language.Javascript.Parser.QQ.Compile.tests
+  Unit.Language.Javascript.Parser.QQ.Antiquote.tests
 
   -- Integration Tests
   Integration.Language.Javascript.Parser.RoundTrip.testRoundTrip

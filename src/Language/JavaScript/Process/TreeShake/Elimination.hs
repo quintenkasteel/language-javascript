@@ -19,7 +19,6 @@ module Language.JavaScript.Process.TreeShake.Elimination
     shouldPreserveStatement,
 
     -- * Expression-Level Elimination
-    eliminateExpressions,
     optimizeUnusedExpressions,
     expressionHasSideEffects,
 
@@ -32,14 +31,12 @@ module Language.JavaScript.Process.TreeShake.Elimination
     isStatementUsed,
     isExpressionUsed,
     hasObservableSideEffects,
-    createEliminationResult,
     validateTreeShaking,
   )
 where
 
 import Lens.Micro ((^.))
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Language.JavaScript.Parser.AST
@@ -320,10 +317,12 @@ isCriticalControlFlowStatement stmt = case stmt of
 
 -- | Check if statement should be preserved for dynamic usage patterns.
 --
--- Handles cases where aggressive vs conservative optimization should differ,
--- particularly around eval, with statements, and dynamic property access.
+-- Conservative: does not detect dynamic usage patterns such as eval,
+-- with statements, or dynamic property access. Context-aware eval detection
+-- is handled separately by 'astContainsEval' and the ultra-conservative
+-- path in 'eliminateWithOptions'.
 shouldPreserveForDynamicUsage :: TreeShakeOptions -> JSStatement -> Bool
-shouldPreserveForDynamicUsage _opts _stmt = False  -- Disabled for now - will use context-aware eval detection instead
+shouldPreserveForDynamicUsage _opts _stmt = False
 
 -- | Check if AST contains eval calls (recursive search).
 astContainsEval :: JSAST -> Bool
@@ -387,13 +386,6 @@ moduleItemContainsEval :: JSModuleItem -> Bool
 moduleItemContainsEval item = case item of
   JSModuleStatementListItem stmt -> statementContainsEval stmt
   _ -> False
-
--- | Eliminate unused expressions.
---
--- Simplifies expressions by removing unused sub-expressions while
--- maintaining side effects and program correctness.
-eliminateExpressions :: TreeShakeOptions -> UsageMap -> [JSExpression] -> [JSExpression]
-eliminateExpressions _opts _uMap exprs = exprs  -- Conservative: preserves all expressions
 
 -- | Optimize unused expressions.
 --
@@ -555,10 +547,11 @@ isCommaListEmptyAfterFiltering _ = False
 
 -- | Eliminate unused exports from module.
 --
--- Removes export statements and export specifiers that export
--- unused identifiers, while preserving configured exports.
+-- Conservative: preserves all exports unchanged. Export elimination requires
+-- cross-module analysis to determine which exports are consumed by downstream
+-- modules, so removing exports without that context risks breaking dependents.
 eliminateUnusedExports :: TreeShakeOptions -> UsageMap -> JSExportDeclaration -> Maybe JSExportDeclaration
-eliminateUnusedExports _opts _uMap exportDecl = Just exportDecl  -- Conservative: preserve all exports
+eliminateUnusedExports _opts _uMap exportDecl = Just exportDecl
 
 -- | Optimize module items based on usage analysis.
 --
@@ -729,25 +722,27 @@ hasObservableSideEffects stmt = case stmt of
     getInitializerFromDecl (JSVarInitExpression _ initializer) = initializer
     getInitializerFromDecl _ = JSVarInitNone
 
--- | Create elimination result from analysis.
---
--- Constructs a comprehensive result structure containing elimination
--- statistics and preserved code.
-createEliminationResult :: JSAST -> JSAST -> EliminationResult
-createEliminationResult _originalAst _optimizedAst = EliminationResult
-  { _eliminatedIdentifiers = Set.empty
-  , _preservedIdentifiers = Set.empty
-  , _eliminationReasons = Map.empty
-  , _preservationReasons = Map.empty
-  , _actualReduction = 0.0
-  }
-
 -- | Validate tree shaking correctness.
 --
--- Comprehensive validation that ensures the optimized AST maintains
--- the same public API and semantic behavior as the original.
+-- Structural validation that ensures the optimized AST is a subset of
+-- the original: every statement in the optimized output must also appear
+-- in the original input. This guarantees that elimination only removes
+-- code and never introduces new statements.
 validateTreeShaking :: JSAST -> JSAST -> Bool
-validateTreeShaking _original _optimized = True  -- Minimal implementation: assume valid
+validateTreeShaking original optimized =
+  all (`elem` extractStatements original) (extractStatements optimized)
+
+-- | Extract top-level statements from a JSAST for subset comparison.
+extractStatements :: JSAST -> [JSStatement]
+extractStatements ast = case ast of
+  JSAstProgram stmts _ -> stmts
+  JSAstModule items _ -> concatMap moduleItemStatements items
+  JSAstStatement stmt _ -> [stmt]
+  JSAstExpression _ _ -> []
+  JSAstLiteral _ _ -> []
+  where
+    moduleItemStatements (JSModuleStatementListItem stmt) = [stmt]
+    moduleItemStatements _ = []
 
 -- Helper functions
 

@@ -28,9 +28,12 @@ module Language.JavaScript.QQ.Compile
 where
 
 import Control.Exception (evaluate)
+import Data.ByteString (ByteString)
+import Data.Typeable (cast)
 import Language.Haskell.TH (Exp, Q)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
-import Language.Haskell.TH.Syntax (liftData)
+import Language.Haskell.TH.Syntax (dataToExpQ, liftTyped)
+import Language.JavaScript.Parser.AST (JSAST)
 import qualified Language.Haskell.TH as TH
 import qualified Language.JavaScript.Parser.Parser as Parser
 
@@ -39,9 +42,9 @@ import qualified Language.JavaScript.Parser.Parser as Parser
 --
 -- The JavaScript source is parsed using the project's parser at compile
 -- time. On failure, a compile-time error is raised. On success, the
--- parsed 'JSAST' is embedded into the Haskell program using 'liftData'
--- (via 'Data' instances), making it available at runtime without any
--- parsing overhead.
+-- parsed 'JSAST' is embedded into the Haskell program using 'dataToExpQ'
+-- with a custom ByteString handler to avoid ByteString's broken 'Data'
+-- instance (which throws in @toConstr@).
 --
 -- ==== Usage
 --
@@ -72,7 +75,18 @@ compileJS input = do
   result <- TH.runIO (evaluate (Parser.parse input (TH.loc_filename loc)))
   case result of
     Left err -> fail (formatError loc err)
-    Right ast -> liftData ast
+    Right ast -> liftAST ast
+
+-- | Lift a parsed AST into a TH expression, handling ByteString fields.
+--
+-- ByteString's 'Data' instance throws an error in @toConstr@, so we
+-- intercept ByteString values with a custom handler that uses the
+-- 'Lift' instance from @bytestring >= 0.11.2.0@ instead.
+liftAST :: JSAST -> Q Exp
+liftAST = dataToExpQ (\a -> cast a >>= liftBS)
+  where
+    liftBS :: ByteString -> Maybe (Q Exp)
+    liftBS bs = Just (TH.unTypeCode (liftTyped bs))
 
 -- | Format a parse error with Haskell source location context.
 formatError :: TH.Loc -> String -> String

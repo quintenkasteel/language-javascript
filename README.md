@@ -1,62 +1,108 @@
-Parser for JavaScript
----------------------
+# language-javascript
 
-[![Build Status](https://secure.travis-ci.org/erikd/language-javascript.png?branch=master)](http://travis-ci.org/erikd/language-javascript)
+A Haskell library for parsing JavaScript source code into an Abstract Syntax Tree (AST).
 
-Based (loosely) on language-python
+## Features
 
-Two Versions
-------------
+- **ES5 through ES2021** syntax coverage (near-complete)
+- **FlatParse-based lexer/parser** for high-performance zero-copy parsing
+- **Faithful pretty printer** that reconstructs JavaScript from the AST (round-trip safe)
+- **JavaScript minifier** (whitespace/comment stripping, string concat, var merging)
+- **Tree shaker** with scope analysis and dead code elimination
+- **Template Haskell quasi-quoters** (`jsast` and `jsx`) for compile-time JavaScript embedding
+- **Smart constructors** (`Language.JavaScript.Parser.Build`) for ergonomic AST construction
+- **Serialization** to JSON, XML, and S-expression formats
 
-There are currently two versions:
+## Quick Start
 
-* 0.5 series : Is a continuation of the 0.5.X.Y series, from the [master]
-(https://github.com/erikd/language-javascript/tree/master) branch of this
-github repository.
+```haskell
+import Language.JavaScript.Parser (parse, renderToString)
 
-* 0.6 and 0.7 series : This has a vastly different and improved AST which makes if far
-more difficult to build an non-sensical Javascript AST. This code is in the
-[new-ast](https://github.com/erikd/language-javascript/tree/new-ast) branch of
-this github repository.
+main :: IO ()
+main = do
+  case parse "function add(a, b) { return a + b; }" "example.js" of
+    Left err  -> putStrLn ("Parse error: " ++ err)
+    Right ast -> putStrLn (renderToString ast)
+```
 
+## Installation
 
-How to build
-------------
+Add to your `.cabal` file:
 
-Make sure your locale supports UTF-8. For example, on most Unix-like platforms,
-you can type:
+```cabal
+build-depends: language-javascript >= 0.8 && < 0.9
+```
 
-    export LC_ALL=en_US.UTF-8
+## API Overview
 
-Library:
+### Parsing
 
-    cabal clean && cabal configure && cabal build
+```haskell
+import Language.JavaScript.Parser
 
-Tests:
+-- Parse JavaScript source code
+parse :: String -> String -> Either String JSAST
 
-    cabal clean && cabal configure -fbuildtests && cabal build
+-- Parse from ByteString (recommended for performance)
+parseBS :: ByteString -> String -> Either String JSAST
+```
 
-Running the tests
+### Pretty Printing
 
-    ./dist/build/runtests/runtests
+```haskell
+import Language.JavaScript.Pretty.Printer (renderToString)
 
+-- Render AST back to JavaScript source
+renderToString :: JSAST -> String
+```
 
-To debug the grammar
+### Minification
 
-    happy -iparse.txt -g -a  -d src/Language/JavaScript/Parser/Grammar5.y
+```haskell
+import Language.JavaScript.Process.Minify (minifyJS)
 
-This generates src/Language/JavaScript/Parser/Grammar5.hs, delete this
-when done with the debug version
+-- Minify JavaScript (strip whitespace, comments, merge vars)
+minifyJS :: JSAST -> JSAST
+```
 
+### Quasi-Quoters
 
-UTF8/Unicode version
---------------------
+```haskell
+{-# LANGUAGE QuasiQuotes #-}
+import Language.JavaScript.QQ (jsast, jsx)
 
-Alex 3.0 now supports unicode natively, and has been included as a
-dependency in the cabal file.
+-- Compile-time parsed AST
+myAst :: JSAST
+myAst = [jsast| var x = 42; |]
 
-Note: The generation of the lexical analyser has been separated out,
-      to remove the install-time dependency on Alex. If any changes
-      need to be made to the lexer, the Lexer.x source lies in
-      src-dev, and the runalex.sh script will invoke Alex with the
-      appropriate directories.
+-- With Haskell expression splicing
+buildGreeting :: JSExpression -> JSAST
+buildGreeting nameExpr = [jsx| console.log("Hello " + ${nameExpr}); |]
+```
+
+### Smart Constructors
+
+```haskell
+import Language.JavaScript.Parser.Build
+
+-- Build AST nodes without manual annotation threading
+let ident = mkIdent "x"
+    num   = mkDecimal 42
+    binOp = mkBinOp ident JSBinOpPlus num
+```
+
+## Building
+
+```bash
+cabal build
+```
+
+## Testing
+
+```bash
+cabal test
+```
+
+## License
+
+BSD-3-Clause. See [LICENSE](LICENSE) for details.

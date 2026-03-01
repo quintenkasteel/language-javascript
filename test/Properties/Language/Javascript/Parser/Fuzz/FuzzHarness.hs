@@ -73,7 +73,7 @@ import Data.List (sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
-import Language.JavaScript.Parser (readJsSafe, renderToString)
+import Language.JavaScript.Parser (parse, renderToString)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
   ( CoverageData (..),
@@ -389,7 +389,7 @@ validateProperties _config input = do
   result <-
     catch
       ( do
-          case readJsSafe (Text.unpack input) of
+          case parse (Text.unpack input) "fuzz" of
             Right prog@(AST.JSAstProgram _ _) -> do
               violations <- checkASTInvariants prog
               case violations of
@@ -506,14 +506,26 @@ generateFailureReport inputFailures = do
 -- Helper Functions
 -- ---------------------------------------------------------------------
 
--- | Test parsing with strict evaluation to catch crashes
+-- | Test parsing with strict evaluation to catch crashes.
+-- Returns 'Right' for both successful parses AND normal parse failures
+-- (which are expected for malformed inputs). Only returns 'Left' when
+-- the parser throws an exception, indicating a genuine crash.
 testParseStrictly :: Text.Text -> IO (Either String ())
 testParseStrictly input =
-  case readJsSafe (Text.unpack input) of
-    Right ast@(AST.JSAstProgram _ _) -> do
-      _ <- evaluate (length (renderToString ast))
-      return $ Right ()
-    _ -> return $ Left "Parse failed"
+  catch
+    ( case parse (Text.unpack input) "fuzz" of
+        Right ast@(AST.JSAstProgram _ _) -> do
+          _ <- evaluate (length (renderToString ast))
+          return (Right ())
+        Right ast -> do
+          _ <- evaluate (length (renderToString ast))
+          return (Right ())
+        Left _ -> return (Right ())
+    )
+    handleCrash
+  where
+    handleCrash :: SomeException -> IO (Either String ())
+    handleCrash ex = return (Left (show ex))
 
 -- | Check AST invariants and return violations
 checkASTInvariants :: AST.JSAST -> IO [String]

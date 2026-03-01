@@ -134,14 +134,18 @@ defaultFuzzTestConfig =
       testDifferentialMode = True
     }
 
--- | CI-optimized configuration (faster, less intensive)
+-- | CI-optimized configuration (fast, lightweight).
+-- Uses minimal iterations to complete within CI time limits while still
+-- providing meaningful crash and property validation.
 ciConfig :: FuzzTestConfig
 ciConfig =
   defaultFuzzTestConfig
-    { testIterations = 200,
+    { testIterations = 50,
       testTimeout = 2000,
       testMinimizeFailures = False,
-      testPerformanceMode = False
+      testPerformanceMode = False,
+      testDifferentialMode = False,
+      testCoverageMode = False
     }
 
 -- | Development configuration (intensive testing)

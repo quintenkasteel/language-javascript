@@ -3,8 +3,13 @@
 
 -- | S-expression serialization for JavaScript AST nodes.
 --
--- This module provides comprehensive S-expression output for all JavaScript
--- language constructs including ES2020+ features like BigInt literals, optional
+-- __Experimental__: This module is under active development. While
+-- expression, statement, and module-level constructs are fully supported,
+-- coverage of all AST constructors is not yet exhaustive. The S-expression
+-- schema may change in future releases.
+--
+-- This module provides S-expression output for JavaScript language
+-- constructs including ES2020+ features like BigInt literals, optional
 -- chaining, and nullish coalescing.
 --
 -- The S-expression format preserves complete AST structure in a Lisp-like
@@ -295,23 +300,213 @@ renderModuleItemToSExpr item = case item of
         renderStatementToSExpr stmt
       ]
 
--- | Render import declaration to S-expression
+-- | Render import declaration to S-expression.
 renderImportDeclarationToSExpr :: AST.JSImportDeclaration -> Text
-renderImportDeclarationToSExpr =
-  const $
+renderImportDeclarationToSExpr decl = case decl of
+  AST.JSImportDeclaration clause fromClause attrs semi ->
     formatSExprList
       [ "JSImportDeclaration",
-        "import-declaration-not-yet-implemented"
+        renderImportClauseToSExpr clause,
+        renderFromClauseToSExpr fromClause,
+        renderMaybeImportAttrsToSExpr attrs,
+        renderSemiToSExpr semi
+      ]
+  AST.JSImportDeclarationBare annot moduleName attrs semi ->
+    formatSExprList
+      [ "JSImportDeclarationBare",
+        renderAnnotation annot,
+        escapeSExprString (Text.unpack . Text.decodeUtf8 $ moduleName),
+        renderMaybeImportAttrsToSExpr attrs,
+        renderSemiToSExpr semi
       ]
 
--- | Render export declaration to S-expression
-renderExportDeclarationToSExpr :: AST.JSExportDeclaration -> Text
-renderExportDeclarationToSExpr =
-  const $
+-- | Render optional import attributes to S-expression.
+renderMaybeImportAttrsToSExpr :: Maybe AST.JSImportAttributes -> Text
+renderMaybeImportAttrsToSExpr Nothing = "nil"
+renderMaybeImportAttrsToSExpr (Just (AST.JSImportAttributes lbrace attrs rbrace)) =
+  formatSExprList
+    [ "JSImportAttributes",
+      renderAnnotation lbrace,
+      formatSExprList ("attributes" : map renderImportAttrToSExpr (extractCommaList attrs)),
+      renderAnnotation rbrace
+    ]
+
+-- | Render a single import attribute to S-expression.
+renderImportAttrToSExpr :: AST.JSImportAttribute -> Text
+renderImportAttrToSExpr (AST.JSImportAttribute key colon value) =
+  formatSExprList
+    [ "JSImportAttribute",
+      renderIdentToSExpr key,
+      renderAnnotation colon,
+      renderExpressionToSExpr value
+    ]
+
+-- | Render import clause to S-expression.
+renderImportClauseToSExpr :: AST.JSImportClause -> Text
+renderImportClauseToSExpr clause = case clause of
+  AST.JSImportClauseDefault ident ->
+    formatSExprList ["JSImportClauseDefault", renderIdentToSExpr ident]
+  AST.JSImportClauseNameSpace ns ->
+    formatSExprList ["JSImportClauseNameSpace", renderImportNameSpaceToSExpr ns]
+  AST.JSImportClauseNamed imports ->
+    formatSExprList ["JSImportClauseNamed", renderImportsNamedToSExpr imports]
+  AST.JSImportClauseDefaultNameSpace ident annot ns ->
+    renderDefaultNSClauseToSExpr ident annot ns
+  AST.JSImportClauseDefaultNamed ident annot imports ->
+    renderDefaultNamedClauseToSExpr ident annot imports
+
+-- | Render default + namespace import clause to S-expression.
+renderDefaultNSClauseToSExpr :: AST.JSIdent -> AST.JSAnnot -> AST.JSImportNameSpace -> Text
+renderDefaultNSClauseToSExpr ident annot ns =
+  formatSExprList
+    [ "JSImportClauseDefaultNameSpace",
+      renderIdentToSExpr ident,
+      renderAnnotation annot,
+      renderImportNameSpaceToSExpr ns
+    ]
+
+-- | Render default + named import clause to S-expression.
+renderDefaultNamedClauseToSExpr :: AST.JSIdent -> AST.JSAnnot -> AST.JSImportsNamed -> Text
+renderDefaultNamedClauseToSExpr ident annot imports =
+  formatSExprList
+    [ "JSImportClauseDefaultNamed",
+      renderIdentToSExpr ident,
+      renderAnnotation annot,
+      renderImportsNamedToSExpr imports
+    ]
+
+-- | Render namespace import to S-expression.
+renderImportNameSpaceToSExpr :: AST.JSImportNameSpace -> Text
+renderImportNameSpaceToSExpr (AST.JSImportNameSpace binOp annot ident) =
+  formatSExprList
+    [ "JSImportNameSpace",
+      renderBinOpToSExpr binOp,
+      renderAnnotation annot,
+      renderIdentToSExpr ident
+    ]
+
+-- | Render named imports to S-expression.
+renderImportsNamedToSExpr :: AST.JSImportsNamed -> Text
+renderImportsNamedToSExpr (AST.JSImportsNamed lbrace specifiers rbrace) =
+  formatSExprList
+    [ "JSImportsNamed",
+      renderAnnotation lbrace,
+      formatSExprList ("specifiers" : map renderImportSpecToSExpr (extractCommaList specifiers)),
+      renderAnnotation rbrace
+    ]
+
+-- | Render import specifier to S-expression.
+renderImportSpecToSExpr :: AST.JSImportSpecifier -> Text
+renderImportSpecToSExpr spec = case spec of
+  AST.JSImportSpecifier ident ->
+    formatSExprList ["JSImportSpecifier", renderIdentToSExpr ident]
+  AST.JSImportSpecifierAs ident annot localIdent ->
     formatSExprList
-      [ "JSExportDeclaration",
-        "export-declaration-not-yet-implemented"
+      [ "JSImportSpecifierAs",
+        renderIdentToSExpr ident,
+        renderAnnotation annot,
+        renderIdentToSExpr localIdent
       ]
+
+-- | Render from clause to S-expression.
+renderFromClauseToSExpr :: AST.JSFromClause -> Text
+renderFromClauseToSExpr (AST.JSFromClause fromAnn modAnn moduleName) =
+  formatSExprList
+    [ "JSFromClause",
+      renderAnnotation fromAnn,
+      renderAnnotation modAnn,
+      escapeSExprString (Text.unpack . Text.decodeUtf8 $ moduleName)
+    ]
+
+-- | Render export declaration to S-expression.
+renderExportDeclarationToSExpr :: AST.JSExportDeclaration -> Text
+renderExportDeclarationToSExpr decl = case decl of
+  AST.JSExportFrom clause fromClause semi ->
+    renderExportFromToSExpr clause fromClause semi
+  AST.JSExportLocals clause semi ->
+    formatSExprList
+      [ "JSExportLocals",
+        renderExportClauseToSExpr clause,
+        renderSemiToSExpr semi
+      ]
+  AST.JSExport stmt semi ->
+    formatSExprList
+      [ "JSExport",
+        renderStatementToSExpr stmt,
+        renderSemiToSExpr semi
+      ]
+  AST.JSExportAllFrom star fromClause semi ->
+    renderExportAllFromToSExpr star fromClause semi
+  AST.JSExportAllAsFrom star asAnn ident fromClause semi ->
+    renderExportAllAsFromToSExpr star asAnn ident fromClause semi
+  AST.JSExportDefault annot stmt semi ->
+    formatSExprList
+      [ "JSExportDefault",
+        renderAnnotation annot,
+        renderStatementToSExpr stmt,
+        renderSemiToSExpr semi
+      ]
+
+-- | Render export-from declaration to S-expression.
+renderExportFromToSExpr :: AST.JSExportClause -> AST.JSFromClause -> AST.JSSemi -> Text
+renderExportFromToSExpr clause fromClause semi =
+  formatSExprList
+    [ "JSExportFrom",
+      renderExportClauseToSExpr clause,
+      renderFromClauseToSExpr fromClause,
+      renderSemiToSExpr semi
+    ]
+
+-- | Render export-all-from declaration to S-expression.
+renderExportAllFromToSExpr :: AST.JSBinOp -> AST.JSFromClause -> AST.JSSemi -> Text
+renderExportAllFromToSExpr star fromClause semi =
+  formatSExprList
+    [ "JSExportAllFrom",
+      renderBinOpToSExpr star,
+      renderFromClauseToSExpr fromClause,
+      renderSemiToSExpr semi
+    ]
+
+-- | Render export-all-as-from declaration to S-expression.
+renderExportAllAsFromToSExpr :: AST.JSBinOp -> AST.JSAnnot -> AST.JSIdent -> AST.JSFromClause -> AST.JSSemi -> Text
+renderExportAllAsFromToSExpr star asAnn ident fromClause semi =
+  formatSExprList
+    [ "JSExportAllAsFrom",
+      renderBinOpToSExpr star,
+      renderAnnotation asAnn,
+      renderIdentToSExpr ident,
+      renderFromClauseToSExpr fromClause,
+      renderSemiToSExpr semi
+    ]
+
+-- | Render export clause to S-expression.
+renderExportClauseToSExpr :: AST.JSExportClause -> Text
+renderExportClauseToSExpr (AST.JSExportClause lbrace specifiers rbrace) =
+  formatSExprList
+    [ "JSExportClause",
+      renderAnnotation lbrace,
+      formatSExprList ("specifiers" : map renderExportSpecToSExpr (extractCommaList specifiers)),
+      renderAnnotation rbrace
+    ]
+
+-- | Render export specifier to S-expression.
+renderExportSpecToSExpr :: AST.JSExportSpecifier -> Text
+renderExportSpecToSExpr spec = case spec of
+  AST.JSExportSpecifier ident ->
+    formatSExprList ["JSExportSpecifier", renderIdentToSExpr ident]
+  AST.JSExportSpecifierAs ident annot exportedIdent ->
+    formatSExprList
+      [ "JSExportSpecifierAs",
+        renderIdentToSExpr ident,
+        renderAnnotation annot,
+        renderIdentToSExpr exportedIdent
+      ]
+
+-- | Extract elements from a comma-separated list.
+extractCommaList :: AST.JSCommaList a -> [a]
+extractCommaList AST.JSLNil = []
+extractCommaList (AST.JSLOne x) = [x]
+extractCommaList (AST.JSLCons rest _ x) = extractCommaList rest ++ [x]
 
 -- | Render annotation to S-expression with position and comments
 renderAnnotation :: AST.JSAnnot -> Text

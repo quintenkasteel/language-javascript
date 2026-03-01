@@ -85,7 +85,7 @@ import Data.List (nub, sortBy, (\\))
 import Data.Ord (Down (..), comparing)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Language.JavaScript.Parser (readJsSafe)
+import Language.JavaScript.Parser (parse)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.FuzzGenerators
   ( applyRandomMutations,
@@ -201,7 +201,7 @@ measureLineCoverage input = do
 measureBranchCoverage :: String -> IO [BranchCoverage]
 measureBranchCoverage input = do
   -- Simulate branch coverage measurement
-  case readJsSafe input of
+  case parse input "coverage" of
     Right (AST.JSAstProgram stmts _) -> do
       forM (zip [1 ..] stmts) $ \(i, stmt) -> do
         let taken = case stmt of
@@ -221,7 +221,7 @@ measureBranchCoverage input = do
 -- | Measure path coverage through parser
 measurePathCoverage :: String -> IO [CoveragePath]
 measurePathCoverage input = do
-  case readJsSafe input of
+  case parse input "coverage" of
     Right (AST.JSAstProgram stmts _) ->
       forM (zip [1 ..] stmts) $ \(i, _stmt) ->
         return $

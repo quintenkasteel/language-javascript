@@ -35,7 +35,6 @@ module Language.JavaScript.Process.TreeShake.Types
     
     -- * Analysis Results
     UsageAnalysis (..),
-    EliminationResult (..),
     
     -- * Lenses for TreeShakeOptions
     preserveTopLevel,
@@ -88,13 +87,6 @@ module Language.JavaScript.Process.TreeShake.Types
     exports,
     hasImportSideEffects,
     reExportsFrom,
-
-    -- * Lenses for EliminationResult
-    eliminatedIdentifiers,
-    preservedIdentifiers,
-    eliminationReasons,
-    preservationReasons,
-    actualReduction,
 
     -- * Lenses for ScopeInfo
     scopeType,
@@ -329,27 +321,6 @@ data UsageAnalysis = UsageAnalysis
     -- ^ Objects that are accessed with dynamic/computed property names
   } deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
--- | Result of code elimination process.
---
--- Provides detailed information about what was eliminated
--- and the impact of the tree shaking process.
-data EliminationResult = EliminationResult
-  { _eliminatedIdentifiers :: !(Set.Set Text.Text)
-    -- ^ Set of identifiers that were eliminated
-    
-  , _preservedIdentifiers :: !(Set.Set Text.Text)
-    -- ^ Set of identifiers that were preserved
-    
-  , _eliminationReasons :: !(Map.Map Text.Text Text.Text)
-    -- ^ Reasons why specific identifiers were eliminated
-    
-  , _preservationReasons :: !(Map.Map Text.Text Text.Text)
-    -- ^ Reasons why specific identifiers were preserved
-    
-  , _actualReduction :: !Double
-    -- ^ Actual size reduction achieved
-  } deriving (Data, Eq, Generic, NFData, Show, Typeable)
-
 -- Generate lenses for all record types
 makeLenses ''TreeShakeOptions
 makeLenses ''UsageInfo
@@ -357,7 +328,6 @@ makeLenses ''UsageAnalysis
 makeLenses ''ImportInfo
 makeLenses ''ExportInfo
 makeLenses ''ModuleDependency
-makeLenses ''EliminationResult
 makeLenses ''ScopeInfo
 
 -- | Default usage information for new identifiers.

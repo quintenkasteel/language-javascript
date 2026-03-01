@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | JavaScript quasi-quoter with Haskell antiquotation support.
@@ -25,13 +26,16 @@ module Language.JavaScript.QQ.Antiquote
   )
 where
 
+import Control.Applicative ((<|>))
 import Control.Exception (evaluate)
-import Data.Generics (extQ)
+import Data.ByteString (ByteString)
+import qualified Data.Data
+import Data.Typeable (cast)
 import qualified Data.ByteString.Char8 as BS8
 import Language.Haskell.Meta.Parse (parseExp)
 import Language.Haskell.TH (Exp, Q)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
-import Language.Haskell.TH.Syntax (dataToExpQ)
+import Language.Haskell.TH.Syntax (dataToExpQ, liftTyped)
 import qualified Data.Map.Strict as Map
 import qualified Language.Haskell.TH as TH
 import qualified Language.JavaScript.Parser.AST as AST
@@ -106,8 +110,17 @@ extractSplices = go (0 :: Int) [] Map.empty
 -- | Convert a parsed AST to a TH expression, replacing placeholder
 -- identifiers with their corresponding Haskell expression splices.
 astToExpWithSplices :: Map.Map String String -> AST.JSAST -> Q Exp
-astToExpWithSplices spliceMap = dataToExpQ (const Nothing `extQ` handleExpr)
+astToExpWithSplices spliceMap = dataToExpQ handler
   where
+    handler :: forall a. Data.Data.Data a => a -> Maybe (Q Exp)
+    handler a = (cast a >>= handleExpr) <|> (cast a >>= handleBS)
+
+    -- | Intercept ByteString values to avoid ByteString's broken 'Data'
+    -- instance (which throws in @toConstr@). Uses the 'Lift' instance
+    -- from @bytestring >= 0.11.2.0@ instead.
+    handleBS :: ByteString -> Maybe (Q Exp)
+    handleBS bs = Just (TH.unTypeCode (liftTyped bs))
+
     handleExpr :: AST.JSExpression -> Maybe (Q Exp)
     handleExpr (AST.JSIdentifier _ name) =
       Map.lookup (BS8.unpack name) spliceMap >>= parseSplice

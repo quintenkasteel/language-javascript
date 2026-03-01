@@ -15,31 +15,19 @@ module Language.JavaScript.Process.TreeShake.Analysis
     analyzeUsage,
     analyzeUsageWithOptions,
     buildUsageMap,
-    
-    -- * Scope Analysis
-    analyzeLexicalScopes,
-    buildScopeStack,
-    findDeclarations,
-    
-    -- * Reference Analysis  
-    findReferences,
+
+    -- * Reference Analysis
     analyzeIdentifierUsage,
     trackCallExpressions,
-    
+
     -- * Module Analysis
-    analyzeModuleSystem,
     extractImportInfo,
     extractExportInfo,
-    buildDependencyGraph,
-    
+
     -- * Side Effect Analysis
-    analyzeSideEffects,
     hasSideEffects,
-    isCallWithSideEffects,
-    isPureFunctionCall,
-    
+
     -- * Utility Functions
-    extractIdentifierName,
     isTopLevelDeclaration,
     isExportedDeclaration,
     calculateEstimatedReduction,
@@ -915,20 +903,6 @@ analyzeClassElement element = case element of
       analyzeBlock body
 
 
--- Implementation of remaining exported functions
-
-analyzeLexicalScopes :: JSAST -> ScopeStack
-analyzeLexicalScopes _ast = [createGlobalScope]
-
-buildScopeStack :: ScopeStack
-buildScopeStack = [createGlobalScope]
-
-findDeclarations :: JSAST -> AnalysisM ()
-findDeclarations = analyzeAST
-
-findReferences :: JSAST -> AnalysisM ()  
-findReferences = analyzeAST
-
 analyzeIdentifierUsage :: Text.Text -> TokenPosn -> AnalysisM ()
 analyzeIdentifierUsage identifier _pos = do
   currentMap <- gets _analysisUsageMap
@@ -940,9 +914,6 @@ analyzeIdentifierUsage identifier _pos = do
 
 trackCallExpressions :: JSExpression -> AnalysisM ()
 trackCallExpressions = analyzeExpression
-
-analyzeModuleSystem :: JSAST -> AnalysisM ()
-analyzeModuleSystem = analyzeAST
 
 extractImportInfo :: JSImportDeclaration -> ImportInfo
 extractImportInfo (JSImportDeclaration clause (JSFromClause _ _ modName) _ _) =
@@ -972,12 +943,6 @@ extractExportInfo (JSExportLocals (JSExportClause _ specifiers _) _) =
 extractExportInfo (JSExportFrom clause (JSFromClause _ _ modName) _) =
   fmap (setExportModule (Text.decodeUtf8 modName)) (extractExportInfoFromClause clause)
 extractExportInfo _ = []
-
-buildDependencyGraph :: [ModuleDependency] -> [ModuleDependency]
-buildDependencyGraph deps = deps
-
-analyzeSideEffects :: JSAST -> AnalysisM ()
-analyzeSideEffects = analyzeAST
 
 hasSideEffects :: JSAST -> Bool
 hasSideEffects ast = case ast of
@@ -1030,17 +995,6 @@ hasSideEffects ast = case ast of
       JSCommaExpression left _ right ->
         hasExpressionSideEffects left || hasExpressionSideEffects right
       _ -> False
-
-isCallWithSideEffects :: JSExpression -> Bool
-isCallWithSideEffects expr = case expr of
-  JSCallExpression {} -> True
-  JSCallExpressionDot {} -> True
-  JSCallExpressionSquare {} -> True
-  JSOptionalCallExpression {} -> True
-  _ -> False
-
-isPureFunctionCall :: JSExpression -> Bool
-isPureFunctionCall expr = not $ isCallWithSideEffects expr
 
 extractIdentifierName :: JSExpression -> Maybe Text.Text
 extractIdentifierName (JSIdentifier _ name) = Just $ Text.decodeUtf8 name

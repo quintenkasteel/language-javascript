@@ -200,6 +200,7 @@ handleResult (FlatParser.ParseError failure) =
 --
 -- This is the safe variant of 'readJs' that returns structured errors
 -- instead of throwing exceptions on parse failure.
+{-# DEPRECATED readJsSafe "Use 'parse' instead." #-}
 readJsSafe :: String -> Either String AST.JSAST
 readJsSafe input = parse input "src"
 
@@ -207,6 +208,7 @@ readJsSafe input = parse input "src"
 --
 -- This is the safe variant of 'readJsModule' that returns structured errors
 -- instead of throwing exceptions on parse failure.
+{-# DEPRECATED readJsModuleSafe "Use 'parseModule' instead." #-}
 readJsModuleSafe :: String -> Either String AST.JSAST
 readJsModuleSafe input = parseModule input "src"
 
@@ -214,7 +216,7 @@ readJsModuleSafe input = parseModule input "src"
 --
 -- __Warning:__ This function throws an exception on parse failure.
 -- Prefer 'readJsSafe' for production use.
-{-# WARNING readJs "Partial function: crashes on parse failure. Use readJsSafe instead." #-}
+{-# DEPRECATED readJs "Partial function: crashes on parse failure. Use 'parse' instead." #-}
 readJs :: String -> AST.JSAST
 readJs input = either (error . show) id (readJsSafe input)
 
@@ -222,7 +224,7 @@ readJs input = either (error . show) id (readJsSafe input)
 --
 -- __Warning:__ This function throws an exception on parse failure.
 -- Prefer 'readJsModuleSafe' for production use.
-{-# WARNING readJsModule "Partial function: crashes on parse failure. Use readJsModuleSafe instead." #-}
+{-# DEPRECATED readJsModule "Partial function: crashes on parse failure. Use 'parseModule' instead." #-}
 readJsModule :: String -> AST.JSAST
 readJsModule input = either (error . show) id (readJsModuleSafe input)
 

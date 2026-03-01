@@ -3,9 +3,14 @@
 
 -- | XML serialization for JavaScript AST nodes.
 --
--- This module provides comprehensive XML output for all JavaScript language
--- constructs including ES2020+ features like BigInt literals, optional
--- chaining, and nullish coalescing.
+-- __Experimental__: This module is under active development. While
+-- expression, statement, and module-level constructs are fully supported,
+-- coverage of all AST constructors is not yet exhaustive. The XML schema
+-- may change in future releases.
+--
+-- This module provides XML output for JavaScript language constructs
+-- including ES2020+ features like BigInt literals, optional chaining,
+-- and nullish coalescing.
 --
 -- The XML format preserves complete AST structure with attributes for
 -- metadata and nested elements for child nodes. This format is ideal
@@ -245,13 +250,171 @@ renderModuleItemToXML item = case item of
     formatXMLElement "JSModuleStatementListItem" [] $
       renderStatementToXML stmt
 
--- | Render import declaration to XML
+-- | Render import declaration to XML.
 renderImportDeclarationToXML :: AST.JSImportDeclaration -> Text
-renderImportDeclarationToXML = const $ formatXMLElement "JSImportDeclaration" [] "<!-- Import declaration XML rendering not yet implemented -->"
+renderImportDeclarationToXML decl = case decl of
+  AST.JSImportDeclaration clause fromClause attrs semi ->
+    formatXMLElement "JSImportDeclaration" [] $
+      renderImportClauseToXML clause
+        <> renderFromClauseToXML fromClause
+        <> renderMaybeImportAttrsToXML attrs
+        <> renderSemiToXML semi
+  AST.JSImportDeclarationBare annot moduleName attrs semi ->
+    formatXMLElement "JSImportDeclarationBare" [] $
+      renderAnnotation annot
+        <> formatXMLElement "module" [("name", escapeXMLString (Text.unpack . Text.decodeUtf8 $ moduleName))] mempty
+        <> renderMaybeImportAttrsToXML attrs
+        <> renderSemiToXML semi
 
--- | Render export declaration to XML
+-- | Render optional import attributes to XML.
+renderMaybeImportAttrsToXML :: Maybe AST.JSImportAttributes -> Text
+renderMaybeImportAttrsToXML Nothing = mempty
+renderMaybeImportAttrsToXML (Just (AST.JSImportAttributes lbrace attrs rbrace)) =
+  formatXMLElement "JSImportAttributes" [] $
+    renderAnnotation lbrace
+      <> formatXMLElement "attributes" [] (Text.concat (map renderImportAttrToXML (extractCommaList attrs)))
+      <> renderAnnotation rbrace
+
+-- | Render a single import attribute to XML.
+renderImportAttrToXML :: AST.JSImportAttribute -> Text
+renderImportAttrToXML (AST.JSImportAttribute key colon value) =
+  formatXMLElement "JSImportAttribute" [] $
+    renderIdentToXML key
+      <> renderAnnotation colon
+      <> formatXMLElement "value" [] (renderExpressionToXML value)
+
+-- | Render import clause to XML.
+renderImportClauseToXML :: AST.JSImportClause -> Text
+renderImportClauseToXML clause = case clause of
+  AST.JSImportClauseDefault ident ->
+    formatXMLElement "JSImportClauseDefault" [] (renderIdentToXML ident)
+  AST.JSImportClauseNameSpace ns ->
+    formatXMLElement "JSImportClauseNameSpace" [] (renderImportNameSpaceToXML ns)
+  AST.JSImportClauseNamed imports ->
+    formatXMLElement "JSImportClauseNamed" [] (renderImportsNamedToXML imports)
+  AST.JSImportClauseDefaultNameSpace ident annot ns ->
+    renderDefaultNameSpaceClauseToXML ident annot ns
+  AST.JSImportClauseDefaultNamed ident annot imports ->
+    renderDefaultNamedClauseToXML ident annot imports
+
+-- | Render default + namespace import clause to XML.
+renderDefaultNameSpaceClauseToXML :: AST.JSIdent -> AST.JSAnnot -> AST.JSImportNameSpace -> Text
+renderDefaultNameSpaceClauseToXML ident annot ns =
+  formatXMLElement "JSImportClauseDefaultNameSpace" [] $
+    renderIdentToXML ident
+      <> renderAnnotation annot
+      <> renderImportNameSpaceToXML ns
+
+-- | Render default + named import clause to XML.
+renderDefaultNamedClauseToXML :: AST.JSIdent -> AST.JSAnnot -> AST.JSImportsNamed -> Text
+renderDefaultNamedClauseToXML ident annot imports =
+  formatXMLElement "JSImportClauseDefaultNamed" [] $
+    renderIdentToXML ident
+      <> renderAnnotation annot
+      <> renderImportsNamedToXML imports
+
+-- | Render namespace import to XML.
+renderImportNameSpaceToXML :: AST.JSImportNameSpace -> Text
+renderImportNameSpaceToXML (AST.JSImportNameSpace binOp annot ident) =
+  formatXMLElement "JSImportNameSpace" [] $
+    renderBinOpToXML binOp
+      <> renderAnnotation annot
+      <> renderIdentToXML ident
+
+-- | Render named imports to XML.
+renderImportsNamedToXML :: AST.JSImportsNamed -> Text
+renderImportsNamedToXML (AST.JSImportsNamed lbrace specifiers rbrace) =
+  formatXMLElement "JSImportsNamed" [] $
+    renderAnnotation lbrace
+      <> formatXMLElement "specifiers" [] (Text.concat (map renderImportSpecToXML (extractCommaList specifiers)))
+      <> renderAnnotation rbrace
+
+-- | Render import specifier to XML.
+renderImportSpecToXML :: AST.JSImportSpecifier -> Text
+renderImportSpecToXML spec = case spec of
+  AST.JSImportSpecifier ident ->
+    formatXMLElement "JSImportSpecifier" [] (renderIdentToXML ident)
+  AST.JSImportSpecifierAs ident annot localIdent ->
+    formatXMLElement "JSImportSpecifierAs" [] $
+      renderIdentToXML ident
+        <> renderAnnotation annot
+        <> renderIdentToXML localIdent
+
+-- | Render from clause to XML.
+renderFromClauseToXML :: AST.JSFromClause -> Text
+renderFromClauseToXML (AST.JSFromClause fromAnn modAnn moduleName) =
+  formatXMLElement "JSFromClause" [("module", escapeXMLString (Text.unpack . Text.decodeUtf8 $ moduleName))] $
+    renderAnnotation fromAnn <> renderAnnotation modAnn
+
+-- | Render export declaration to XML.
 renderExportDeclarationToXML :: AST.JSExportDeclaration -> Text
-renderExportDeclarationToXML = const $ formatXMLElement "JSExportDeclaration" [] "<!-- Export declaration XML rendering not yet implemented -->"
+renderExportDeclarationToXML decl = case decl of
+  AST.JSExportFrom clause fromClause semi ->
+    renderExportFromToXML clause fromClause semi
+  AST.JSExportLocals clause semi ->
+    formatXMLElement "JSExportLocals" [] $
+      renderExportClauseToXML clause <> renderSemiToXML semi
+  AST.JSExport stmt semi ->
+    formatXMLElement "JSExport" [] $
+      renderStatementToXML stmt <> renderSemiToXML semi
+  AST.JSExportAllFrom star fromClause semi ->
+    renderExportAllFromToXML star fromClause semi
+  AST.JSExportAllAsFrom star asAnn ident fromClause semi ->
+    renderExportAllAsFromToXML star asAnn ident fromClause semi
+  AST.JSExportDefault annot stmt semi ->
+    formatXMLElement "JSExportDefault" [] $
+      renderAnnotation annot <> renderStatementToXML stmt <> renderSemiToXML semi
+
+-- | Render export-from declaration to XML.
+renderExportFromToXML :: AST.JSExportClause -> AST.JSFromClause -> AST.JSSemi -> Text
+renderExportFromToXML clause fromClause semi =
+  formatXMLElement "JSExportFrom" [] $
+    renderExportClauseToXML clause
+      <> renderFromClauseToXML fromClause
+      <> renderSemiToXML semi
+
+-- | Render export-all-from declaration to XML.
+renderExportAllFromToXML :: AST.JSBinOp -> AST.JSFromClause -> AST.JSSemi -> Text
+renderExportAllFromToXML star fromClause semi =
+  formatXMLElement "JSExportAllFrom" [] $
+    renderBinOpToXML star
+      <> renderFromClauseToXML fromClause
+      <> renderSemiToXML semi
+
+-- | Render export-all-as-from declaration to XML.
+renderExportAllAsFromToXML :: AST.JSBinOp -> AST.JSAnnot -> AST.JSIdent -> AST.JSFromClause -> AST.JSSemi -> Text
+renderExportAllAsFromToXML star asAnn ident fromClause semi =
+  formatXMLElement "JSExportAllAsFrom" [] $
+    renderBinOpToXML star
+      <> renderAnnotation asAnn
+      <> renderIdentToXML ident
+      <> renderFromClauseToXML fromClause
+      <> renderSemiToXML semi
+
+-- | Render export clause to XML.
+renderExportClauseToXML :: AST.JSExportClause -> Text
+renderExportClauseToXML (AST.JSExportClause lbrace specifiers rbrace) =
+  formatXMLElement "JSExportClause" [] $
+    renderAnnotation lbrace
+      <> formatXMLElement "specifiers" [] (Text.concat (map renderExportSpecToXML (extractCommaList specifiers)))
+      <> renderAnnotation rbrace
+
+-- | Render export specifier to XML.
+renderExportSpecToXML :: AST.JSExportSpecifier -> Text
+renderExportSpecToXML spec = case spec of
+  AST.JSExportSpecifier ident ->
+    formatXMLElement "JSExportSpecifier" [] (renderIdentToXML ident)
+  AST.JSExportSpecifierAs ident annot exportedIdent ->
+    formatXMLElement "JSExportSpecifierAs" [] $
+      renderIdentToXML ident
+        <> renderAnnotation annot
+        <> renderIdentToXML exportedIdent
+
+-- | Extract elements from a comma-separated list.
+extractCommaList :: AST.JSCommaList a -> [a]
+extractCommaList AST.JSLNil = []
+extractCommaList (AST.JSLOne x) = [x]
+extractCommaList (AST.JSLCons rest _ x) = extractCommaList rest ++ [x]
 
 -- | Render annotation to XML with position and comments
 renderAnnotation :: AST.JSAnnot -> Text

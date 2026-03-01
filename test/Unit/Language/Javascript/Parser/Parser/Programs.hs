@@ -22,7 +22,7 @@ import Language.JavaScript.Parser.AST
     JSPropertyName (..),
     JSVarInitializer (..),
   )
-import Language.JavaScript.Parser.Parser (parseProgram, parseUsing, showStrippedString)
+import Language.JavaScript.Parser.Parser (parseProgram, parseUsing)
 import Test.Hspec
 
 testProgramParser :: Spec
@@ -271,4 +271,4 @@ utf8 :: String -> ByteString
 utf8 = Text.encodeUtf8 . Text.pack
 
 testFileUtf8 :: FilePath -> IO String
-testFileUtf8 fileName = showStrippedString <$> parseFileUtf8 fileName
+testFileUtf8 fileName = showStripped <$> parseFileUtf8 fileName
