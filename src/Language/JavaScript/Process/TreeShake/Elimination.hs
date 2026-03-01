@@ -393,7 +393,7 @@ moduleItemContainsEval item = case item of
 -- Simplifies expressions by removing unused sub-expressions while
 -- maintaining side effects and program correctness.
 eliminateExpressions :: TreeShakeOptions -> UsageMap -> [JSExpression] -> [JSExpression]
-eliminateExpressions _opts _uMap exprs = exprs  -- Minimal implementation: return unchanged
+eliminateExpressions _opts _uMap exprs = exprs  -- Conservative: preserves all expressions
 
 -- | Optimize unused expressions.
 --

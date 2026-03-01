@@ -25,7 +25,6 @@ module Language.JavaScript.Process.Minify
   )
 where
 
-import Control.Applicative ((<$>))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
@@ -97,6 +96,12 @@ fixStmt a _ (JSTry _ b tc tf) = JSTry a (fixEmpty b) (fmap fixEmpty tc) (fixEmpt
 fixStmt a s (JSVariable _ ss _) = JSVariable a (fixVarList ss) s
 fixStmt a s (JSWhile _ _ e _ st) = JSWhile a emptyAnnot (fixEmpty e) emptyAnnot (fixStmt a s st)
 fixStmt a s (JSWith _ _ e _ st _) = JSWith a emptyAnnot (fixEmpty e) emptyAnnot (fixStmtE noSemi st) s
+fixStmt a s (JSDebugger _ _) = JSDebugger a s
+fixStmt a s (JSAsyncGenerator _ _ _ n _ ps _ blk _) = JSAsyncGenerator a spaceAnnot emptyAnnot (fixEmpty n) emptyAnnot (fixEmpty ps) emptyAnnot (fixEmpty blk) s
+fixStmt a s (JSForAwaitOf _ _ _ e1 op e2 _ st) = JSForAwaitOf a emptyAnnot emptyAnnot (fixEmpty e1) (fixSpace op) (fixSpace e2) emptyAnnot (fixStmtE s st)
+fixStmt a s (JSForAwaitVarOf _ _ _ _ e1 op e2 _ st) = JSForAwaitVarOf a emptyAnnot emptyAnnot spaceAnnot (fixEmpty e1) (fixSpace op) (fixSpace e2) emptyAnnot (fixStmtE s st)
+fixStmt a s (JSForAwaitLetOf _ _ _ _ e1 op e2 _ st) = JSForAwaitLetOf a emptyAnnot emptyAnnot spaceAnnot (fixEmpty e1) (fixSpace op) (fixSpace e2) emptyAnnot (fixStmtE s st)
+fixStmt a s (JSForAwaitConstOf _ _ _ _ e1 op e2 _ st) = JSForAwaitConstOf a emptyAnnot emptyAnnot spaceAnnot (fixEmpty e1) (fixSpace op) (fixSpace e2) emptyAnnot (fixStmtE s st)
 
 fixIfElseBlock :: JSAnnot -> JSSemi -> JSStatement -> JSStatement
 fixIfElseBlock _ _ (JSStatementBlock _ [] _ _) = JSEmptyStatement emptyAnnot
@@ -190,6 +195,7 @@ instance MinifyJS JSExpression where
   fix a (JSAsyncFunctionExpression _ _ n _ x2s _ x3) = JSAsyncFunctionExpression a emptyAnnot (fixSpace n) emptyAnnot (fixEmpty x2s) emptyAnnot (fixEmpty x3)
   fix a (JSGeneratorExpression _ _ n _ x2s _ x3) = JSGeneratorExpression a emptyAnnot (fixEmpty n) emptyAnnot (fixEmpty x2s) emptyAnnot (fixEmpty x3)
   fix a (JSMemberDot xs _ n) = JSMemberDot (fix a xs) emptyAnnot (fixEmpty n)
+  fix a (JSMemberPrivateDot xs _ _ name) = JSMemberPrivateDot (fix a xs) emptyAnnot emptyAnnot name
   fix a (JSMemberExpression e _ args _) = JSMemberExpression (fix a e) emptyAnnot (fixEmpty args) emptyAnnot
   fix a (JSMemberNew _ n _ s _) = JSMemberNew a (fix spaceAnnot n) emptyAnnot (fixEmpty s) emptyAnnot
   fix a (JSMemberSquare xs _ e _) = JSMemberSquare (fix a xs) emptyAnnot (fixEmpty e) emptyAnnot
@@ -207,6 +213,8 @@ instance MinifyJS JSExpression where
   fix a (JSOptionalMemberDot e _ p) = JSOptionalMemberDot (fix a e) emptyAnnot (fixEmpty p)
   fix a (JSOptionalMemberSquare e _ p _) = JSOptionalMemberSquare (fix a e) emptyAnnot (fixEmpty p) emptyAnnot
   fix a (JSOptionalCallExpression e _ args _) = JSOptionalCallExpression (fix a e) emptyAnnot (fixEmpty args) emptyAnnot
+  fix a (JSAsyncArrowExpression _ ps _ body) = JSAsyncArrowExpression a (fix a ps) emptyAnnot (fix a body)
+  fix a (JSAsyncGeneratorExpression _ _ _ n _ x2s _ x3) = JSAsyncGeneratorExpression a emptyAnnot emptyAnnot (fixEmpty n) emptyAnnot (fixEmpty x2s) emptyAnnot (fixEmpty x3)
 
 instance MinifyJS JSArrowParameterList where
   fix _ (JSUnparenthesizedArrowParameter p) = JSUnparenthesizedArrowParameter (fixEmpty p)
@@ -324,6 +332,7 @@ instance MinifyJS JSAssignOp where
   fix a (JSLogicalAndAssign _) = JSLogicalAndAssign a
   fix a (JSLogicalOrAssign _) = JSLogicalOrAssign a
   fix a (JSNullishAssign _) = JSNullishAssign a
+  fix a (JSExponentiationAssign _) = JSExponentiationAssign a
 
 instance MinifyJS JSModuleItem where
   fix _ (JSModuleImportDeclaration _ x1) = JSModuleImportDeclaration emptyAnnot (fixEmpty x1)
@@ -389,6 +398,7 @@ instance MinifyJS JSExportSpecifier where
 instance MinifyJS JSTryCatch where
   fix a (JSCatch _ _ x1 _ x3) = JSCatch a emptyAnnot (fixEmpty x1) emptyAnnot (fixEmpty x3)
   fix a (JSCatchIf _ _ x1 _ ex _ x3) = JSCatchIf a emptyAnnot (fixEmpty x1) spaceAnnot (fixSpace ex) emptyAnnot (fixEmpty x3)
+  fix a (JSCatchNoParam _ x3) = JSCatchNoParam a (fixEmpty x3)
 
 instance MinifyJS JSTryFinally where
   fix a (JSFinally _ x) = JSFinally a (fixEmpty x)
@@ -473,6 +483,12 @@ instance MinifyJS [JSClassElement] where
   fix a (JSPrivateField _ name _ (Just initializer) _ : t) = JSPrivateField a name a (Just (fixSpace initializer)) semi : fixEmpty t
   fix a (JSPrivateMethod _ name _ params _ block : t) = JSPrivateMethod a name a (fixEmpty params) a (fixSpace block) : fixEmpty t
   fix a (JSPrivateAccessor accessor _ name _ params _ block : t) = JSPrivateAccessor (fixSpace accessor) a name a (fixEmpty params) a (fixSpace block) : fixEmpty t
+  fix a (JSClassField name _ Nothing _ : t) = JSClassField (fixEmpty name) a Nothing semi : fixEmpty t
+  fix a (JSClassField name _ (Just initializer) _ : t) = JSClassField (fixEmpty name) a (Just (fixEmpty initializer)) semi : fixEmpty t
+  fix a (JSClassStaticField _ name _ Nothing _ : t) = JSClassStaticField a (fixEmpty name) a Nothing semi : fixEmpty t
+  fix a (JSClassStaticField _ name _ (Just initializer) _ : t) = JSClassStaticField a (fixEmpty name) a (Just (fixEmpty initializer)) semi : fixEmpty t
+  fix a (JSClassStaticBlock _ block : t) = JSClassStaticBlock a (fixEmpty block) : fixEmpty t
+  fix a (JSAsyncGeneratorMethodDefinition _ _ name _ params _ block : t) = JSAsyncGeneratorMethodDefinition a emptyAnnot (fixEmpty name) emptyAnnot (fixEmpty params) emptyAnnot (fixEmpty block) : fixEmpty t
 
 spaceAnnot :: JSAnnot
 spaceAnnot = JSAnnot tokenPosnEmpty [WhiteSpace tokenPosnEmpty " "]

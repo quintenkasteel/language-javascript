@@ -237,6 +237,31 @@ testProgramParser = describe "Program parser:" $ do
       Left err -> expectationFailure ("Parse should succeed: " ++ show err)
       Right ast -> expectationFailure ("Expected program with var and function, got: " ++ show ast)
 
+  it "hashbang comments" $ do
+    case parseBS "#!/usr/bin/env node\nvar x = 1" of
+      Right (JSAstProgram [JSVariable _ (JSLOne (JSVarInitExpression (JSIdentifier _ "x") (JSVarInit _ (JSDecimal _ 1)))) _] _) -> pure ()
+      result -> expectationFailure ("Expected program with hashbang and var declaration, got: " ++ show result)
+    case parseBS "#!/usr/bin/env node\n" of
+      Right (JSAstProgram [] _) -> pure ()
+      result -> expectationFailure ("Expected empty program with hashbang, got: " ++ show result)
+    case parseBS "#!/usr/bin/env node\nfunction f() {}\nvar y = 2" of
+      Right (JSAstProgram [JSFunction _ (JSIdentName _ "f") _ JSLNil _ (JSBlock _ [] _) _, JSVariable _ (JSLOne (JSVarInitExpression (JSIdentifier _ "y") (JSVarInit _ (JSDecimal _ 2)))) _] _) -> pure ()
+      result -> expectationFailure ("Expected program with hashbang, function, and var, got: " ++ show result)
+
+  it "for await...of" $ do
+    case testProg "async function f() { for await (const x of y) { } }" of
+      Right (JSAstProgram [JSAsyncFunction _ _ (JSIdentName _ "f") _ JSLNil _ (JSBlock _ [JSForAwaitConstOf _ _ _ _ (JSIdentifier _ "x") _ (JSIdentifier _ "y") _ (JSStatementBlock _ [] _ _)] _) _] _) -> pure ()
+      result -> expectationFailure ("Expected async function with for-await-const-of, got: " ++ show result)
+    case testProg "async function f() { for await (let x of y) { } }" of
+      Right (JSAstProgram [JSAsyncFunction _ _ (JSIdentName _ "f") _ JSLNil _ (JSBlock _ [JSForAwaitLetOf _ _ _ _ (JSIdentifier _ "x") _ (JSIdentifier _ "y") _ (JSStatementBlock _ [] _ _)] _) _] _) -> pure ()
+      result -> expectationFailure ("Expected async function with for-await-let-of, got: " ++ show result)
+    case testProg "async function f() { for await (var x of y) { } }" of
+      Right (JSAstProgram [JSAsyncFunction _ _ (JSIdentName _ "f") _ JSLNil _ (JSBlock _ [JSForAwaitVarOf _ _ _ _ (JSIdentifier _ "x") _ (JSIdentifier _ "y") _ (JSStatementBlock _ [] _ _)] _) _] _) -> pure ()
+      result -> expectationFailure ("Expected async function with for-await-var-of, got: " ++ show result)
+    case testProg "async function f() { for await (x of y) { } }" of
+      Right (JSAstProgram [JSAsyncFunction _ _ (JSIdentName _ "f") _ JSLNil _ (JSBlock _ [JSForAwaitOf _ _ _ (JSIdentifier _ "x") _ (JSIdentifier _ "y") _ (JSStatementBlock _ [] _ _)] _) _] _) -> pure ()
+      result -> expectationFailure ("Expected async function with for-await-of, got: " ++ show result)
+
 testProg :: String -> Either String JSAST
 testProg str = parseUsing parseProgram str "src"
 

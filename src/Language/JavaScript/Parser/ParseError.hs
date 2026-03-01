@@ -303,11 +303,11 @@ renderParseError err = case err of
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidEscapeSequence seq pos ctx errSuggestions ->
+  InvalidEscapeSequence escSeq pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
         suggestStr = renderSuggestions errSuggestions
-     in "[Validation Error] Invalid escape sequence '" ++ seq ++ "' at " ++ posStr
+     in "[Validation Error] Invalid escape sequence '" ++ escSeq ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
@@ -319,11 +319,11 @@ renderParseError err = case err of
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr
-  InvalidUnicodeSequence seq pos ctx errSuggestions ->
+  InvalidUnicodeSequence unicodeSeq pos ctx errSuggestions ->
     let posStr = show pos
         contextStr = renderContext ctx
         suggestStr = renderSuggestions errSuggestions
-     in "[Validation Error] Invalid unicode sequence '" ++ seq ++ "' at " ++ posStr
+     in "[Validation Error] Invalid unicode sequence '" ++ unicodeSeq ++ "' at " ++ posStr
           ++ "\n  Context: "
           ++ contextStr
           ++ suggestStr

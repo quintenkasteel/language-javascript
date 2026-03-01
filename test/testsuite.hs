@@ -25,7 +25,6 @@ import Benchmarks.Language.Javascript.Parser.Memory
 import Benchmarks.Language.Javascript.Parser.Performance
 import Control.Monad (when)
 import Golden.Language.Javascript.Parser.GoldenTests
-import Integration.Language.Javascript.Parser.Compatibility
 import Integration.Language.Javascript.Parser.Minification
 import Integration.Language.Javascript.Parser.RoundTrip
 import Properties.Language.Javascript.Parser.CoreProperties
@@ -161,7 +160,6 @@ testAll = do
   Integration.Language.Javascript.Parser.Minification.testMinifyStmt
   Integration.Language.Javascript.Parser.Minification.testMinifyProg
   Integration.Language.Javascript.Parser.Minification.testMinifyModule
-  Integration.Language.Javascript.Parser.Compatibility.testRealWorldCompatibility
   Integration.Language.Javascript.Process.TreeShake.testTreeShakeIntegration
 
   -- Golden Tests

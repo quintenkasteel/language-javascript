@@ -108,8 +108,8 @@ configureAggressive opts = opts
 -- Ensures that the specified identifiers are never removed
 -- even if they appear unused within the analyzed code.
 configurePreserveExports :: [Text.Text] -> TreeShakeOptions -> TreeShakeOptions
-configurePreserveExports exports opts = opts
-  & Language.JavaScript.Process.TreeShake.Types.preserveExports .~ Set.fromList exports
+configurePreserveExports exportNames opts = opts
+  & Language.JavaScript.Process.TreeShake.Types.preserveExports .~ Set.fromList exportNames
 
 -- | Enable preservation of side effect statements.
 --
@@ -145,10 +145,9 @@ iterativeTreeShake opts ast = go ast (0 :: Int)
              then currentAst  -- Fixpoint reached
              else go optimizedAst (iteration + 1)
 
--- | Check if two ASTs are structurally equal.
--- Simple implementation using string representation for now.
+-- | Check if two ASTs are structurally equal using derived 'Eq' instance.
 astEqual :: JSAST -> JSAST -> Bool
-astEqual ast1 ast2 = show ast1 == show ast2
+astEqual = (==)
 
 -- | Remove unused code and return analysis information.
 --

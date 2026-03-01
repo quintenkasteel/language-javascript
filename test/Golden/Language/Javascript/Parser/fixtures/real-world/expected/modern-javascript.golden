@@ -1,2 +1,2 @@
 PARSE_ERROR:
-SyntaxError 1:1 "lexical error" []
+test/Golden/Language/Javascript/Parser/fixtures/real-world/inputs/modern-javascript.js: SyntaxError 1:1 "lexical error" []

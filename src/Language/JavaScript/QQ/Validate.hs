@@ -68,9 +68,7 @@ js =
 validateJS :: String -> Q Exp
 validateJS input = do
   loc <- TH.location
-  TH.runIO (putStrLn ("QQ DEBUG: input = " <> show input))
   eitherExc <- TH.runIO (try (evaluate (parseToString input (TH.loc_filename loc))) :: IO (Either SomeException String))
-  TH.runIO (putStrLn ("QQ DEBUG: result = " <> show eitherExc))
   case eitherExc of
     Left exc -> fail ("js: exception during parse: " <> show exc)
     Right "OK" -> TH.litE (TH.stringL input)

@@ -348,6 +348,25 @@ testStatementParser = describe "Parse statements:" $ do
       Right (JSAstStatement (JSClass {}) _) -> pure ()
       result -> expectationFailure ("Expected static async generator to parse, got: " ++ show result)
 
+  it "optional catch binding" $ do
+    case testStatement "try { x } catch { y }" of
+      Right (JSAstStatement (JSTry _ _ [JSCatchNoParam _ _] _) _) -> pure ()
+      result -> expectationFailure ("Expected try/catch without parameter (JSCatchNoParam), got: " ++ show result)
+    case testStatement "try { throw 1 } catch { return 2 }" of
+      Right (JSAstStatement (JSTry _ _ [JSCatchNoParam _ _] _) _) -> pure ()
+      result -> expectationFailure ("Expected try/catch without parameter for throw/return, got: " ++ show result)
+    case testStatement "try { x } catch { y } finally { z }" of
+      Right (JSAstStatement (JSTry _ _ [JSCatchNoParam _ _] (JSFinally _ _)) _) -> pure ()
+      result -> expectationFailure ("Expected try/catch-no-param/finally, got: " ++ show result)
+
+  it "debugger" $ do
+    case testStatement "debugger" of
+      Right (JSAstStatement (JSDebugger _ _) _) -> pure ()
+      result -> expectationFailure ("Expected debugger statement, got: " ++ show result)
+    case testStatement "debugger;" of
+      Right (JSAstStatement (JSDebugger _ _) _) -> pure ()
+      result -> expectationFailure ("Expected debugger statement with semicolon, got: " ++ show result)
+
 -- | Original function for existing string-based tests
 testStmt :: String -> String
 testStmt str = showStrippedMaybeString (parseUsing parseStatement str "src")

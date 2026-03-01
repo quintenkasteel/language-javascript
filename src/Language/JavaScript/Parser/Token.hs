@@ -9,15 +9,15 @@
 -----------------------------------------------------------------------------
 
 -- |
--- Module      : Language.Python.Common.Token
+-- Module      : Language.JavaScript.Parser.Token
 -- Copyright   : (c) 2009 Bernie Pope
 -- License     : BSD-style
 -- Maintainer  : bjpop@csse.unimelb.edu.au
 -- Stability   : experimental
 -- Portability : ghc
 --
--- Lexical tokens for the Python lexer. Contains the superset of tokens from
--- version 2 and version 3 of Python (they are mostly the same).
+-- Lexical tokens for the JavaScript lexer. Defines the token types produced
+-- by the lexer and consumed by the parser.
 module Language.JavaScript.Parser.Token
   ( -- * The tokens
     Token (..),

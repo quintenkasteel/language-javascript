@@ -68,9 +68,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Char as Char
 import Data.List (group, intercalate, nub, sort)
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Numeric
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -82,8 +81,6 @@ import Language.JavaScript.Parser.AST
     JSAnnot (..),
     JSArrayElement (..),
     JSArrowParameterList (..),
-    JSAssignOp (..),
-    JSBinOp (..),
     JSBlock (..),
     JSClassElement (..),
     JSClassHeritage (..),
@@ -94,7 +91,6 @@ import Language.JavaScript.Parser.AST
     JSExportDeclaration (..),
     JSExportSpecifier (..),
     JSExpression (..),
-    JSFromClause (..),
     JSIdent (..),
     JSImportAttribute (..),
     JSImportAttributes (..),
@@ -107,7 +103,6 @@ import Language.JavaScript.Parser.AST
     JSModuleItem (..),
     JSObjectProperty (..),
     JSPropertyName (..),
-    JSSemi (..),
     JSStatement (..),
     JSSwitchParts (..),
     JSTemplatePart (..),
@@ -122,12 +117,9 @@ import Language.JavaScript.Parser.Token
   ( JSDocComment(..)
   , JSDocTag(..)
   , JSDocTagSpecific(..)
-  , JSDocAccess(..)
-  , JSDocProperty(..)
   , JSDocType(..)
   , JSDocObjectField(..)
   , JSDocEnumValue(..)
-  , CommentAnnotation(..)
   )
 
 -- | Strongly typed validation errors with comprehensive JavaScript coverage.
@@ -861,79 +853,79 @@ validateStatement ctx stmt = case stmt of
   JSConstant _annot exprs _semi ->
     concatMap (validateExpression ctx) (fromCommaList exprs)
       ++ validateConstDeclarations ctx (fromCommaList exprs)
-  JSClass _annot name heritage _lbrace elements _rbrace _semi ->
+  JSClass _annot _name heritage _lbrace elements _rbrace _semi ->
     let classCtx = ctx {contextInClass = True, contextSuperContext = hasHeritage heritage}
      in validateClassHeritage ctx heritage
           ++ concatMap (validateClassElement classCtx) elements
           ++ validateClassElements elements
-  JSDoWhile _do stmt _while _lparen expr _rparen _semi ->
+  JSDoWhile _do bodyStmt _while _lparen expr _rparen _semi ->
     let loopCtx = ctx {contextInLoop = True}
-     in validateStatement loopCtx stmt
+     in validateStatement loopCtx bodyStmt
           ++ validateExpression ctx expr
-  JSFor _for _lparen init _semi1 test _semi2 update _rparen stmt ->
+  JSFor _for _lparen forInit _semi1 test _semi2 update _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
-     in concatMap (validateExpression ctx) (fromCommaList init)
+     in concatMap (validateExpression ctx) (fromCommaList forInit)
           ++ concatMap (validateExpression ctx) (fromCommaList test)
           ++ concatMap (validateExpression ctx) (fromCommaList update)
-          ++ validateStatement loopCtx stmt
-  JSForIn _for _lparen lhs _in rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForIn _for _lparen lhs _in rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForInLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForVar _for _lparen _var decls _semi1 test _semi2 update _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForVar _for _lparen _var decls _semi1 test _semi2 update _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in concatMap (validateExpression ctx) (fromCommaList decls)
           ++ concatMap (validateExpression ctx) (fromCommaList test)
           ++ concatMap (validateExpression ctx) (fromCommaList update)
-          ++ validateStatement loopCtx stmt
-  JSForVarIn _for _lparen _var lhs _in rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForVarIn _for _lparen _var lhs _in rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForInLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForLet _for _lparen _let decls _semi1 test _semi2 update _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForLet _for _lparen _let decls _semi1 test _semi2 update _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in concatMap (validateExpression ctx) (fromCommaList decls)
           ++ concatMap (validateExpression ctx) (fromCommaList test)
           ++ concatMap (validateExpression ctx) (fromCommaList update)
-          ++ validateStatement loopCtx stmt
-  JSForLetIn _for _lparen _let lhs _in rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForLetIn _for _lparen _let lhs _in rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForInLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForLetOf _for _lparen _let lhs _of rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForLetOf _for _lparen _let lhs _of rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForOfLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForConst _for _lparen _const decls _semi1 test _semi2 update _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForConst _for _lparen _const decls _semi1 test _semi2 update _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in concatMap (validateExpression ctx) (fromCommaList decls)
           ++ concatMap (validateExpression ctx) (fromCommaList test)
           ++ concatMap (validateExpression ctx) (fromCommaList update)
-          ++ validateStatement loopCtx stmt
-  JSForConstIn _for _lparen _const lhs _in rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForConstIn _for _lparen _const lhs _in rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForInLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForConstOf _for _lparen _const lhs _of rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForConstOf _for _lparen _const lhs _of rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForOfLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForOf _for _lparen lhs _of rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForOf _for _lparen lhs _of rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForOfLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
-  JSForVarOf _for _lparen _var lhs _of rhs _rparen stmt ->
+          ++ validateStatement loopCtx bodyStmt
+  JSForVarOf _for _lparen _var lhs _of rhs _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateForOfLHS ctx lhs
           ++ validateExpression ctx rhs
-          ++ validateStatement loopCtx stmt
+          ++ validateStatement loopCtx bodyStmt
   JSAsyncFunction _async _function name _lparen params _rparen block _semi ->
     let funcCtx = ctx {contextInFunction = True, contextInAsync = True}
      in validateFunctionName ctx name
@@ -956,8 +948,8 @@ validateStatement ctx stmt = case stmt of
     validateExpression ctx test
       ++ validateStatement ctx consequent
       ++ validateStatement ctx alternate
-  JSLabelled label _colon stmt ->
-    validateLabelledStatement ctx label stmt
+  JSLabelled label _colon labelledStmt ->
+    validateLabelledStatement ctx label labelledStmt
   JSEmptyStatement _semi -> []
   JSExpressionStatement expr _semi ->
     validateExpression ctx expr
@@ -983,12 +975,38 @@ validateStatement ctx stmt = case stmt of
       ++ validateFinallyClause ctx finally'
   JSVariable _var decls _semi ->
     concatMap (validateExpression ctx) (fromCommaList decls)
-  JSWhile _while _lparen test _rparen stmt ->
+  JSWhile _while _lparen test _rparen bodyStmt ->
     let loopCtx = ctx {contextInLoop = True}
      in validateExpression ctx test
-          ++ validateStatement loopCtx stmt
-  JSWith _with _lparen object _rparen stmt _semi ->
-    validateWithStatement ctx object stmt
+          ++ validateStatement loopCtx bodyStmt
+  JSWith _with _lparen object _rparen withBody _semi ->
+    validateWithStatement ctx object withBody
+  JSDebugger _ _ -> []
+  JSAsyncGenerator _ _ _ name _ params _ block _ ->
+    let genCtx = ctx {contextInFunction = True, contextInGenerator = True, contextInAsync = True}
+     in validateFunctionName ctx name
+          ++ validateFunctionParameters ctx (fromCommaList params)
+          ++ validateBlock genCtx block
+  JSForAwaitOf _ _ _ lhs _ rhs _ bodyStmt ->
+    let loopCtx = ctx {contextInLoop = True}
+     in validateForOfLHS ctx lhs
+          ++ validateExpression ctx rhs
+          ++ validateStatement loopCtx bodyStmt
+  JSForAwaitVarOf _ _ _ _ lhs _ rhs _ bodyStmt ->
+    let loopCtx = ctx {contextInLoop = True}
+     in validateForOfLHS ctx lhs
+          ++ validateExpression ctx rhs
+          ++ validateStatement loopCtx bodyStmt
+  JSForAwaitLetOf _ _ _ _ lhs _ rhs _ bodyStmt ->
+    let loopCtx = ctx {contextInLoop = True}
+     in validateForOfLHS ctx lhs
+          ++ validateExpression ctx rhs
+          ++ validateStatement loopCtx bodyStmt
+  JSForAwaitConstOf _ _ _ _ lhs _ rhs _ bodyStmt ->
+    let loopCtx = ctx {contextInLoop = True}
+     in validateForOfLHS ctx lhs
+          ++ validateExpression ctx rhs
+          ++ validateStatement loopCtx bodyStmt
 
 -- | Validate JavaScript expressions with comprehensive edge case coverage.
 validateExpression :: ValidationContext -> JSExpression -> [ValidationError]
@@ -1020,8 +1038,8 @@ validateExpression ctx expr = case expr of
     validateExpression ctx lhs
       ++ validateExpression ctx rhs
       ++ validateAssignmentTarget lhs
-  JSAwaitExpression _await expr ->
-    validateAwaitExpression ctx expr
+  JSAwaitExpression _await awaitExpr ->
+    validateAwaitExpression ctx awaitExpr
   JSCallExpression callee _lparen args _rparen ->
     validateExpression ctx callee
       ++ concatMap (validateExpression ctx) (fromCommaList args)
@@ -1032,7 +1050,7 @@ validateExpression ctx expr = case expr of
   JSCallExpressionSquare obj _lbracket prop _rbracket ->
     validateExpression ctx obj
       ++ validateExpression ctx prop
-  JSClassExpression _class name heritage _lbrace elements _rbrace ->
+  JSClassExpression _class _name heritage _lbrace elements _rbrace ->
     let classCtx = ctx {contextInClass = True, contextSuperContext = hasHeritage heritage}
      in validateClassHeritage ctx heritage
           ++ concatMap (validateClassElement classCtx) elements
@@ -1043,11 +1061,11 @@ validateExpression ctx expr = case expr of
   JSExpressionBinary left _op right ->
     validateExpression ctx left
       ++ validateExpression ctx right
-  JSExpressionParen _lparen expr _rparen ->
-    validateExpression ctx expr
-  JSExpressionPostfix expr _op ->
-    validateExpression ctx expr
-      ++ validateAssignmentTarget expr
+  JSExpressionParen _lparen parenExpr _rparen ->
+    validateExpression ctx parenExpr
+  JSExpressionPostfix postfixExpr _op ->
+    validateExpression ctx postfixExpr
+      ++ validateAssignmentTarget postfixExpr
   JSExpressionTernary test _question consequent _colon alternate ->
     validateExpression ctx test
       ++ validateExpression ctx consequent
@@ -1075,6 +1093,8 @@ validateExpression ctx expr = case expr of
     validateExpression ctx obj
       ++ validateExpression ctx prop
       ++ validateMemberExpression ctx obj prop
+  JSMemberPrivateDot obj _dot _hash _name ->
+    validateExpression ctx obj
   JSMemberExpression obj _lparen args _rparen ->
     validateExpression ctx obj
       ++ concatMap (validateExpression ctx) (fromCommaList args)
@@ -1097,26 +1117,35 @@ validateExpression ctx expr = case expr of
       ++ concatMap (validateExpression ctx) (fromCommaList args)
   JSObjectLiteral _lbrace props _rbrace ->
     validateObjectLiteral ctx props
-  JSSpreadExpression _spread expr ->
-    validateExpression ctx expr
+  JSSpreadExpression _spread spreadExpr ->
+    validateExpression ctx spreadExpr
   JSTemplateLiteral maybeTag _backtick _head parts ->
     maybe [] (validateExpression ctx) maybeTag
       ++ concatMap (validateTemplatePart ctx) parts
       ++ validateTemplateLiteral maybeTag parts
-  JSUnaryExpression op expr ->
-    validateExpression ctx expr
-      ++ validateUnaryExpression ctx op expr
-  JSVarInitExpression expr init ->
-    validateExpression ctx expr
-      ++ validateVarInitializer ctx init
+  JSUnaryExpression unaryOp unaryExpr ->
+    validateExpression ctx unaryExpr
+      ++ validateUnaryExpression ctx unaryOp unaryExpr
+  JSVarInitExpression varExpr varInit ->
+    validateExpression ctx varExpr
+      ++ validateVarInitializer ctx varInit
   JSYieldExpression _yield maybeExpr ->
     validateYieldExpression ctx maybeExpr
-  JSYieldFromExpression _yield _from expr ->
-    validateYieldExpression ctx (Just expr)
+  JSYieldFromExpression _yield _from yieldExpr ->
+    validateYieldExpression ctx (Just yieldExpr)
   JSImportMeta import_annot _dot ->
     [ImportMetaOutsideModule (extractAnnotationPos import_annot) | not (contextInModule ctx)]
-  JSImportCall _import _lparen expr _rparen ->
-    validateExpression ctx expr
+  JSImportCall _import _lparen importArg _rparen ->
+    validateExpression ctx importArg
+  JSAsyncArrowExpression _ params _ body ->
+    let asyncCtx = ctx {contextInFunction = True, contextInAsync = True}
+     in validateArrowParameters ctx params
+          ++ validateConciseBody asyncCtx body
+  JSAsyncGeneratorExpression _ _ _ name _ params _ block ->
+    let genCtx = ctx {contextInFunction = True, contextInGenerator = True, contextInAsync = True}
+     in validateOptionalFunctionName ctx name
+          ++ validateFunctionParameters ctx (fromCommaList params)
+          ++ validateBlock genCtx block
 
 -- | Validate module items with import/export semantics.
 validateModuleItem :: ValidationContext -> JSModuleItem -> [ValidationError]
@@ -1137,6 +1166,7 @@ validateAssignmentTarget :: JSExpression -> [ValidationError]
 validateAssignmentTarget expr = case expr of
   JSIdentifier _annot _name -> []
   JSMemberDot _obj _dot _prop -> []
+  JSMemberPrivateDot _obj _dot _hash _name -> []
   JSMemberSquare _obj _lbracket _prop _rbracket -> []
   JSOptionalMemberDot _obj _optDot _prop -> []
   JSOptionalMemberSquare _obj _optLbracket _prop _rbracket -> []
@@ -1273,6 +1303,8 @@ validateExpressionInParameterDefault ctx expr = case expr of
     validateExpressionInParameterDefault ctx func
       ++ concatMap (validateExpressionInParameterDefault ctx) (fromCommaList args)
   JSMemberDot obj _dot _prop ->
+    validateExpressionInParameterDefault ctx obj
+  JSMemberPrivateDot obj _dot _hash _name ->
     validateExpressionInParameterDefault ctx obj
   JSMemberSquare obj _lb index _rb ->
     validateExpressionInParameterDefault ctx obj
@@ -1435,9 +1467,9 @@ validateStringEscapes = go
     validateUnicodeCodePoint rest = case break (== '}') rest of
       (hexDigits, '}' : remaining)
         | length hexDigits >= 1 && length hexDigits <= 6 && all isHexDigit hexDigits ->
-          case Numeric.readHex hexDigits of
+          case (Numeric.readHex hexDigits :: [(Int, String)]) of
             [(codePoint, "")] | codePoint <= 0x10FFFF -> go remaining
-            [(codePoint, "")] ->
+            [(_, "")] ->
               [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
             _ -> [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
         | otherwise -> [InvalidEscapeSequence (Text.pack ("\\u{" ++ hexDigits ++ "}")) (TokenPn 0 0 0)] ++ go remaining
@@ -1478,7 +1510,7 @@ parseRegexLiteral regex = case regex of
     parseRegexParts :: String -> Either ValidationError (String, String)
     parseRegexParts = go ""
       where
-        go acc [] = Left (InvalidRegexPattern (Text.pack regex) (TokenPn 0 0 0))
+        go _acc [] = Left (InvalidRegexPattern (Text.pack regex) (TokenPn 0 0 0))
         go acc ('\\' : c : rest) = go (acc ++ ['\\', c]) rest
         go acc ('/' : flags) = Right (acc, flags)
         go acc (c : rest) = go (acc ++ [c]) rest
@@ -1492,7 +1524,7 @@ validateRegexPattern = validateRegexSyntax
       where
         go :: Int -> [Char] -> String -> [ValidationError]
         go _ _ [] = []
-        go depth stack ('\\' : c : rest) = go depth stack rest -- Skip escaped chars
+        go depth stack ('\\' : _ : rest) = go depth stack rest -- Skip escaped chars
         go depth stack ('[' : rest) = go depth ('[' : stack) rest
         go depth (s : stack') (']' : rest) | s == '[' = go depth stack' rest
         go depth stack ('(' : rest) = go (depth + 1) ('(' : stack) rest
@@ -1564,7 +1596,7 @@ validateArrayLiteral elements = concatMap validateArrayElement' elements
   where
     validateArrayElement' :: JSArrayElement -> [ValidationError]
     validateArrayElement' element = case element of
-      JSArrayElement expr -> [] -- Expression validation handled elsewhere
+      JSArrayElement _ -> [] -- Expression validation handled elsewhere
       JSArrayComma _ -> [] -- Comma elements are valid (sparse arrays)
 
 validateCallExpression :: ValidationContext -> JSExpression -> JSCommaList JSExpression -> [ValidationError]
@@ -1630,6 +1662,7 @@ validateObjectLiteral ctx props =
       JSMethodDefinition propName _ _ _ _ -> getPropertyNameText propName
       JSGeneratorMethodDefinition _ propName _ _ _ _ -> getPropertyNameText propName
       JSPropertyAccessor _ propName _ _ _ _ -> getPropertyNameText propName
+      JSAsyncMethodDefinition _ propName _ _ _ _ -> getPropertyNameText propName
 
 -- | Validate individual object property.
 validateObjectProperty :: ValidationContext -> JSObjectProperty -> [ValidationError]
@@ -1655,7 +1688,7 @@ validateTemplateLiteral :: Maybe JSExpression -> [JSTemplatePart] -> [Validation
 validateTemplateLiteral maybeTag parts =
   let tagErrors = case maybeTag of
         Nothing -> []
-        Just tag -> [] -- Tag validation handled elsewhere
+        Just _ -> [] -- Tag validation handled elsewhere
       partErrors = concatMap validateTemplatePart' parts
    in tagErrors ++ partErrors
   where
@@ -1663,8 +1696,8 @@ validateTemplateLiteral maybeTag parts =
     validateTemplatePart' (JSTemplatePart _expr _ _) = [] -- Template parts are validated during expression validation
 
 validateVarInitializer :: ValidationContext -> JSVarInitializer -> [ValidationError]
-validateVarInitializer ctx init = case init of
-  JSVarInit _eq expr -> validateExpression ctx expr
+validateVarInitializer ctx varInit = case varInit of
+  JSVarInit _eq initExpr -> validateExpression ctx initExpr
   JSVarInitNone -> []
 
 validateArrowParameters :: ValidationContext -> JSArrowParameterList -> [ValidationError]
@@ -1700,10 +1733,20 @@ validateClassElement ctx element = case element of
   JSClassInstanceMethod method -> validateMethodDefinition ctx method
   JSClassStaticMethod _static method -> validateMethodDefinition ctx method
   JSClassSemi _semi -> []
-  JSPrivateField _annot _name _eq init _semi ->
-    maybe [] (validateExpression ctx) init
+  JSPrivateField _annot _name _eq fieldInit _semi ->
+    maybe [] (validateExpression ctx) fieldInit
   JSPrivateMethod _annot _name _lp _params _rp _block -> [] -- Private method validation handled elsewhere
   JSPrivateAccessor _accessor _annot _name _lp _params _rp _block -> [] -- Private accessor validation handled elsewhere
+  JSClassField _name _eq fieldInit _semi ->
+    maybe [] (validateExpression ctx) fieldInit
+  JSClassStaticField _annot _name _eq fieldInit _semi ->
+    maybe [] (validateExpression ctx) fieldInit
+  JSClassStaticBlock _annot block ->
+    validateBlock ctx block
+  JSAsyncGeneratorMethodDefinition _ _ _name _ params _ block ->
+    let genCtx = ctx {contextInFunction = True, contextInGenerator = True, contextInAsync = True}
+     in validateFunctionParameters ctx (fromCommaList params)
+          ++ validateBlock genCtx block
 
 validateClassElements :: [JSClassElement] -> [ValidationError]
 validateClassElements elements =
@@ -1723,19 +1766,24 @@ validateClassElements elements =
     extractMethodNames = concatMap extractMethodName
       where
         extractMethodName :: JSClassElement -> [Text]
-        extractMethodName element = case element of
+        extractMethodName classElem = case classElem of
           JSClassInstanceMethod method -> [getMethodName method]
           JSClassStaticMethod _ method -> [getMethodName method]
           JSClassSemi _ -> []
-          JSPrivateField _ name _ _ _ -> [Text.decodeUtf8 ( ("#" <> name))]
-          JSPrivateMethod _ name _ _ _ _ -> [Text.decodeUtf8 ( ("#" <> name))]
-          JSPrivateAccessor _ _ name _ _ _ _ -> [Text.decodeUtf8 ( ("#" <> name))]
+          JSPrivateField _ name _ _ _ -> [Text.decodeUtf8 ("#" <> name)]
+          JSPrivateMethod _ name _ _ _ _ -> [Text.decodeUtf8 ("#" <> name)]
+          JSPrivateAccessor _ _ name _ _ _ _ -> [Text.decodeUtf8 ("#" <> name)]
+          JSClassField propName _ _ _ -> [getPropertyNameFromMethod propName]
+          JSClassStaticField _ propName _ _ _ -> [getPropertyNameFromMethod propName]
+          JSClassStaticBlock _ _ -> []
+          JSAsyncGeneratorMethodDefinition _ _ propName _ _ _ _ -> [getPropertyNameFromMethod propName]
 
         getMethodName :: JSMethodDefinition -> Text
         getMethodName method = case method of
           JSMethodDefinition propName _ _ _ _ -> getPropertyNameFromMethod propName
           JSGeneratorMethodDefinition _ propName _ _ _ _ -> getPropertyNameFromMethod propName
           JSPropertyAccessor _ propName _ _ _ _ -> getPropertyNameFromMethod propName
+          JSAsyncMethodDefinition _ propName _ _ _ _ -> getPropertyNameFromMethod propName
 
         getPropertyNameFromMethod :: JSPropertyName -> Text
         getPropertyNameFromMethod propName = case propName of
@@ -1812,11 +1860,16 @@ validateMethodDefinition ctx method = case method of
      in validatePropertyName ctx propName
           ++ validateAccessorParameters accessor params
           ++ validateBlock accessorCtx body
+  JSAsyncMethodDefinition _async propName _lparen params _rparen body ->
+    let asyncCtx = ctx {contextInFunction = True, contextInAsync = True, contextInMethod = True}
+     in validatePropertyName ctx propName
+          ++ validateFunctionParameters ctx (fromCommaList params)
+          ++ validateBlock asyncCtx body
   where
     validateMethodConstraints :: JSMethodDefinition -> [ValidationError]
     validateMethodConstraints _ = [] -- No additional method constraints for basic methods
     validateGeneratorMethodConstraints :: JSMethodDefinition -> [ValidationError]
-    validateGeneratorMethodConstraints method = case method of
+    validateGeneratorMethodConstraints genMethod = case genMethod of
       JSGeneratorMethodDefinition _ propName _ _ _ _ ->
         if isConstructorProperty propName
           then [ConstructorWithGenerator (extractPropertyPosition propName)]
@@ -1892,6 +1945,8 @@ validateCatchClause ctx catchClause = case catchClause of
     validateExpression ctx param ++ validateBlock ctx block
   JSCatchIf _catch _lparen param _if test _rparen block ->
     validateExpression ctx param ++ validateExpression ctx test ++ validateBlock ctx block
+  JSCatchNoParam _catch block ->
+    validateBlock ctx block
 
 validateFinallyClause :: ValidationContext -> JSTryFinally -> [ValidationError]
 validateFinallyClause ctx finally' = case finally' of
@@ -1917,6 +1972,7 @@ validateForIteratorLHS :: JSExpression -> (JSExpression -> TokenPosn -> Validati
 validateForIteratorLHS lhs errorConstructor = case lhs of
   JSIdentifier _annot _name -> []
   JSMemberDot _obj _dot _prop -> []
+  JSMemberPrivateDot _obj _dot _hash _name -> []
   JSMemberSquare _obj _lbracket _prop _rbracket -> []
   JSArrayLiteral _lbracket _elements _rbracket -> []
   JSObjectLiteral _lbrace _props _rbrace -> []
@@ -1952,7 +2008,7 @@ validateDestructuringObject expr = case expr of
       JSPropertyNameandValue _ _ values -> concatMap validateDestructuringPattern values
       JSPropertyIdentRef _ _ -> []
       JSObjectMethod _ -> [InvalidDestructuringTarget (JSLiteral (JSAnnot (TokenPn 0 0 0) []) "method") (TokenPn 0 0 0)]
-      JSObjectSpread _ expr -> validateDestructuringPattern expr
+      JSObjectSpread _ spreadExpr -> validateDestructuringPattern spreadExpr
 
     validateDestructuringPattern :: JSExpression -> [ValidationError]
     validateDestructuringPattern pattern = case pattern of
@@ -1983,6 +2039,7 @@ validateExportDeclaration ctx exportDecl = case exportDecl of
   JSExportLocals _ _ -> []
   JSExportAllFrom _ _ _ -> []
   JSExportAllAsFrom _ _ _ _ _ -> []
+  JSExportDefault _ statement _ -> validateStatement ctx statement
 
 validateNoDuplicateFunctionDeclarations :: [JSStatement] -> [ValidationError]
 validateNoDuplicateFunctionDeclarations stmts =
@@ -2020,12 +2077,13 @@ validateNoDuplicateExports items =
           _ -> []
 
         extractExportDeclNames :: JSExportDeclaration -> [Text]
-        extractExportDeclNames exportDecl = case exportDecl of
-          JSExport stmt _ -> extractStatementBindings stmt
+        extractExportDeclNames decl = case decl of
+          JSExport exportStmt _ -> extractStatementBindings exportStmt
           JSExportFrom _ _ _ -> [] -- Re-exports don't bind local names
           JSExportLocals (JSExportClause _ specs _) _ -> extractExportSpecNames specs
           JSExportAllFrom _ _ _ -> [] -- Namespace export
           JSExportAllAsFrom _ _ _ _ _ -> [] -- Namespace export as name
+          JSExportDefault _ _ _ -> ["default"]
         extractExportSpecNames :: JSCommaList JSExportSpecifier -> [Text]
         extractExportSpecNames specs = concatMap extractSpecName (fromCommaList specs)
           where
@@ -2130,6 +2188,7 @@ extractExpressionPos expr = case expr of
   JSGeneratorExpression annot _ _ _ _ _ _ -> extractAnnotationPos annot
   JSAsyncFunctionExpression annot _ _ _ _ _ _ -> extractAnnotationPos annot
   JSMemberDot obj _ _ -> extractExpressionPos obj
+  JSMemberPrivateDot obj _ _ _ -> extractExpressionPos obj
   JSMemberExpression expr' _ _ _ -> extractExpressionPos expr'
   JSMemberNew annot _ _ _ _ -> extractAnnotationPos annot
   JSMemberSquare obj _ _ _ -> extractExpressionPos obj
@@ -2146,6 +2205,8 @@ extractExpressionPos expr = case expr of
   JSOptionalMemberDot obj _ _ -> extractExpressionPos obj
   JSOptionalMemberSquare obj _ _ _ -> extractExpressionPos obj
   JSOptionalCallExpression callee _ _ _ -> extractExpressionPos callee
+  JSAsyncArrowExpression annot _ _ _ -> extractAnnotationPos annot
+  JSAsyncGeneratorExpression annot _ _ _ _ _ _ _ -> extractAnnotationPos annot
 
 -- | Extract position from statement.
 extractStatementPos :: JSStatement -> TokenPosn
@@ -2186,6 +2247,12 @@ extractStatementPos stmt = case stmt of
   JSVariable annot _ _ -> extractAnnotationPos annot
   JSWhile annot _ _ _ _ -> extractAnnotationPos annot
   JSWith annot _ _ _ _ _ -> extractAnnotationPos annot
+  JSDebugger annot _ -> extractAnnotationPos annot
+  JSAsyncGenerator annot _ _ _ _ _ _ _ _ -> extractAnnotationPos annot
+  JSForAwaitOf annot _ _ _ _ _ _ _ -> extractAnnotationPos annot
+  JSForAwaitVarOf annot _ _ _ _ _ _ _ _ -> extractAnnotationPos annot
+  JSForAwaitLetOf annot _ _ _ _ _ _ _ _ -> extractAnnotationPos annot
+  JSForAwaitConstOf annot _ _ _ _ _ _ _ _ -> extractAnnotationPos annot
 
 -- | Extract position from identifier.
 extractIdentPos :: JSIdent -> TokenPosn
@@ -2233,7 +2300,7 @@ validateParameterTag pos tag =
   case (jsDocTagType tag, jsDocTagParamName tag) of
     (Nothing, _) -> [JSDocInvalidType "missing type" pos]
     (_, Nothing) -> [JSDocMissingParameter "unnamed parameter" pos]
-    (Just tagType, Just paramName) -> validateJSDocTypeStructure tagType pos
+    (Just tagType, Just _paramName) -> validateJSDocTypeStructure tagType pos
 
 -- | Validate JSDoc types structure.
 validateJSDocTypes :: JSDocComment -> [ValidationError]
@@ -2439,15 +2506,14 @@ validateSpecificTag pos tagSpecific tagName = case tagSpecific of
   _ -> []
 
 validateParamSpecific :: TokenPosn -> Text -> Bool -> Bool -> Maybe Text -> [ValidationError]
-validateParamSpecific pos tagName optional variadic defaultValue =
-  let errors = []
-      optionalErrors = if optional && variadic
+validateParamSpecific pos _tagName optional variadic defaultValue =
+  let optionalErrors = if optional && variadic
                       then [JSDocInvalidTagCombination "optional" "variadic" pos]
                       else []
       defaultErrors = case defaultValue of
-        Just value | not optional -> [JSDocInvalidDefaultValue "optional parameter" "non-optional" pos]
+        Just _ | not optional -> [JSDocInvalidDefaultValue "optional parameter" "non-optional" pos]
         _ -> []
-   in errors ++ optionalErrors ++ defaultErrors
+   in optionalErrors ++ defaultErrors
 
 validateAuthorSpecific :: TokenPosn -> Text -> Maybe Text -> [ValidationError]
 validateAuthorSpecific pos name email =
@@ -2505,8 +2571,8 @@ validateMutuallyExclusive pos tagNames =
   let exclusiveGroups = [ ["public", "private", "protected", "package"]
                         , ["class", "constructor", "namespace", "module"]
                         ]
-      checkGroup group =
-        let presentTags = filter (`elem` tagNames) group
+      checkGroup exclusiveGroup =
+        let presentTags = filter (`elem` tagNames) exclusiveGroup
         in case presentTags of
           [] -> []
           [_] -> []
@@ -2640,23 +2706,21 @@ validateCrossReference pos tag = case jsDocTagSpecific tag of
   _ -> []
 
 validateMemberOfReference :: TokenPosn -> Text -> Bool -> [ValidationError]
-validateMemberOfReference pos parent forced =
-  let errors = []
-      parentErrors = if Text.null parent
+validateMemberOfReference pos parent _forced =
+  let parentErrors = if Text.null parent
                     then [JSDocInvalidReferenceFormat "empty parent reference" pos]
                     else []
       formatErrors = if not (isValidIdentifier parent)
                     then [JSDocInvalidReferenceFormat ("invalid parent format: " <> parent) pos]
                     else []
-   in errors ++ parentErrors ++ formatErrors
+   in parentErrors ++ formatErrors
 
 validateSeeReference :: TokenPosn -> Text -> Maybe Text -> [ValidationError]
-validateSeeReference pos reference displayText =
-  let errors = []
-      refErrors = if not (isValidSeeReference reference)
+validateSeeReference pos reference _displayText =
+  let refErrors = if not (isValidSeeReference reference)
                  then [JSDocInvalidReferenceFormat reference pos]
                  else []
-   in errors ++ refErrors
+   in refErrors
 
 isValidIdentifier :: Text -> Bool
 isValidIdentifier text =
@@ -2681,36 +2745,32 @@ validateJSDocSemantics jsDoc =
       ++ validateInheritanceRules pos tags
 
 validateSemanticConsistency :: TokenPosn -> [Text] -> [JSDocTag] -> [ValidationError]
-validateSemanticConsistency pos tagNames tags =
-  let errors = []
-      asyncErrors = if "async" `elem` tagNames && not ("returns" `elem` tagNames)
+validateSemanticConsistency pos tagNames _tags =
+  let asyncErrors = if "async" `elem` tagNames && not ("returns" `elem` tagNames)
                    then [JSDocMissingRequiredTag "returns with Promise type for async functions" pos]
                    else []
       generatorErrors = if "generator" `elem` tagNames && not ("yields" `elem` tagNames)
                        then [JSDocMissingRequiredTag "yields for generator functions" pos]
                        else []
-   in errors ++ asyncErrors ++ generatorErrors
+   in asyncErrors ++ generatorErrors
 
 validateContextualRequirements :: TokenPosn -> [Text] -> [ValidationError]
 validateContextualRequirements pos tagNames =
-  let errors = []
-      overrideErrors = if "override" `elem` tagNames && not ("extends" `elem` tagNames || "implements" `elem` tagNames)
+  let overrideErrors = if "override" `elem` tagNames && not ("extends" `elem` tagNames || "implements" `elem` tagNames)
                       then [JSDocMissingRequiredTag "extends or implements for override" pos]
                       else []
       abstractErrors = if "abstract" `elem` tagNames && "final" `elem` tagNames
                       then [JSDocInvalidTagCombination "abstract" "final" pos]
                       else []
-   in errors ++ overrideErrors ++ abstractErrors
+   in overrideErrors ++ abstractErrors
 
 validateInheritanceRules :: TokenPosn -> [JSDocTag] -> [ValidationError]
 validateInheritanceRules pos tags =
-  let errors = []
-      extendsTags = filter (\tag -> jsDocTagName tag == "extends") tags
-      implementsTags = filter (\tag -> jsDocTagName tag == "implements") tags
+  let extendsTags = filter (\tag -> jsDocTagName tag == "extends") tags
       multipleExtendsErrors = if length extendsTags > 1
                              then [JSDocInvalidTagCombination "multiple extends" "single inheritance" pos]
                              else []
-   in errors ++ multipleExtendsErrors
+   in multipleExtendsErrors
 
 -- | Validate JSDoc example code blocks
 validateJSDocExamples :: JSDocComment -> [ValidationError]
@@ -2728,14 +2788,13 @@ validateExampleTag pos tag =
 
 validateExampleCode :: TokenPosn -> Text -> [ValidationError]
 validateExampleCode pos code =
-  let errors = []
-      emptyErrors = if Text.null (Text.strip code)
+  let emptyErrors = if Text.null (Text.strip code)
                    then [JSDocInvalidType "empty example code" pos]
                    else []
       tooLongErrors = if Text.length code > 2000
                      then [JSDocInvalidType "example code too long" pos]
                      else []
-   in errors ++ emptyErrors ++ tooLongErrors
+   in emptyErrors ++ tooLongErrors
 
 -- ============================================================================
 -- Runtime Validation Functions (Consolidated from Runtime.Validator)
@@ -2822,8 +2881,8 @@ validateRuntimeValueInternal pos expectedType actualValue = case (expectedType, 
       _ -> validateRuntimeValueInternal pos baseType value
   (JSDocEnumType enumName enumValues, value) ->
     validateEnumRuntimeValue pos enumName enumValues value
-  (expectedType, actualValue) ->
-    [RuntimeTypeError (showJSDocType expectedType) (showRuntimeValue actualValue) pos]
+  (otherType, otherValue) ->
+    [RuntimeTypeError (showJSDocType otherType) (showRuntimeValue otherValue) pos]
 
 -- | Validate runtime value against enum specification
 validateEnumRuntimeValue :: TokenPosn -> Text -> [JSDocEnumValue] -> RuntimeValue -> [ValidationError]
@@ -2912,7 +2971,7 @@ formatValidationError err = case err of
   _ -> Text.pack (errorToString err)
   where
     addContextualKeywords :: Text -> Text -> Text -> Text
-    addContextualKeywords expected actual baseMsg
+    addContextualKeywords expected actual _baseMsg
       | Text.isInfixOf "Array" expected =
           "Runtime type error for param1 items: expected '" <> expected <> "', got '" <> actual <> "' " <> Text.pack (showPos (TokenPn 0 0 0))
       | Text.isInfixOf "|" expected =

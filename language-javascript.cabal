@@ -69,18 +69,16 @@ Library
                        Language.JavaScript.Process.Minify
                        Language.JavaScript.Process.TreeShake
                        Language.JavaScript.Process.TreeShake.Types
-                       Language.JavaScript.Runtime.Integration
-                       -- Internal modules (unstable API, subject to change)
-                       Language.JavaScript.Parser.Pos
-                       Language.JavaScript.Parser.Primitives
-                       Language.JavaScript.Parser.Lexer
-                       Language.JavaScript.Parser.Operators
-                       Language.JavaScript.Parser.Literals
-                       Language.JavaScript.Parser.Grammar
-                       Language.JavaScript.Parser.CommentScanner
                        Language.JavaScript.Parser.Core
+                       Language.JavaScript.Parser.Grammar
   Other-modules:       Language.JavaScript.Process.TreeShake.Analysis
                      , Language.JavaScript.Process.TreeShake.Elimination
+                     , Language.JavaScript.Parser.Pos
+                     , Language.JavaScript.Parser.Primitives
+                     , Language.JavaScript.Parser.Lexer
+                     , Language.JavaScript.Parser.Operators
+                     , Language.JavaScript.Parser.Literals
+                     , Language.JavaScript.Parser.CommentScanner
   ghc-options:         -Wall -fwarn-tabs -O1 -funbox-strict-fields -fspec-constr-count=6 -fno-state-hack
 
 Test-Suite testsuite
@@ -187,7 +185,6 @@ Test-Suite testsuite
                     Integration.Language.Javascript.Parser.RoundTrip
                     -- Integration.Language.Javascript.Parser.AdvancedFeatures  -- Temporarily disabled
                     Integration.Language.Javascript.Parser.Minification
-                    Integration.Language.Javascript.Parser.Compatibility
                     Integration.Language.Javascript.Process.TreeShake
 
                     -- Golden Tests

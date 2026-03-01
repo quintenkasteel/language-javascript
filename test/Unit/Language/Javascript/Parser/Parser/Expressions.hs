@@ -1002,6 +1002,33 @@ testExpressionParser = describe "Parse expressions:" $ do
           ) -> pure ()
       result -> expectationFailure ("Expected left-associative nullish coalescing, got: " ++ show result)
 
+  it "exponentiation assignment" $ do
+    case testExpr "x **= 2" of
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "x") (JSExponentiationAssign _opAnnot) (JSDecimal _numAnnot 2)) _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected exponentiation assignment x **= 2, got: " ++ show result)
+    case testExpr "a **= b" of
+      Right (JSAstExpression (JSAssignExpression (JSIdentifier _idAnnot "a") (JSExponentiationAssign _opAnnot) (JSIdentifier _rhsAnnot "b")) _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected exponentiation assignment a **= b, got: " ++ show result)
+
+  it "private field access" $ do
+    case testExpr "this.#name" of
+      Right (JSAstExpression (JSMemberPrivateDot (JSLiteral _thisAnnot "this") _dotAnnot _hashAnnot "name") _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected private field access this.#name, got: " ++ show result)
+    case testExpr "obj.#field" of
+      Right (JSAstExpression (JSMemberPrivateDot (JSIdentifier _idAnnot "obj") _dotAnnot _hashAnnot "field") _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected private field access obj.#field, got: " ++ show result)
+    case testExpr "this.#x.#y" of
+      Right (JSAstExpression (JSMemberPrivateDot (JSMemberPrivateDot (JSLiteral _thisAnnot "this") _dot1Annot _hash1Annot "x") _dot2Annot _hash2Annot "y") _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected chained private field access this.#x.#y, got: " ++ show result)
+
+  it "optional chaining with private fields" $ do
+    case testExpr "obj?.#field" of
+      Right (JSAstExpression (JSMemberPrivateDot (JSIdentifier _idAnnot "obj") _dotAnnot _hashAnnot "field") _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected optional chaining with private field obj?.#field, got: " ++ show result)
+    case testExpr "this?.#name" of
+      Right (JSAstExpression (JSMemberPrivateDot (JSLiteral _thisAnnot "this") _dotAnnot _hashAnnot "name") _astAnnot) -> pure ()
+      result -> expectationFailure ("Expected optional chaining with private field this?.#name, got: " ++ show result)
+
   it "static class expressions (ES2015) - supported features" $ do
     -- Basic static method in class expression
     case testExpr "class { static method() {} }" of

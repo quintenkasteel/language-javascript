@@ -86,7 +86,8 @@ parse ::
   -- | An error or maybe the abstract syntax tree (AST) of zero
   -- or more Javascript statements, plus comments.
   Either String AST.JSAST
-parse input _srcName = parseFlatparse input
+parse input srcName =
+  either (Left . prependSrcName srcName) Right (parseFlatparse input)
 
 -- | Parse JavaScript module
 --
@@ -100,7 +101,12 @@ parseModule ::
   -- | An error or maybe the abstract syntax tree (AST) of zero
   -- or more JavaScript statements, plus comments.
   Either String AST.JSAST
-parseModule input _srcName = parseFlatparseModule input
+parseModule input srcName =
+  either (Left . prependSrcName srcName) Right (parseFlatparseModule input)
+
+-- | Prepend source file name to an error message for better diagnostics.
+prependSrcName :: String -> String -> String
+prependSrcName srcName msg = srcName <> ": " <> msg
 
 -- | Internal function to parse JavaScript module using flatparse.
 parseFlatparseModule :: String -> Either String AST.JSAST
@@ -140,17 +146,13 @@ parseBS = handleResult . FlatParser.parseProgramByteString
 parseModuleBS :: ByteString -> Either String AST.JSAST
 parseModuleBS = handleResult . FlatParser.parseModuleProgramByteString
 
--- | Safe variant of 'parseBS' — identical behavior, provided for naming
--- consistency with the String-based API ('readJsSafe').
---
--- @since 0.8.0.0
+-- | Deprecated: Use 'parseBS' instead. Identical behavior.
+{-# DEPRECATED parseSafeBS "Use parseBS instead — they are identical" #-}
 parseSafeBS :: ByteString -> Either String AST.JSAST
 parseSafeBS = parseBS
 
--- | Safe variant of 'parseModuleBS' — identical behavior, provided for
--- naming consistency with the String-based API ('readJsModuleSafe').
---
--- @since 0.8.0.0
+-- | Deprecated: Use 'parseModuleBS' instead. Identical behavior.
+{-# DEPRECATED parseModuleSafeBS "Use parseModuleBS instead — they are identical" #-}
 parseModuleSafeBS :: ByteString -> Either String AST.JSAST
 parseModuleSafeBS = parseModuleBS
 
@@ -173,17 +175,13 @@ parseText = parseBS . Text.encodeUtf8
 parseModuleText :: Text -> Either String AST.JSAST
 parseModuleText = parseModuleBS . Text.encodeUtf8
 
--- | Safe variant of 'parseText' — identical behavior, provided for
--- naming consistency.
---
--- @since 0.8.0.0
+-- | Deprecated: Use 'parseText' instead. Identical behavior.
+{-# DEPRECATED parseSafeText "Use parseText instead — they are identical" #-}
 parseSafeText :: Text -> Either String AST.JSAST
 parseSafeText = parseText
 
--- | Safe variant of 'parseModuleText' — identical behavior, provided for
--- naming consistency.
---
--- @since 0.8.0.0
+-- | Deprecated: Use 'parseModuleText' instead. Identical behavior.
+{-# DEPRECATED parseModuleSafeText "Use parseModuleText instead — they are identical" #-}
 parseModuleSafeText :: Text -> Either String AST.JSAST
 parseModuleSafeText = parseModuleText
 
@@ -255,11 +253,13 @@ showStrippedMaybe maybeAst =
     Left msg -> "Left (" <> (show msg <> ")")
     Right p -> "Right (" <> (AST.showStripped p <> ")")
 
--- | Backward-compatible String version of showStripped
+-- | Deprecated: Use 'showStripped' instead. Identical behavior.
+{-# DEPRECATED showStrippedString "Use showStripped instead — they are identical" #-}
 showStrippedString :: AST.JSAST -> String
 showStrippedString = AST.showStripped
 
--- | Backward-compatible String version of showStrippedMaybe
+-- | Deprecated: Use 'showStrippedMaybe' instead. Identical behavior.
+{-# DEPRECATED showStrippedMaybeString "Use showStrippedMaybe instead — they are identical" #-}
 showStrippedMaybeString :: Show a => Either a AST.JSAST -> String
 showStrippedMaybeString = showStrippedMaybe
 

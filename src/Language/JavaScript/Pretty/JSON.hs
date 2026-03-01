@@ -419,6 +419,13 @@ renderExportDeclarationToJSON decl = case decl of
         ("source", renderFromClauseToJSON fromClause),
         ("semicolon", renderSemiColonToJSON semi)
       ]
+  AST.JSExportDefault annot stmt semi ->
+    formatJSONObject
+      [ ("type", "\"ExportDefaultDeclaration\""),
+        ("annotation", renderAnnotation annot),
+        ("declaration", renderStatementToJSON stmt),
+        ("semicolon", renderSemiColonToJSON semi)
+      ]
 
 -- | Render export clause to JSON.
 renderExportClauseToJSON :: AST.JSExportClause -> Text

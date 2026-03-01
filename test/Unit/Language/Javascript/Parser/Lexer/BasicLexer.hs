@@ -1,185 +1,153 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wall #-}
+
+-- | Basic lexer tests exercised through the public parser API.
+--
+-- These tests verify that the flatparse-based lexer correctly handles
+-- fundamental JavaScript token categories: comments, numbers, strings,
+-- escape sequences, spread, assignment, keywords, BigInt, optional
+-- chaining, nullish coalescing, and ASI with comments.
+--
+-- All tests use 'Language.JavaScript.Parser.Parser.parse' to parse
+-- complete programs and then pattern-match on the resulting AST
+-- to confirm the lexer produced correct tokens.
+--
+-- @since 0.8.0.0
 module Unit.Language.Javascript.Parser.Lexer.BasicLexer
   ( testLexer,
   )
 where
 
+import Data.ByteString (ByteString)
+import Data.Either (isRight)
+import Language.JavaScript.Parser.AST
+  ( JSAnnot (..),
+    JSArrayElement (..),
+    JSAST (..),
+    JSAssignOp (..),
+    JSBinOp (..),
+    JSExpression (..),
+    JSIdent (..),
+    JSSemi (..),
+    JSStatement (..),
+  )
+import Language.JavaScript.Parser.Parser (parse)
 import Test.Hspec
 
--- | Basic lexer tests - needs flatparse test helpers to replace legacy Alex-based helpers
+-- | Parse a JavaScript source string through the public API.
+testParse :: String -> Either String JSAST
+testParse input = parse input "test"
+
+-- | Main test suite for basic lexer functionality.
 testLexer :: Spec
 testLexer = describe "Lexer:" $ do
-  it "comments" $ do
-    pending
-    -- testLex "// 𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡 " `shouldBe` "[CommentToken]"
-    -- testLex "/* 𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡 */" `shouldBe` "[CommentToken]"
+  commentTests
+  numberTests
+  stringTests
+  escapeCharTests
+  spreadTokenTests
+  assignmentTests
+  keywordTests
+  bigIntTests
+  optionalChainingTests
+  nullishCoalescingTests
+  asiWithCommentTests
 
-  it "numbers" $ do
-    pending
-    -- testLex "123" `shouldBe` "[DecimalToken 123]"
-    -- testLex "037" `shouldBe` "[OctalToken 037]"
-    -- testLex "0xab" `shouldBe` "[HexIntegerToken 0xab]"
-    -- testLex "0xCD" `shouldBe` "[HexIntegerToken 0xCD]"
+-- | Verify that line and block comments do not affect parsing.
+commentTests :: Spec
+commentTests = it "comments" $ do
+  assertDecimalProgram "// line comment\n42" 42
+  assertDecimalProgram "/* block comment */42" 42
 
-  it "invalid numbers" $ do
-    pending
-    -- testLex "089" `shouldBe` "[DecimalToken 0,DecimalToken 89]"
-    -- testLex "0xGh" `shouldBe` "[DecimalToken 0,IdentifierToken 'xGh']"
+-- | Verify numeric literal parsing for decimal and hex integers.
+numberTests :: Spec
+numberTests = it "numbers" $ do
+  assertDecimalProgram "123" 123
+  assertHexProgram "0xab" 0xab
+  assertHexProgram "0xCD" 0xCD
 
-  it "string" $ do
-    pending
-    -- testLex "'cat'" `shouldBe` "[StringToken 'cat']"
-    -- testLex "\"dog\"" `shouldBe` "[StringToken \"dog\"]"
+-- | Verify single-quoted and double-quoted string literal parsing.
+stringTests :: Spec
+stringTests = it "string" $ do
+  assertStringProgram "'cat'" "'cat'"
+  assertStringProgram "\"dog\"" "\"dog\""
 
-  it "strings with escape chars" $ do
-    pending
-    -- testLex "'\t'" `shouldBe` "[StringToken '\t']"
-    -- testLex "'\\n'" `shouldBe` "[StringToken '\\n']"
-    -- testLex "'\\\\n'" `shouldBe` "[StringToken '\\\\n']"
-    -- testLex "'\\\\'" `shouldBe` "[StringToken '\\\\']"
-    -- testLex "'\\0'" `shouldBe` "[StringToken '\\0']"
-    -- testLex "'\\12'" `shouldBe` "[StringToken '\\12']"
-    -- testLex "'\\s'" `shouldBe` "[StringToken '\\s']"
-    -- testLex "'\\-'" `shouldBe` "[StringToken '\\-']"
+-- | Verify escape sequences within string literals parse successfully.
+escapeCharTests :: Spec
+escapeCharTests = it "strings with escape chars" $ do
+  testParse "'\\n'" `shouldSatisfy` isRight
+  testParse "'\\\\'" `shouldSatisfy` isRight
+  testParse "'\\0'" `shouldSatisfy` isRight
 
-  it "strings with non-escaped chars" $ do
-    pending
-    -- testLex "'\\/'" `shouldBe` "[StringToken '\\/']"
+-- | Verify the spread operator is parsed inside array literals.
+spreadTokenTests :: Spec
+spreadTokenTests = it "spread token" $
+  case testParse "[...a]" of
+    Right (JSAstProgram [JSExpressionStatement (JSArrayLiteral _ [JSArrayElement (JSSpreadExpression _ (JSIdentifier _ "a"))] _) _] _) -> pure ()
+    result -> expectationFailure ("Expected array with spread expression, got: " ++ show result)
 
-  it "strings with escaped quotes" $ do
-    pending
-    -- testLex "'\"'" `shouldBe` "[StringToken '\"']"
-    -- testLex "\"\\\"\"" `shouldBe` "[StringToken \"\\\\\"\"]"
-    -- testLex "'\\\''" `shouldBe` "[StringToken '\\\\'']"
-    -- testLex "'\"'" `shouldBe` "[StringToken '\"']"
-    -- testLex "\"\\'\"" `shouldBe` "[StringToken \"\\'\"]"
+-- | Verify simple assignment parsing.
+assignmentTests :: Spec
+assignmentTests = it "assignment" $
+  case testParse "x=1" of
+    Right (JSAstProgram [JSAssignStatement (JSIdentifier _ "x") (JSAssign _) (JSDecimal _ 1.0) _] _) -> pure ()
+    result -> expectationFailure ("Expected assignment x=1, got: " ++ show result)
 
-  it "spread token" $ do
-    pending
-    -- testLex "...a" `shouldBe` "[SpreadToken,IdentifierToken 'a']"
+-- | Verify keyword-triggered ASI produces break followed by assignment.
+keywordTests :: Spec
+keywordTests = it "break/keyword ASI" $
+  case testParse "break\nx=1" of
+    Right (JSAstProgram (JSBreak {} : _) _) -> pure ()
+    result -> expectationFailure ("Expected break statement first, got: " ++ show result)
 
-  it "assignment" $ do
-    pending
-    -- testLex "x=1" `shouldBe` "[IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
-    -- testLex "x=1\ny=2" `shouldBe` "[IdentifierToken 'x',SimpleAssignToken,DecimalToken 1,WsToken,IdentifierToken 'y',SimpleAssignToken,DecimalToken 2]"
+-- | Verify BigInt literal parsing.
+bigIntTests :: Spec
+bigIntTests = it "bigint literals" $
+  case testParse "123n" of
+    Right (JSAstProgram [JSExpressionStatement (JSBigIntLiteral _ 123) _] _) -> pure ()
+    result -> expectationFailure ("Expected BigInt literal 123n, got: " ++ show result)
 
-  it "break/continue/return" $ do
-    pending
-    -- testLex "break\nx=1" `shouldBe` "[BreakToken,WsToken,IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
-    -- testLex "continue\nx=1" `shouldBe` "[ContinueToken,WsToken,IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
-    -- testLex "return\nx=1" `shouldBe` "[ReturnToken,WsToken,IdentifierToken 'x',SimpleAssignToken,DecimalToken 1]"
+-- | Verify optional chaining operator parses as optional member dot.
+optionalChainingTests :: Spec
+optionalChainingTests = it "optional chaining" $
+  case testParse "obj?.prop" of
+    Right (JSAstProgram [JSExpressionStatement (JSOptionalMemberDot (JSIdentifier _ "obj") _ (JSIdentifier _ "prop")) _] _) -> pure ()
+    result -> expectationFailure ("Expected optional chaining obj?.prop, got: " ++ show result)
 
-  it "var/let" $ do
-    pending
-    -- testLex "var\n" `shouldBe` "[VarToken,WsToken]"
-    -- testLex "let\n" `shouldBe` "[LetToken,WsToken]"
+-- | Verify nullish coalescing operator parses as binary expression.
+nullishCoalescingTests :: Spec
+nullishCoalescingTests = it "nullish coalescing" $
+  case testParse "x ?? y" of
+    Right (JSAstProgram [JSExpressionStatement (JSExpressionBinary (JSIdentifier _ "x") (JSBinOpNullishCoalescing _) (JSIdentifier _ "y")) _] _) -> pure ()
+    result -> expectationFailure ("Expected nullish coalescing x ?? y, got: " ++ show result)
 
-  it "in/of" $ do
-    pending
-    -- testLex "in\n" `shouldBe` "[InToken,WsToken]"
-    -- testLex "of\n" `shouldBe` "[OfToken,WsToken]"
+-- | Verify ASI interacts correctly with comments after return.
+asiWithCommentTests :: Spec
+asiWithCommentTests = it "automatic semicolon insertion with comments" $
+  case testParse "return // comment\n4" of
+    Right (JSAstProgram (JSReturn {} : _) _) -> pure ()
+    result -> expectationFailure ("Expected return statement followed by expression, got: " ++ show result)
 
-  it "function" $ do
-    pending
-    -- testLex "async function\n" `shouldBe` "[AsyncToken,WsToken,FunctionToken,WsToken]"
+-- | Assert that input parses as a program with a single decimal expression.
+assertDecimalProgram :: String -> Double -> IO ()
+assertDecimalProgram input expected =
+  case testParse input of
+    Right (JSAstProgram [JSExpressionStatement (JSDecimal _ val) _] _)
+      | val == expected -> pure ()
+    result -> expectationFailure ("Expected JSDecimal " ++ show expected ++ " for input " ++ show input ++ ", got: " ++ show result)
 
-  it "bigint literals" $ do
-    pending
-    -- testLex "123n" `shouldBe` "[BigIntToken 123n]"
-    -- testLex "0n" `shouldBe` "[BigIntToken 0n]"
-    -- testLex "0x1234n" `shouldBe` "[BigIntToken 0x1234n]"
-    -- testLex "0X1234n" `shouldBe` "[BigIntToken 0X1234n]"
-    -- testLex "077n" `shouldBe` "[BigIntToken 077n]"
+-- | Assert that input parses as a program with a single hex integer expression.
+assertHexProgram :: String -> Integer -> IO ()
+assertHexProgram input expected =
+  case testParse input of
+    Right (JSAstProgram [JSExpressionStatement (JSHexInteger _ val) _] _)
+      | val == expected -> pure ()
+    result -> expectationFailure ("Expected JSHexInteger " ++ show expected ++ " for input " ++ show input ++ ", got: " ++ show result)
 
-  it "optional chaining" $ do
-    pending
-    -- testLex "obj?.prop" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,IdentifierToken 'prop']"
-    -- testLex "obj?.[key]" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,LeftBracketToken,IdentifierToken 'key',RightBracketToken]"
-    -- testLex "obj?.method()" `shouldBe` "[IdentifierToken 'obj',OptionalChainingToken,IdentifierToken 'method',LeftParenToken,RightParenToken]"
-
-  it "nullish coalescing" $ do
-    pending
-    -- testLex "x ?? y" `shouldBe` "[IdentifierToken 'x',WsToken,NullishCoalescingToken,WsToken,IdentifierToken 'y']"
-    -- testLex "null??'default'" `shouldBe` "[NullToken,NullishCoalescingToken,StringToken 'default']"
-
-  it "automatic semicolon insertion with comments" $ do
-    pending
-    -- Single-line comments with newlines trigger ASI
-    -- testLexASI "return // comment\n4" `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,AutoSemiToken,DecimalToken 4]"
-    -- testLexASI "break // comment\nx" `shouldBe` "[BreakToken,WsToken,CommentToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
-    -- testLexASI "continue // comment\n" `shouldBe` "[ContinueToken,WsToken,CommentToken,WsToken,AutoSemiToken]"
-
-    -- Multi-line comments with newlines trigger ASI
-    -- testLexASI "return /* comment\n */ 4" `shouldBe` "[ReturnToken,WsToken,CommentToken,AutoSemiToken,WsToken,DecimalToken 4]"
-    -- testLexASI "break /* line1\nline2 */ x" `shouldBe` "[BreakToken,WsToken,CommentToken,AutoSemiToken,WsToken,IdentifierToken 'x']"
-
-    -- Multi-line comments without newlines do NOT trigger ASI
-    -- testLexASI "return /* comment */ 4" `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,DecimalToken 4]"
-    -- testLexASI "break /* inline */ x" `shouldBe` "[BreakToken,WsToken,CommentToken,WsToken,IdentifierToken 'x']"
-
-    -- Whitespace with newlines still triggers ASI (existing behavior)
-    -- testLexASI "return \n 4" `shouldBe` "[ReturnToken,WsToken,AutoSemiToken,DecimalToken 4]"
-    -- testLexASI "continue \n x" `shouldBe` "[ContinueToken,WsToken,AutoSemiToken,IdentifierToken 'x']"
-
-    -- Different line terminator types in comments
-    -- testLexASI "return // comment\r\n4" `shouldBe` "[ReturnToken,WsToken,CommentToken,WsToken,AutoSemiToken,DecimalToken 4]"
-    -- testLexASI "break /* comment\r */ x" `shouldBe` "[BreakToken,WsToken,CommentToken,AutoSemiToken,WsToken,IdentifierToken 'x']"
-
-    -- Comments after non-ASI tokens do not create AutoSemiToken
-    -- testLexASI "var // comment\n x" `shouldBe` "[VarToken,WsToken,CommentToken,WsToken,IdentifierToken 'x']"
-    -- testLexASI "function /* comment\n */ f" `shouldBe` "[FunctionToken,WsToken,CommentToken,WsToken,IdentifierToken 'f']"
-
--- Legacy Alex-based tokenizer test helpers - disabled for flatparse migration
-{-
-testLex :: String -> String
-testLex str =
-  either id stringify $ alexTestTokeniser str
-  where
-    stringify xs = "[" ++ intercalate "," (map showToken xs) ++ "]"
-    utf8ToString :: String -> String
-    utf8ToString = id
-
-    showToken :: Token -> String
-    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
-    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
-    showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
-    showToken (OctalToken _ lit _) = "OctalToken " ++ lit
-    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ lit
-    showToken (BigIntToken _ lit _) = "BigIntToken " ++ lit
-    showToken token = takeWhile (/= ' ') $ show token
-
-    stringEscape [] = []
-    stringEscape (term : rest) =
-      let escapeTerm [] = []
-          escapeTerm [x] = [x]
-          escapeTerm (x : xs)
-            | term == x = "\\" ++ [x] ++ escapeTerm xs
-            | otherwise = x : escapeTerm xs
-       in term : escapeTerm rest
-
--- Test function that uses ASI-enabled tokenizer - disabled for flatparse migration
-testLexASI :: String -> String
-testLexASI str =
-  either id stringify $ alexTestTokeniserASI str
-  where
-    stringify xs = "[" ++ intercalate "," (map showToken xs) ++ "]"
-    utf8ToString :: String -> String
-    utf8ToString = id
-
-    showToken :: Token -> String
-    showToken (StringToken _ lit _) = "StringToken " ++ stringEscape lit
-    showToken (IdentifierToken _ lit _) = "IdentifierToken '" ++ stringEscape lit ++ "'"
-    showToken (DecimalToken _ lit _) = "DecimalToken " ++ lit
-    showToken (OctalToken _ lit _) = "OctalToken " ++ lit
-    showToken (HexIntegerToken _ lit _) = "HexIntegerToken " ++ lit
-    showToken (BigIntToken _ lit _) = "BigIntToken " ++ lit
-    showToken token = takeWhile (/= ' ') $ show token
-
-    stringEscape [] = []
-    stringEscape (term : rest) =
-      let escapeTerm [] = []
-          escapeTerm [x] = [x]
-          escapeTerm (x : xs)
-            | term == x = "\\" ++ [x] ++ escapeTerm xs
-            | otherwise = x : escapeTerm xs
-       in term : escapeTerm rest
--}
+-- | Assert that input parses as a program with a single string literal.
+assertStringProgram :: String -> ByteString -> IO ()
+assertStringProgram input expected =
+  case testParse input of
+    Right (JSAstProgram [JSExpressionStatement (JSStringLiteral _ val) _] _)
+      | val == expected -> pure ()
+    result -> expectationFailure ("Expected JSStringLiteral " ++ show expected ++ " for input " ++ show input ++ ", got: " ++ show result)

@@ -43,8 +43,6 @@ import qualified Blaze.ByteString.Builder.Char.Utf8 as BS
 import qualified Codec.Binary.UTF8.String as US
 import qualified Data.ByteString.Lazy as LB
 import Data.List (foldl')
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy.Encoding as LT
 import Language.JavaScript.Parser.AST
@@ -143,6 +141,7 @@ instance RenderJS JSExpression where
   (|>) pacc (JSAsyncGeneratorExpression async function star n lb x2s rb x3) = pacc |> async |> "async" |> function |> "function" |> star |> "*" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
   (|>) pacc (JSGeneratorExpression annot s n lb x2s rb x3) = pacc |> annot |> "function" |> s |> "*" |> n |> lb |> "(" |> x2s |> rb |> ")" |> x3
   (|>) pacc (JSMemberDot xs dot n) = pacc |> xs |> "." |> dot |> n
+  (|>) pacc (JSMemberPrivateDot xs dot hash name) = pacc |> xs |> "." |> dot |> hash |> "#" |> name
   (|>) pacc (JSMemberExpression e lb a rb) = pacc |> e |> lb |> "(" |> a |> rb |> ")"
   (|>) pacc (JSMemberNew a lb n rb s) = pacc |> a |> "new" |> lb |> "(" |> n |> rb |> ")" |> s
   (|>) pacc (JSMemberSquare xs als e ars) = pacc |> xs |> als |> "[" |> e |> ars |> "]"
@@ -218,6 +217,7 @@ instance RenderJS CommentAnnotation where
   (|>) pacc NoComment = pacc
   (|>) pacc (CommentA p s) = pacc |> p |> s
   (|>) pacc (WhiteSpace p s) = pacc |> p |> s
+  (|>) pacc (JSDocA _ _) = pacc
 
 instance RenderJS [JSExpression] where
   (|>) = foldl' (|>)
@@ -277,6 +277,7 @@ instance RenderJS JSAssignOp where
   (|>) pacc (JSLogicalAndAssign annot) = pacc |> annot |> "&&="
   (|>) pacc (JSLogicalOrAssign annot) = pacc |> annot |> "||="
   (|>) pacc (JSNullishAssign annot) = pacc |> annot |> "??="
+  (|>) pacc (JSExponentiationAssign annot) = pacc |> annot |> "**="
 
 instance RenderJS JSSemi where
   (|>) pacc (JSSemi annot) = pacc |> annot |> ";"
@@ -285,6 +286,7 @@ instance RenderJS JSSemi where
 instance RenderJS JSTryCatch where
   (|>) pacc (JSCatch anc alb x1 arb x3) = pacc |> anc |> "catch" |> alb |> "(" |> x1 |> arb |> ")" |> x3
   (|>) pacc (JSCatchIf anc alb x1 aif ex arb x3) = pacc |> anc |> "catch" |> alb |> "(" |> x1 |> aif |> "if" |> ex |> arb |> ")" |> x3
+  (|>) pacc (JSCatchNoParam anc x3) = pacc |> anc |> "catch" |> x3
 
 instance RenderJS [JSTryCatch] where
   (|>) = foldl' (|>)
@@ -479,9 +481,9 @@ instance RenderJS JSClassElement where
   (|>) pacc (JSPrivateField a name eq (Just initializer) s) = pacc |> a |> "#" |> name |> eq |> "=" |> initializer |> s
   (|>) pacc (JSPrivateMethod a name lp params rp block) = pacc |> a |> "#" |> name |> lp |> params |> rp |> block
   (|>) pacc (JSPrivateAccessor accessor a name lp params rp block) = pacc |> accessor |> a |> "#" |> name |> lp |> params |> rp |> block
-  (|>) pacc (JSClassField name eq Nothing s) = pacc |> name |> s
+  (|>) pacc (JSClassField name _eq Nothing s) = pacc |> name |> s
   (|>) pacc (JSClassField name eq (Just initializer) s) = pacc |> name |> eq |> "=" |> initializer |> s
-  (|>) pacc (JSClassStaticField sa name eq Nothing s) = pacc |> sa |> "static" |> name |> s
+  (|>) pacc (JSClassStaticField sa name _eq Nothing s) = pacc |> sa |> "static" |> name |> s
   (|>) pacc (JSClassStaticField sa name eq (Just initializer) s) = pacc |> sa |> "static" |> name |> eq |> "=" |> initializer |> s
   (|>) pacc (JSClassStaticBlock sa block) = pacc |> sa |> "static" |> block
   (|>) pacc (JSAsyncGeneratorMethodDefinition async star name lp params rp block) = pacc |> async |> "async" |> star |> "*" |> name |> lp |> "(" |> params |> rp |> ")" |> block

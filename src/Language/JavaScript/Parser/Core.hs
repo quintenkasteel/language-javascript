@@ -80,8 +80,6 @@ where
 import Control.DeepSeq (NFData, rnf)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.Data (Data)
-import Data.Generics (everywhere, everything, mkT, mkQ)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
 import Data.Text (Text)
@@ -172,8 +170,8 @@ parseProgramByteString input =
   case runJSParser (Lexer.whitespace *> program) input of
     Right (result, rest, consumed) ->
       ParseOK (ParseSuccess (postProcessAST input result) rest consumed)
-    Left err ->
-      ParseError (ParseFailure err input 0)
+    Left parseErr ->
+      ParseError (ParseFailure parseErr input 0)
 
 -- | Parse JavaScript expression from Text.
 --
@@ -204,8 +202,8 @@ parseModuleProgramByteString input =
   case runJSParser (Lexer.whitespace *> moduleProgram) input of
     Right (result, rest, consumed) ->
       ParseOK (ParseSuccess (postProcessAST input result) rest consumed)
-    Left err ->
-      ParseError (ParseFailure err input 0)
+    Left parseErr ->
+      ParseError (ParseFailure parseErr input 0)
 
 -- | Parse JavaScript expression from Text (alternative name).
 parseExpressionText :: Text -> ParseResult JSExpression
@@ -220,8 +218,8 @@ parseExpressionByteString input =
   case runJSParser (Lexer.whitespace *> expression) input of
     Right (result, rest, consumed) ->
       ParseOK (ParseSuccess (postProcessAST input result) rest consumed)
-    Left err ->
-      ParseError (ParseFailure err input 0)
+    Left parseErr ->
+      ParseError (ParseFailure parseErr input 0)
 
 -- ---------------------------------------------------------------------
 -- Error Handling
@@ -261,7 +259,7 @@ formatParseError (ParseFailure pErr _pInput _pOffset) =
 
 -- | Extract position from parse error.
 parseErrorPosition :: ParseError -> JSPos.Pos
-parseErrorPosition err = case err of
+parseErrorPosition parseErr = case parseErr of
   SyntaxError pos _ _ -> pos
   UnexpectedEOF pos -> pos
   UnexpectedChar pos _ _ -> pos
@@ -316,31 +314,25 @@ offsetToLineCol lineStarts offset = (line, col)
 
 -- | Post-process a parsed AST: fix positions and reattach comments.
 --
--- Uses two SYB traversals:
+-- Uses 'HasAnnot' type class for efficient traversal without SYB overhead:
 --
---   1. A read-only fold ('everything') to collect annotation byte offsets
---      from the raw remaining-bytes positions. This is cheap because it
---      does not allocate a new AST.
---   2. A single write pass ('everywhere') that both fixes positions
+--   1. A read-only fold ('foldAnnot') to collect annotation byte offsets
+--      from the raw remaining-bytes positions.
+--   2. A single write pass ('mapAnnot') that both fixes positions
 --      (remaining bytes -> line:col) and attaches comments.
 --
--- Computing offsets from raw positions (offset = inputLen - remaining)
--- avoids needing a separate fix-then-collect approach.
---
 -- @since 0.8.0.0
-postProcessAST :: Data a => ByteString -> a -> a
-postProcessAST input ast = everywhere (mkT fixAndAttach) ast
+postProcessAST :: HasAnnot a => ByteString -> a -> a
+postProcessAST input ast = mapAnnot fixAndAttach ast
   where
     inputLen = BS.length input
     lineStarts = buildLineStarts input
     entries = scanComments input
-    -- Read-only fold to collect annotation byte offsets into IntSet.
-    offsetSet = everything IntSet.union (mkQ IntSet.empty getRawOffsetSet) ast
+    offsetSet = IntSet.fromList (foldAnnot getRawOffset ast)
     commentMap = buildCommentMap entries offsetSet
-    getRawOffsetSet (JSAnnot (TokenPn rem 0 0) _)
-      | rem >= 0 && rem <= inputLen = IntSet.singleton (inputLen - rem)
-    getRawOffsetSet _ = IntSet.empty
-    -- Single write pass: fix positions and attach comments
+    getRawOffset (JSAnnot (TokenPn rawRem 0 0) _)
+      | rawRem >= 0 && rawRem <= inputLen = [inputLen - rawRem]
+    getRawOffset _ = []
     fixAndAttach (JSAnnot (TokenPn remainingBytes 0 0) _)
       | remainingBytes >= 0 && remainingBytes <= inputLen =
           let offset = inputLen - remainingBytes
@@ -351,17 +343,17 @@ postProcessAST input ast = everywhere (mkT fixAndAttach) ast
 
 -- | Fix all positions in a parsed AST without comment reattachment.
 -- Used for parsing individual statements where comments are not needed.
-fixPositions :: Data a => ByteString -> a -> a
-fixPositions input = everywhere (mkT fixTokenPosn)
+fixPositions :: HasAnnot a => ByteString -> a -> a
+fixPositions input = mapAnnot fixAnnotPosn
   where
     inputLen = BS.length input
     lineStarts = buildLineStarts input
-    fixTokenPosn (TokenPn remainingBytes 0 0)
+    fixAnnotPosn (JSAnnot (TokenPn remainingBytes 0 0) cs)
       | remainingBytes >= 0 && remainingBytes <= inputLen =
           let offset = inputLen - remainingBytes
               (line, col) = offsetToLineCol lineStarts offset
-          in TokenPn offset line col
-    fixTokenPosn tp = tp
+          in JSAnnot (TokenPn offset line col) cs
+    fixAnnotPosn annot = annot
 
 -- | Build a map from annotation offset to the comments that precede it.
 --
@@ -405,29 +397,32 @@ commentEndOffset start NoComment = start
 -- Core Parser Functions
 -- ---------------------------------------------------------------------
 
--- ---------------------------------------------------------------------
--- Parser Combinators for Common Patterns
--- ---------------------------------------------------------------------
-
--- | Parse complete expression consuming all input.
-completeExpression :: JSParser JSExpression
-completeExpression = do
-  Lexer.whitespace
-  expr <- expression
-  Lexer.whitespace
-  FP.eof
-  pure expr
-
--- | Parse expression allowing trailing content.
-partialExpression :: JSParser JSExpression
-partialExpression = do
-  Lexer.whitespace
-  expression
+-- | Skip optional hashbang line (@#!...@) at the start of input.
+-- Per ECMAScript spec, hashbang comments are only valid at position 0.
+-- This is called only from top-level 'program' and 'moduleProgram'
+-- parsers, so no runtime position check is needed.
+--
+-- Note: FlatParse's 'Pos' counts byte offsets backwards from the buffer
+-- end, so @unPos pos == 0@ means end-of-input, not start-of-input.
+-- The previous implementation incorrectly checked @unPos pos == 0@ to
+-- detect start-of-input. We rely on the call site to ensure this runs
+-- only at the top level.
+skipHashbang :: JSParser ()
+skipHashbang =
+  FP.optional_ (FP.word8 0x23 *> FP.word8 0x21 *> skipToNewline)
+  where
+    skipToNewline :: JSParser ()
+    skipToNewline = do
+      c <- FP.anyChar
+      if c == '\n' || c == '\r'
+        then pure ()
+        else skipToNewline
 
 -- | Parse complete JavaScript program consuming all input.
 -- Captures trailing position for comment reattachment.
 program :: JSParser JSAST
 program = do
+  skipHashbang
   Lexer.whitespace
   statements <- statementList
   trailPos <- FP.getPos
@@ -439,6 +434,7 @@ program = do
 -- Captures trailing position for comment reattachment.
 moduleProgram :: JSParser JSAST
 moduleProgram = do
+  skipHashbang
   Lexer.whitespace
   items <- moduleItemList
   trailPos <- FP.getPos

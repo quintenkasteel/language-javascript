@@ -1,2 +1,2 @@
 PARSE_ERROR:
-SyntaxError 1:1 "lexical error" []
+test/Golden/Language/Javascript/Parser/fixtures/ecmascript/inputs/literals.js: SyntaxError 1:1 "lexical error" []

@@ -354,7 +354,10 @@ analyzeExpression expr = case expr of
     analyzeExpression target
     -- Track property access for tree shaking (mark property as used)
     markPropertyUsed target prop
-    
+
+  JSMemberPrivateDot target _ _ _name -> do
+    analyzeExpression target
+
   JSMemberSquare target _ prop _ -> do
     analyzeExpression target
     analyzeExpression prop
@@ -859,6 +862,8 @@ analyzeTryCatch (JSCatch _ _ param _ body) = do
 analyzeTryCatch (JSCatchIf _ _ param _ condition _ body) = do
   analyzeExpression param
   analyzeExpression condition
+  analyzeBlock body
+analyzeTryCatch (JSCatchNoParam _ body) =
   analyzeBlock body
 
 -- | Analyze try-finally clause.

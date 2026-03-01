@@ -95,7 +95,6 @@ import qualified Data.Set as Set
 import qualified FlatParse.Basic as FP
 
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.SrcLocation (TokenPosn(TokenPn))
 
 import Language.JavaScript.Parser.Lexer
   ( whitespace
@@ -530,15 +529,23 @@ callChainAccess expr =
   callChainTaggedTemplate expr FP.<|>
   optionalChainAccess expr
 
--- | Parse dot access: @obj.prop@ (before any call).
+-- | Parse dot access: @obj.prop@ or @obj.#priv@ (before any call).
 dotAccessResult :: JSExpression -> JSParser (JSExpression, Bool)
 dotAccessResult expr = do
   pos <- FP.getPos
   parseChar '.'
   notFollowedBy '.'
   whitespace
-  prop <- rawIdentifier
-  pure (JSMemberDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) prop), False)
+  dotPrivateAccess expr pos FP.<|> dotPublicAccess expr pos
+  where
+    dotPrivateAccess e p = do
+      hashPos <- FP.getPos
+      parseChar '#'
+      name <- rawIdentifier
+      pure (JSMemberPrivateDot e (fpPosToAnnot p) (fpPosToAnnot hashPos) name, False)
+    dotPublicAccess e p = do
+      prop <- rawIdentifier
+      pure (JSMemberDot e (fpPosToAnnot p) (JSIdentifier (fpPosToAnnot p) prop), False)
 
 -- | Parse bracket access: @obj[expr]@ (before any call).
 bracketAccessResult :: JSExpression -> JSParser (JSExpression, Bool)
@@ -591,15 +598,23 @@ optionalChainResult expr = do
   result <- optionalChainAccess expr
   pure (result, False)
 
--- | Parse dot access after a call: @fn().prop@. Uses 'JSCallExpressionDot'.
+-- | Parse dot access after a call: @fn().prop@ or @fn().#priv@. Uses 'JSCallExpressionDot' or 'JSMemberPrivateDot'.
 callChainDot :: JSExpression -> JSParser JSExpression
 callChainDot expr = do
   pos <- FP.getPos
   parseChar '.'
   notFollowedBy '.'
   whitespace
-  prop <- rawIdentifier
-  pure (JSCallExpressionDot expr (fpPosToAnnot pos) (JSIdentifier (fpPosToAnnot pos) prop))
+  callDotPrivate expr pos FP.<|> callDotPublic expr pos
+  where
+    callDotPrivate e p = do
+      hashPos <- FP.getPos
+      parseChar '#'
+      name <- rawIdentifier
+      pure (JSMemberPrivateDot e (fpPosToAnnot p) (fpPosToAnnot hashPos) name)
+    callDotPublic e p = do
+      prop <- rawIdentifier
+      pure (JSCallExpressionDot e (fpPosToAnnot p) (JSIdentifier (fpPosToAnnot p) prop))
 
 -- | Parse bracket access after a call: @fn()[expr]@. Uses 'JSCallExpressionSquare'.
 callChainBracket :: JSExpression -> JSParser JSExpression
@@ -625,8 +640,13 @@ optionalChainAccess expr = do
   pos <- FP.getPos
   parseString "?."
   whitespace
-  optDot expr pos FP.<|> optBracket expr pos FP.<|> optCall expr pos
+  optPrivate expr pos FP.<|> optDot expr pos FP.<|> optBracket expr pos FP.<|> optCall expr pos
   where
+    optPrivate e p = do
+      hashPos <- FP.getPos
+      parseChar '#'
+      name <- rawIdentifier
+      pure (JSMemberPrivateDot e (fpPosToAnnot p) (fpPosToAnnot hashPos) name)
     optDot e p = do
       propPos <- FP.getPos
       prop <- rawIdentifier
@@ -2142,7 +2162,7 @@ catchClause = do
       pure (JSIdentifier (fpPosToAnnot pPos) p)
     catchNoParam ca = do
       body <- blockBody
-      pure (JSCatch ca defaultAnnot (JSIdentifier defaultAnnot "e") defaultAnnot body)
+      pure (JSCatchNoParam ca body)
 
 -- | Parse finally clause: @finally { body }@
 finallyClause :: JSParser (JSAnnot, JSBlock)

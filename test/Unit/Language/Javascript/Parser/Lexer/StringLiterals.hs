@@ -1,23 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wall #-}
 
--- | Comprehensive string literal complexity testing module.
+-- | String literal complexity testing for JavaScript parser.
 --
--- This module provides exhaustive testing for JavaScript string literal parsing,
--- covering all supported string formats, escape sequences, unicode handling,
--- template literals, and edge cases.
+-- Tests JavaScript string literal parsing across escape sequences, unicode
+-- handling, template literals, and edge cases. Organized into three phases:
 --
--- The test suite is organized into phases:
---   * Phase 1: Extended string literal tests (all escape sequences, unicode, cross-quotes, errors)
---   * Phase 2: Template literal comprehensive tests (interpolation, nesting, escapes, tagged)
---   * Phase 3: Edge cases and performance (long strings, complex escapes, boundaries)
---
--- Test coverage targets 200+ expression paths across:
---   * 80 basic string literal paths
---   * 80 template literal paths
---   * 40 escape sequence paths
---   * 25 error case paths
---   * 15 edge case paths
+--   * Phase 1: Extended string literal tests (escape sequences, unicode, cross-quotes, errors)
+--   * Phase 2: Template literal tests (interpolation, nesting, escapes, tagged)
+--   * Phase 3: Edge cases (long strings, complex escapes, boundary conditions)
 --
 -- @since 0.7.1.0
 module Unit.Language.Javascript.Parser.Lexer.StringLiterals
@@ -25,49 +16,104 @@ module Unit.Language.Javascript.Parser.Lexer.StringLiterals
   )
 where
 
+import Data.Either (isLeft, isRight)
+import Language.JavaScript.Parser.AST (JSAST)
+import Language.JavaScript.Parser.Parser (parse, showStrippedMaybe)
 import Test.Hspec
 
--- | Main test suite for string literal complexity - needs flatparse test helpers
+-- | Parse a JavaScript source string, returning the AST or an error.
+testParse :: String -> Either String JSAST
+testParse input = parse input "test"
+
+-- | Main test suite for string literal complexity.
 testStringLiteralComplexity :: Spec
 testStringLiteralComplexity = describe "String Literal Complexity" $ do
   describe "Extended string literal tests" $ do
-    it "all escape sequences" $ do
-      pending
-
-    it "unicode handling" $ do
-      pending
-
-    it "cross-quotes" $ do
-      pending
-
-    it "error cases" $ do
-      pending
-
+    escapeSequenceTests
+    unicodeHandlingTests
+    crossQuoteTests
+    errorCaseTests
   describe "Template literal comprehensive tests" $ do
-    it "interpolation" $ do
-      pending
-
-    it "nesting" $ do
-      pending
-
-    it "escapes" $ do
-      pending
-
-    it "tagged templates" $ do
-      pending
-
+    interpolationTests
+    nestingTests
+    templateEscapeTests
+    taggedTemplateTests
   describe "Edge cases and performance" $ do
-    it "long strings" $ do
-      pending
+    longStringTests
+    complexEscapeTests
+    boundaryConditionTests
 
-    it "complex escapes" $ do
-      pending
+-- | Phase 1: Verify common escape sequences in single-quoted strings.
+escapeSequenceTests :: Spec
+escapeSequenceTests = it "escape sequences" $ do
+  testShow "'hello\\nworld'" `shouldBe` "Right (JSAstProgram [JSStringLiteral 'hello\\nworld'])"
+  testShow "'tab\\there'" `shouldBe` "Right (JSAstProgram [JSStringLiteral 'tab\\there'])"
+  testShow "'null\\0char'" `shouldBe` "Right (JSAstProgram [JSStringLiteral 'null\\0char'])"
+  testShow "'backslash\\\\path'" `shouldBe` "Right (JSAstProgram [JSStringLiteral 'backslash\\\\path'])"
+  testShow "'\\'s'" `shouldBe` "Right (JSAstProgram [JSStringLiteral '\\'s'])"
 
-    it "boundary conditions" $ do
-      pending
+-- | Phase 1: Verify unicode escape sequences in strings.
+unicodeHandlingTests :: Spec
+unicodeHandlingTests = it "unicode handling" $ do
+  testShow "'\\u0041'" `shouldBe` "Right (JSAstProgram [JSStringLiteral '\\u0041'])"
+  testShow "'\\u{1F600}'" `shouldBe` "Right (JSAstProgram [JSStringLiteral '\\u{1F600}'])"
 
--- Legacy Alex-based tokenizer test helpers - disabled for flatparse migration
-{-
--- All string literal testing functions and related helpers have been
--- commented out until the flatparse lexer is fully implemented
--}
+-- | Phase 1: Verify strings containing the opposite quote type.
+crossQuoteTests :: Spec
+crossQuoteTests = it "cross-quotes" $ do
+  testShow "'He said \"hello\"'" `shouldBe` "Right (JSAstProgram [JSStringLiteral 'He said \"hello\"'])"
+  testShow "\"She said 'hi'\"" `shouldBe` "Right (JSAstProgram [JSStringLiteral \"She said 'hi'\"])"
+
+-- | Phase 1: Verify that malformed strings produce parse errors.
+errorCaseTests :: Spec
+errorCaseTests = it "error cases" $
+  testParse "'unterminated" `shouldSatisfy` isLeft
+
+-- | Phase 2: Verify template literal interpolation parsing.
+interpolationTests :: Spec
+interpolationTests = it "interpolation" $
+  testShow "`hello ${name}`" `shouldBe`
+    "Right (JSAstProgram [JSTemplateLiteral ((),'`hello ${'," <>
+    "[(JSIdentifier 'name','}`')])])"
+
+-- | Phase 2: Verify nested template literals parse correctly.
+nestingTests :: Spec
+nestingTests = it "nesting" $
+  testShow "`outer ${`inner`}`" `shouldBe`
+    "Right (JSAstProgram [JSTemplateLiteral ((),'`outer ${'," <>
+    "[(JSTemplateLiteral ((),'`inner`',[]),'}`')])])"
+
+-- | Phase 2: Verify escape sequences inside template literals.
+templateEscapeTests :: Spec
+templateEscapeTests = it "escapes" $
+  testShow "`line1\\nline2`" `shouldBe`
+    "Right (JSAstProgram [JSTemplateLiteral ((),'`line1\\nline2`',[])])"
+
+-- | Phase 2: Verify tagged template literal parsing.
+taggedTemplateTests :: Spec
+taggedTemplateTests = it "tagged templates" $
+  testShow "html`<div></div>`" `shouldBe`
+    "Right (JSAstProgram [JSTemplateLiteral ((JSIdentifier 'html'),'`<div></div>`',[])])"
+
+-- | Phase 3: Verify parsing of a string with 1000 characters.
+longStringTests :: Spec
+longStringTests = it "long strings" $
+  testParse longInput `shouldSatisfy` isRight
+  where
+    longInput = "'" <> replicate 1000 'a' <> "'"
+
+-- | Phase 3: Verify multiple consecutive escape sequences.
+complexEscapeTests :: Spec
+complexEscapeTests = it "complex escapes" $
+  testShow "'\\n\\t\\r\\0'" `shouldBe`
+    "Right (JSAstProgram [JSStringLiteral '\\n\\t\\r\\0'])"
+
+-- | Phase 3: Verify empty string edge cases.
+boundaryConditionTests :: Spec
+boundaryConditionTests = it "boundary conditions" $ do
+  testShow "''" `shouldBe` "Right (JSAstProgram [JSStringLiteral ''])"
+  testShow "\"\"" `shouldBe` "Right (JSAstProgram [JSStringLiteral \"\"])"
+
+-- | Convenience wrapper: parse and show the stripped AST representation.
+testShow :: String -> String
+testShow = showStrippedMaybe . testParse

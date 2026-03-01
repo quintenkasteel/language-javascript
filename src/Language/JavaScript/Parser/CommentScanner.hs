@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -O2 -Wno-type-defaults #-}
 
 -- | Two-pass comment scanner for restoring comments to the AST.
 --
@@ -48,9 +48,22 @@ data CommentEntry = CommentEntry
 -- String literals, template literals, and regex literals are skipped
 -- to avoid matching comment-like sequences inside them.
 scanComments :: ByteString -> [CommentEntry]
-scanComments bs = go 0
+scanComments bs = handleHashbang 0
   where
     len = BS.length bs
+
+    -- Handle optional hashbang (#!) at start of file
+    handleHashbang !i
+      | i + 1 < len && matchesAt i '#' && matchesAt (i + 1) '!' =
+          scanHashbang i (i + 2)
+      | otherwise = go i
+
+    -- Scan hashbang line until newline, treating it as a comment
+    scanHashbang !start !i
+      | i >= len = mkComment start i : []
+      | isLineEnd (charAt i) = mkComment start (i + 1) : go (i + 1)
+      | otherwise = scanHashbang start (i + 1)
+
     go !i
       | i >= len = []
       | isWS (charAt i) = scanWhitespace i (i + 1)

@@ -332,7 +332,7 @@ assignmentOperator = do
   (parseString ">>>=" *> pure (JSUrshAssign a)) FP.<|>
     (parseString ">>=" *> pure (JSRshAssign a)) FP.<|>
     (parseString "<<=" *> pure (JSLshAssign a)) FP.<|>
-    (parseString "**=" *> notFollowedBy '=' *> pure (JSTimesAssign a)) FP.<|>
+    (parseString "**=" *> notFollowedBy '=' *> pure (JSExponentiationAssign a)) FP.<|>
     (parseString "&&=" *> pure (JSLogicalAndAssign a)) FP.<|>
     (parseString "||=" *> pure (JSLogicalOrAssign a)) FP.<|>
     (parseString "??=" *> pure (JSNullishAssign a)) FP.<|>

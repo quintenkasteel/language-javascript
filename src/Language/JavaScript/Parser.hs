@@ -33,6 +33,17 @@ module Language.JavaScript.Parser
     PA.parseSafeText,
     PA.parseModuleSafeText,
 
+    -- * Structured Parsing (rich error types via "Language.JavaScript.Parser.Core")
+    Core.parseProgramByteString,
+    Core.parseModuleProgramByteString,
+    Core.parseExpressionByteString,
+    Core.ParseResult (..),
+    Core.ParseSuccess (..),
+    Core.ParseFailure (..),
+    Core.ParseError (..),
+    Core.formatParseError,
+    Core.parseErrorPosition,
+
     -- * Display Utilities
     PA.showStripped,
     PA.showStrippedMaybe,
@@ -61,12 +72,6 @@ module Language.JavaScript.Parser
     renderToString,
     renderToText,
 
-    -- * XML Serialization
-    renderToXML,
-
-    -- * S-Expression Serialization
-    renderToSExpr,
-
     -- * Quasi-quoters
     js,
     jsast,
@@ -75,12 +80,11 @@ module Language.JavaScript.Parser
 where
 
 import Language.JavaScript.Parser.AST
+import qualified Language.JavaScript.Parser.Core as Core
 import qualified Language.JavaScript.Parser.Parser as PA
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
 import Language.JavaScript.Pretty.Printer
-import Language.JavaScript.Pretty.SExpr (renderToSExpr)
-import Language.JavaScript.Pretty.XML (renderToXML)
 import Language.JavaScript.QQ (js, jsast, jsx)
 
 -- EOF

@@ -367,6 +367,8 @@ data JSExpression
     JSAsyncGeneratorExpression !JSAnnot !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   | -- | firstpart, dot, name
     JSMemberDot !JSExpression !JSAnnot !JSExpression
+  | -- | firstpart, dot, hash, private field name (e.g. @obj.#field@)
+    JSMemberPrivateDot !JSExpression !JSAnnot !JSAnnot !ByteString
   | JSMemberExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot -- expr, lb, args, rb
   | -- | new, name, lb, args, rb
     JSMemberNew !JSAnnot !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot
@@ -471,6 +473,7 @@ data JSAssignOp
   | JSLogicalOrAssign !JSAnnot
   | -- | |=
     JSNullishAssign !JSAnnot -- ??=
+  | JSExponentiationAssign !JSAnnot -- **=
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSTryCatch
@@ -478,6 +481,8 @@ data JSTryCatch
     JSCatch !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSBlock
   | -- | catch,lb,ident,if,expr,rb,block
     JSCatchIf !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSExpression !JSAnnot !JSBlock
+  | -- | catch,block (ES2019 optional catch binding)
+    JSCatchNoParam !JSAnnot !JSBlock
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 data JSTryFinally
@@ -711,6 +716,7 @@ instance HasAnnot JSAssignOp where
   mapAnnot f (JSLogicalAndAssign a) = JSLogicalAndAssign (f a)
   mapAnnot f (JSLogicalOrAssign a) = JSLogicalOrAssign (f a)
   mapAnnot f (JSNullishAssign a) = JSNullishAssign (f a)
+  mapAnnot f (JSExponentiationAssign a) = JSExponentiationAssign (f a)
   foldAnnot f (JSAssign a) = f a
   foldAnnot f (JSTimesAssign a) = f a
   foldAnnot f (JSDivideAssign a) = f a
@@ -726,6 +732,7 @@ instance HasAnnot JSAssignOp where
   foldAnnot f (JSLogicalAndAssign a) = f a
   foldAnnot f (JSLogicalOrAssign a) = f a
   foldAnnot f (JSNullishAssign a) = f a
+  foldAnnot f (JSExponentiationAssign a) = f a
 
 instance HasAnnot JSIdent where
   mapAnnot f (JSIdentName a s) = JSIdentName (f a) s
@@ -788,8 +795,10 @@ instance HasAnnot JSSwitchParts where
 instance HasAnnot JSTryCatch where
   mapAnnot f (JSCatch a1 a2 e a3 b) = JSCatch (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f b)
   mapAnnot f (JSCatchIf a1 a2 e1 a3 e2 a4 b) = JSCatchIf (f a1) (f a2) (mapAnnot f e1) (f a3) (mapAnnot f e2) (f a4) (mapAnnot f b)
+  mapAnnot f (JSCatchNoParam a1 b) = JSCatchNoParam (f a1) (mapAnnot f b)
   foldAnnot f (JSCatch a1 a2 e a3 b) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f b
   foldAnnot f (JSCatchIf a1 a2 e1 a3 e2 a4 b) = f a1 ++ f a2 ++ foldAnnot f e1 ++ f a3 ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f b
+  foldAnnot f (JSCatchNoParam a1 b) = f a1 ++ foldAnnot f b
 
 instance HasAnnot JSPropertyName where
   mapAnnot f (JSPropertyIdent a s) = JSPropertyIdent (f a) s
@@ -960,6 +969,7 @@ instance HasAnnot JSExpression where
   mapAnnot f (JSAsyncArrowExpression a1 ps a2 b) = JSAsyncArrowExpression (f a1) (mapAnnot f ps) (f a2) (mapAnnot f b)
   mapAnnot f (JSAsyncGeneratorExpression a1 a2 a3 i a4 ps a5 b) = JSAsyncGeneratorExpression (f a1) (f a2) (f a3) (mapAnnot f i) (f a4) (mapAnnot f ps) (f a5) (mapAnnot f b)
   mapAnnot f (JSMemberDot e1 a e2) = JSMemberDot (mapAnnot f e1) (f a) (mapAnnot f e2)
+  mapAnnot f (JSMemberPrivateDot e1 a1 a2 name) = JSMemberPrivateDot (mapAnnot f e1) (f a1) (f a2) name
   mapAnnot f (JSMemberExpression e a1 args a2) = JSMemberExpression (mapAnnot f e) (f a1) (mapAnnot f args) (f a2)
   mapAnnot f (JSMemberNew a1 e a2 args a3) = JSMemberNew (f a1) (mapAnnot f e) (f a2) (mapAnnot f args) (f a3)
   mapAnnot f (JSMemberSquare e a1 x a2) = JSMemberSquare (mapAnnot f e) (f a1) (mapAnnot f x) (f a2)
@@ -1004,6 +1014,7 @@ instance HasAnnot JSExpression where
   foldAnnot f (JSAsyncArrowExpression a1 ps a2 b) = f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
   foldAnnot f (JSAsyncGeneratorExpression a1 a2 a3 i a4 ps a5 b) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f i ++ f a4 ++ foldAnnot f ps ++ f a5 ++ foldAnnot f b
   foldAnnot f (JSMemberDot e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
+  foldAnnot f (JSMemberPrivateDot e1 a1 a2 _name) = foldAnnot f e1 ++ f a1 ++ f a2
   foldAnnot f (JSMemberExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
   foldAnnot f (JSMemberNew a1 e a2 args a3) = f a1 ++ foldAnnot f e ++ f a2 ++ foldAnnot f args ++ f a3
   foldAnnot f (JSMemberSquare e a1 x a2) = foldAnnot f e ++ f a1 ++ foldAnnot f x ++ f a2
@@ -1222,6 +1233,7 @@ instance ShowStripped JSExpression where
   ss (JSLiteral _ s) | BS8.null s = "JSLiteral ''"
   ss (JSLiteral _ s) = "JSLiteral " <> singleQuote (bsToStr s)
   ss (JSMemberDot x1s _d x2) = "JSMemberDot (" <> ss x1s <> "," <> ss x2 <> ")"
+  ss (JSMemberPrivateDot x1s _d _h name) = "JSMemberPrivateDot (" <> ss x1s <> ",#" <> bsToStr name <> ")"
   ss (JSMemberExpression e _ a _) = "JSMemberExpression (" <> ss e <> ",JSArguments " <> ss a <> ")"
   ss (JSMemberNew _a n _ s _) = "JSMemberNew (" <> ss n <> ",JSArguments " <> ss s <> ")"
   ss (JSMemberSquare x1s _lb x2 _rb) = "JSMemberSquare (" <> ss x1s <> "," <> ss x2 <> ")"
@@ -1304,6 +1316,7 @@ instance ShowStripped JSExportSpecifier where
 instance ShowStripped JSTryCatch where
   ss (JSCatch _ _lb x1 _rb x3) = "JSCatch (" <> ss x1 <> "," <> ss x3 <> ")"
   ss (JSCatchIf _ _lb x1 _ ex _rb x3) = "JSCatch (" <> ss x1 <> ") if " <> ss ex <> " (" <> ss x3 <> ")"
+  ss (JSCatchNoParam _ x1) = "JSCatchNoParam (" <> ss x1 <> ")"
 
 instance ShowStripped JSTryFinally where
   ss (JSFinally _ x) = "JSFinally (" <> ss x <> ")"
@@ -1397,6 +1410,7 @@ instance ShowStripped JSAssignOp where
   ss (JSLogicalAndAssign _) = "'&&='"
   ss (JSLogicalOrAssign _) = "'||='"
   ss (JSNullishAssign _) = "'??='"
+  ss (JSExponentiationAssign _) = "'**='"
 
 instance ShowStripped JSVarInitializer where
   ss (JSVarInit _ n) = "[" <> ss n <> "]"
