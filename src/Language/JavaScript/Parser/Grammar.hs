@@ -92,6 +92,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Word (Word8)
 import qualified FlatParse.Basic as FP
 
 import Language.JavaScript.Parser.AST
@@ -110,6 +111,12 @@ import Language.JavaScript.Parser.Primitives
 -- =====================================================================
 -- Helpers (imported from Operators module, locally used parsers below)
 -- =====================================================================
+
+-- | Peek at the next byte without consuming input.
+-- Used for first-byte dispatch to eliminate backtracking in hot paths.
+peekByte :: JSParser Word8
+peekByte = FP.lookahead FP.anyWord8
+{-# INLINE peekByte #-}
 
 -- | Parse block body: @{ stmts }@
 blockBody :: JSParser JSBlock
@@ -747,26 +754,43 @@ callExpression = callMemberExpression
 -- ---------------------------------------------------------------------
 
 -- | Parse primary expression (atoms).
+-- Uses first-byte dispatch to eliminate backtracking: peeks the next byte
+-- and routes directly to the relevant parser(s), avoiding a 19-way chain.
 primaryExpression :: JSParser JSExpression
-primaryExpression =
-  thisLiteral FP.<|>
-  superLiteral FP.<|>
-  nullLiteral FP.<|>
-  booleanLiteral FP.<|>
-  literalExpression FP.<|>
-  regexLiteral FP.<|>
-  templateLiteral FP.<|>
-  spreadExpression FP.<|>
-  importExpression FP.<|>
-  asyncGeneratorExpr FP.<|>
-  asyncFunctionExpr FP.<|>
-  generatorExpression FP.<|>
-  functionExpression FP.<|>
-  classExpression FP.<|>
-  arrayLiteral FP.<|>
-  objectLiteral FP.<|>
-  parenthesizedExpression FP.<|>
-  identifierExpression
+primaryExpression = do
+  b <- peekByte
+  dispatchPrimary b
+{-# INLINE primaryExpression #-}
+
+-- | Dispatch primary expression parsing based on first byte of input.
+dispatchPrimary :: Word8 -> JSParser JSExpression
+dispatchPrimary b
+  | b == 0x22 || b == 0x27 = stringLit
+  | b >= 0x30 && b <= 0x39 = numericLit
+  | b == 0x2E = numericLit FP.<|> spreadExpression
+  | b == 0x60 = templateLiteral
+  | b == 0x5B = arrayLiteral
+  | b == 0x7B = objectLiteral
+  | b == 0x28 = parenthesizedExpression
+  | b == 0x2F = regexLiteral
+  | b == 0x23 = privateIdentifierExpression
+  | b == 0x74 = thisLiteral FP.<|> booleanLiteral FP.<|> identifierExpression
+  | b == 0x73 = superLiteral FP.<|> identifierExpression
+  | b == 0x6E = nullLiteral FP.<|> identifierExpression
+  | b == 0x66 = booleanLiteral FP.<|> generatorExpression FP.<|> functionExpression FP.<|> identifierExpression
+  | b == 0x63 = classExpression FP.<|> identifierExpression
+  | b == 0x61 = asyncGeneratorExpr FP.<|> asyncFunctionExpr FP.<|> identifierExpression
+  | b == 0x69 = importExpression FP.<|> identifierExpression
+  | otherwise = identifierExpression
+
+-- | Parse standalone private identifier: @#name@ (ES2022 private brand check).
+-- Used as the left operand in @#field in obj@ expressions.
+privateIdentifierExpression :: JSParser JSExpression
+privateIdentifierExpression = do
+  pos <- FP.getPos
+  parseChar '#'
+  name <- rawIdentifier
+  pure (JSPrivateIdentifier (fpPosToAnnot pos) name)
 
 -- | Parse template literal: @\`hello ${name}\`@
 templateLiteral :: JSParser JSExpression
@@ -1339,31 +1363,35 @@ accessorMethodDef = do
 -- =====================================================================
 
 -- | Parse any JavaScript statement.
+-- Uses first-byte dispatch after consuming whitespace to eliminate
+-- backtracking: peeks the next byte and routes to the relevant parser(s).
 statement :: JSParser JSStatement
 statement = do
   whitespace
-  blockStatement FP.<|>
-    emptyStatement FP.<|>
-    variableDeclaration FP.<|>
-    asyncGeneratorDecl FP.<|>
-    asyncFunctionDecl FP.<|>
-    generatorDecl FP.<|>
-    functionDeclaration FP.<|>
-    classDeclaration FP.<|>
-    ifStatement FP.<|>
-    whileStatement FP.<|>
-    doWhileStatement FP.<|>
-    forStatement FP.<|>
-    switchStatement FP.<|>
-    tryStatement FP.<|>
-    withStatement FP.<|>
-    returnStatement FP.<|>
-    breakStatement FP.<|>
-    continueStatement FP.<|>
-    throwStatement FP.<|>
-    debuggerStatement FP.<|>
-    labeledStatement FP.<|>
-    expressionStatement
+  b <- peekByte
+  dispatchStatement b
+{-# INLINE statement #-}
+
+-- | Dispatch statement parsing based on first byte of input.
+-- Each arm contains only the parsers whose keyword or syntax begins
+-- with the matched byte, with 'expressionStatement' as the final fallback.
+dispatchStatement :: Word8 -> JSParser JSStatement
+dispatchStatement b
+  | b == 0x7B = blockStatement
+  | b == 0x3B = emptyStatement
+  | b == 0x76 = variableDeclaration FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x6C = variableDeclaration FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x63 = variableDeclaration FP.<|> classDeclaration FP.<|> continueStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x61 = asyncGeneratorDecl FP.<|> asyncFunctionDecl FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x66 = generatorDecl FP.<|> functionDeclaration FP.<|> forStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x69 = ifStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x77 = whileStatement FP.<|> withStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x64 = doWhileStatement FP.<|> debuggerStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x73 = switchStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x74 = tryStatement FP.<|> throwStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x72 = returnStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | b == 0x62 = breakStatement FP.<|> labeledStatement FP.<|> expressionStatement
+  | otherwise = labeledStatement FP.<|> expressionStatement
 
 -- | Parse a list of statements.
 statementList :: JSParser [JSStatement]
@@ -1489,11 +1517,11 @@ ifStatement = do
   pos <- FP.getPos
   keyword "if"
   whitespace
-  lp <- parseCharAnnot '('
+  lp <- cutWithPos (parseCharAnnot '(') "expected '(' after 'if'"
   whitespace
   test <- expression
   whitespace
-  rp <- parseCharAnnot ')'
+  rp <- cutWithPos (parseCharAnnot ')') "expected ')' after if condition"
   whitespace
   consequent <- statement
   elseClause <- FP.optional (do whitespace; ea <- keywordAnnot "else"; whitespace; alt <- statement; pure (ea, alt))
@@ -1507,11 +1535,11 @@ whileStatement = do
   pos <- FP.getPos
   keyword "while"
   whitespace
-  lp <- parseCharAnnot '('
+  lp <- cutWithPos (parseCharAnnot '(') "expected '(' after 'while'"
   whitespace
   test <- expression
   whitespace
-  rp <- parseCharAnnot ')'
+  rp <- cutWithPos (parseCharAnnot ')') "expected ')' after while condition"
   whitespace
   body <- statement
   pure (JSWhile (fpPosToAnnot pos) lp test rp body)
@@ -1878,13 +1906,13 @@ switchStatement = do
   pos <- FP.getPos
   keyword "switch"
   whitespace
-  lp <- parseCharAnnot '('
+  lp <- cutWithPos (parseCharAnnot '(') "expected '(' after 'switch'"
   whitespace
   discriminant <- expression
   whitespace
-  rp <- parseCharAnnot ')'
+  rp <- cutWithPos (parseCharAnnot ')') "expected ')' after switch expression"
   whitespace
-  lb <- parseCharAnnot '{'
+  lb <- cutWithPos (parseCharAnnot '{') "expected '{' in switch statement"
   whitespace
   cases <- FP.many (whitespace *> (caseClause FP.<|> defaultClause))
   whitespace
@@ -2011,11 +2039,11 @@ functionDeclaration = do
   whitespace
   name <- identName
   whitespace
-  lp <- parseCharAnnot '('
+  lp <- cutWithPos (parseCharAnnot '(') "expected '(' after function name"
   whitespace
   paramList <- parseAnnotCommaListDropTrailing functionParam
   whitespace
-  rp <- parseCharAnnot ')'
+  rp <- cutWithPos (parseCharAnnot ')') "expected ')' after parameters"
   whitespace
   body <- blockBody
   semi <- expectStatementEnd
@@ -2090,7 +2118,7 @@ classDeclaration = do
   whitespace
   heritage <- FP.optional extendsClause
   whitespace
-  lb <- parseCharAnnot '{'
+  lb <- cutWithPos (parseCharAnnot '{') "expected '{' in class declaration"
   whitespace
   elements <- FP.many classElement
   whitespace
@@ -2116,7 +2144,7 @@ tryStatement = do
   pos <- FP.getPos
   keyword "try"
   whitespace
-  tryBlock <- blockBody
+  tryBlock <- cutWithPos blockBody "expected '{' after 'try'"
   whitespace
   catches <- FP.many (whitespace *> catchClause)
   whitespace

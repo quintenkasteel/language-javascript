@@ -66,14 +66,12 @@ module Language.JavaScript.Parser.Lexer
     withPos,
 
     -- * Error Handling
-    ParseError (..),
     parseError,
     unexpected,
   )
 where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS8
 import Data.Char (chr, digitToInt)
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -82,8 +80,8 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import FlatParse.Basic (Pos, (<|>), many, some, satisfy, anyChar, optional, skipMany, empty)
 import qualified FlatParse.Basic as FP
+import Language.JavaScript.Parser.Primitives (JSParser, ParseError(..), isIdentifierStart, isIdentifierContinue, isWhitespace, isDecimalDigit, isBinaryDigit, isOctalDigit, isHexDigit)
 import qualified Language.JavaScript.Parser.Pos as JSPos
-import Language.JavaScript.Parser.Primitives (JSParser, isIdentifierStart, isIdentifierContinue, isWhitespace, isDecimalDigit, isBinaryDigit, isOctalDigit, isHexDigit)
 
 -- ---------------------------------------------------------------------
 -- Core Parser Infrastructure
@@ -102,22 +100,15 @@ parseChar c = FP.word8 (fromIntegral (fromEnum c))
 parseString :: ByteString -> JSParser ()
 parseString = FP.byteString
 
--- | Parse error with position and context information.
-data ParseError
-  = SyntaxError !JSPos.Pos !Text ![Text]     -- position, message, suggestions
-  | UnexpectedEOF !JSPos.Pos                 -- position
-  | UnexpectedChar !JSPos.Pos !Char !Text    -- position, found, expected
-  | InvalidEscape !JSPos.Pos !Text           -- position, escape sequence
-  | InvalidNumeric !JSPos.Pos !Text          -- position, numeric format
-  deriving (Eq, Show)
-
--- | Create a parse error at current position.
+-- | Create a fatal parse error at current position.
+-- Uses 'FP.err' to throw a non-backtrackable error with the message.
 parseError :: Text -> JSParser a
-parseError msg = FP.err (Text.encodeUtf8 msg)
+parseError msg = FP.err (SyntaxError (JSPos.mkPos 1 1) msg [])
 
--- | Report unexpected character.
+-- | Report unexpected character as a fatal error.
 unexpected :: Char -> Text -> JSParser a
-unexpected found expected = FP.err (BS8.pack ("unexpected '" ++ [found] ++ "', expected " ++ Text.unpack expected))
+unexpected found expected =
+  FP.err (UnexpectedChar (JSPos.mkPos 1 1) found expected)
 
 -- | Parse with position tracking.
 withPos :: JSParser a -> JSParser (Pos, a)

@@ -12,7 +12,7 @@
 
 -- Integration Tests
 
--- import Integration.Language.Javascript.Parser.AdvancedFeatures  -- Temporarily disabled due to constructor issues
+import Integration.Language.Javascript.Parser.AdvancedFeatures
 
 -- Golden Tests
 
@@ -69,8 +69,9 @@ import Unit.Language.Javascript.Process.TreeShake.AdvancedJSEdgeCases
 import Unit.Language.Javascript.Process.TreeShake.LibraryPatterns
 import Unit.Language.Javascript.Process.TreeShake.IntegrationScenarios
 import Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
--- import Unit.Language.Javascript.Process.TreeShake.Usage
--- import Unit.Language.Javascript.Process.TreeShake.Elimination
+import Unit.Language.Javascript.Process.TreeShake.Usage
+import Unit.Language.Javascript.Process.TreeShake.Elimination
+import Unit.Language.Javascript.Process.TreeShake.ModernJS
 import Integration.Language.Javascript.Process.TreeShake
 import Test.Language.Javascript.JSDocTest
 import Unit.Language.Javascript.Runtime.ValidatorTest
@@ -138,8 +139,9 @@ testAll = do
   Unit.Language.Javascript.Process.TreeShake.LibraryPatterns.libraryPatternsTests
   Unit.Language.Javascript.Process.TreeShake.IntegrationScenarios.integrationScenariosTests
   Unit.Language.Javascript.Process.TreeShake.EnterpriseScale.enterpriseScaleTests
-  -- Unit.Language.Javascript.Process.TreeShake.Usage.testUsageAnalysis
-  -- Unit.Language.Javascript.Process.TreeShake.Elimination.testEliminationCore
+  Unit.Language.Javascript.Process.TreeShake.Usage.testUsageAnalysis
+  Unit.Language.Javascript.Process.TreeShake.Elimination.testEliminationCore
+  Unit.Language.Javascript.Process.TreeShake.ModernJS.testModernJavaScriptPatterns
 
   -- Unit Tests - JSDoc
   Test.Language.Javascript.JSDocTest.tests
@@ -155,7 +157,7 @@ testAll = do
   -- Integration Tests
   Integration.Language.Javascript.Parser.RoundTrip.testRoundTrip
   Integration.Language.Javascript.Parser.RoundTrip.testES6RoundTrip
-  -- Integration.Language.Javascript.Parser.AdvancedFeatures.testAdvancedJavaScriptFeatures  -- Temporarily disabled
+  Integration.Language.Javascript.Parser.AdvancedFeatures.testAdvancedJavaScriptFeatures
   Integration.Language.Javascript.Parser.Minification.testMinifyExpr
   Integration.Language.Javascript.Parser.Minification.testMinifyStmt
   Integration.Language.Javascript.Parser.Minification.testMinifyProg

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | JavaScript minification — reduces AST to minimal whitespace output.
 --
@@ -7,15 +8,24 @@
 -- semicolons to produce the smallest semantically equivalent JavaScript.
 -- Operates purely on the AST without re-parsing.
 --
+-- ==== Transformations Applied
+--
+--   * Removes all comments and unnecessary whitespace
+--   * Normalizes string quotes to single quotes
+--   * Concatenates adjacent string literals (@\"a\" + \"b\"@ becomes @\'ab\'@)
+--   * Removes trailing semicolons where ASI applies
+--   * Merges adjacent @var@ and @const@ declarations
+--   * Simplifies single-statement blocks
+--
 -- ==== Usage
 --
 -- @
--- import Language.JavaScript.Parser (readJsSafe)
+-- import Language.JavaScript.Parser (parse)
 -- import Language.JavaScript.Process.Minify (minifyJS)
 -- import Language.JavaScript.Pretty.Printer (renderToString)
 --
 -- minify :: String -> Either String String
--- minify src = renderToString . minifyJS \<$\> readJsSafe src
+-- minify src = renderToString . minifyJS \<$\> parse src "input.js"
 -- @
 --
 -- @since 0.6.0.0
@@ -27,7 +37,7 @@ where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
+import Data.Word (Word8)
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
@@ -59,10 +69,10 @@ fixSpace = fix spaceAnnot
 -- instance for the MinifyJS typeclass would not be sufficient.
 
 fixStmt :: JSAnnot -> JSSemi -> JSStatement -> JSStatement
-fixStmt a s (JSStatementBlock _lb ss _rb _) = fixStatementBlock a s ss
+fixStmt a s (JSStatementBlock _lb stmts _rb _) = fixStatementBlock a s stmts
 fixStmt a s (JSBreak _ i _) = JSBreak a (fixSpace i) s
 fixStmt a s (JSClass _ n h _ ms _ _) = JSClass a (fixSpace n) (fixSpace h) emptyAnnot (fixEmpty ms) emptyAnnot s
-fixStmt a s (JSConstant _ ss _) = JSConstant a (fixVarList ss) s
+fixStmt a s (JSConstant _ vars _) = JSConstant a (fixVarList vars) s
 fixStmt a s (JSContinue _ i _) = JSContinue a (fixSpace i) s
 fixStmt a s (JSDoWhile _ st _ _ e _ _) = JSDoWhile a (mkStatementBlock noSemi st) emptyAnnot emptyAnnot (fixEmpty e) emptyAnnot s
 fixStmt a s (JSFor _ _ el1 _ el2 _ el3 _ st) = JSFor a emptyAnnot (fixEmpty el1) emptyAnnot (fixEmpty el2) emptyAnnot (fixEmpty el3) emptyAnnot (fixStmtE s st)
@@ -93,7 +103,7 @@ fixStmt a s (JSReturn _ me _) = JSReturn a (fixSpace me) s
 fixStmt a s (JSSwitch _ _ e _ _ sps _ _) = JSSwitch a emptyAnnot (fixEmpty e) emptyAnnot emptyAnnot (fixSwitchParts sps) emptyAnnot s
 fixStmt a s (JSThrow _ e _) = JSThrow a (fixSpace e) s
 fixStmt a _ (JSTry _ b tc tf) = JSTry a (fixEmpty b) (fmap fixEmpty tc) (fixEmpty tf)
-fixStmt a s (JSVariable _ ss _) = JSVariable a (fixVarList ss) s
+fixStmt a s (JSVariable _ vars _) = JSVariable a (fixVarList vars) s
 fixStmt a s (JSWhile _ _ e _ st) = JSWhile a emptyAnnot (fixEmpty e) emptyAnnot (fixStmt a s st)
 fixStmt a s (JSWith _ _ e _ st _) = JSWith a emptyAnnot (fixEmpty e) emptyAnnot (fixStmtE noSemi st) s
 fixStmt a s (JSDebugger _ _) = JSDebugger a s
@@ -119,8 +129,8 @@ mkStatementBlock s x = JSStatementBlock emptyAnnot [fixStmtE noSemi x] emptyAnno
 -- JSStatementBlocks. If the resulting list contains only a single element,
 -- remove the enclosing JSStatementBlock and return the inner JSStatement.
 fixStatementBlock :: JSAnnot -> JSSemi -> [JSStatement] -> JSStatement
-fixStatementBlock a s ss =
-  case filter (not . isEmpty) ss of
+fixStatementBlock a s stmts =
+  case filter (not . isEmpty) stmts of
     [] -> JSStatementBlock emptyAnnot [] emptyAnnot s
     [sx] -> fixStmt a s sx
     sss -> JSStatementBlock emptyAnnot (fixStatementList noSemi sss) emptyAnnot s
@@ -208,6 +218,7 @@ instance MinifyJS JSExpression where
   fix a (JSYieldFromExpression _ _ x) = JSYieldFromExpression a emptyAnnot (fixEmpty x)
   fix a (JSImportMeta _ _) = JSImportMeta a emptyAnnot
   fix a (JSImportCall _ _ expr _) = JSImportCall a emptyAnnot (fixEmpty expr) emptyAnnot
+  fix a (JSPrivateIdentifier _ name) = JSPrivateIdentifier a name
   fix a (JSSpreadExpression _ e) = JSSpreadExpression a (fixEmpty e)
   fix a (JSBigIntLiteral _ s) = JSBigIntLiteral a s
   fix a (JSOptionalMemberDot e _ p) = JSOptionalMemberDot (fix a e) emptyAnnot (fixEmpty p)
@@ -249,27 +260,40 @@ stringLitConcat :: ByteString -> ByteString -> JSExpression
 stringLitConcat xs ys
   | BS.null xs = JSStringLiteral emptyAnnot ys
   | BS.null ys = JSStringLiteral emptyAnnot xs
-  | otherwise = JSStringLiteral emptyAnnot (BS8.init xs <> BS8.init (BS.drop 1 ys) <> "'")
+  | otherwise = JSStringLiteral emptyAnnot (safeDrop1End xs <> safeDrop1End (BS.drop 1 ys) <> "'")
+
+-- | Drop the last byte of a ByteString safely. Returns empty for empty input.
+safeDrop1End :: ByteString -> ByteString
+safeDrop1End bs
+  | BS.null bs = BS.empty
+  | otherwise = BS.take (BS.length bs - 1) bs
 
 -- Normalize a ByteString. If its single quoted, just return it and if its
 -- double quoted convert it to single quoted.
 normalizeToSQ :: ByteString -> ByteString
-normalizeToSQ str
-  | BS.null str = str
-  | BS8.head str == '\'' = str
-  | BS8.head str == '"' = BS8.cons '\'' (convertSQ (BS.drop 1 str))
-  | otherwise = str
+normalizeToSQ str = case BS.uncons str of
+  Nothing -> str
+  Just (w, _)
+    | w == squote -> str
+    | w == dquote -> BS.cons squote (convertSQ (BS.drop 1 str))
+    | otherwise -> str
   where
-    convertSQ bs
-      | BS.null bs = BS.empty
-      | BS.length bs == 1 = "'"
-      | BS8.head bs == '\'' = "\\'" <> convertSQ (BS.drop 1 bs)
-      | BS8.head bs == '\\' = handleEscape (BS.drop 1 bs)
-      | otherwise = BS8.cons (BS8.head bs) (convertSQ (BS.drop 1 bs))
-    handleEscape rest
-      | BS.null rest = "\\"
-      | BS8.head rest == '"' = BS8.cons '"' (convertSQ (BS.drop 1 rest))
-      | otherwise = BS8.cons '\\' (convertSQ rest)
+    squote, dquote, backslash :: Word8
+    squote = 0x27
+    dquote = 0x22
+    backslash = 0x5C
+    convertSQ bs = case BS.uncons bs of
+      Nothing -> BS.empty
+      Just _ | BS.length bs == 1 -> "'"
+      Just (w, rest)
+        | w == squote -> "\\'" <> convertSQ rest
+        | w == backslash -> handleEscape rest
+        | otherwise -> BS.cons w (convertSQ rest)
+    handleEscape rest = case BS.uncons rest of
+      Nothing -> "\\"
+      Just (w, rest')
+        | w == dquote -> BS.cons w (convertSQ rest')
+        | otherwise -> BS.cons backslash (convertSQ rest)
 
 instance MinifyJS JSBinOp where
   fix _ (JSBinOpAnd _) = JSBinOpAnd emptyAnnot
@@ -411,15 +435,15 @@ fixSwitchParts parts =
     [x] -> [fixPart noSemi x]
     (x : xs) -> fixPart semi x : fixSwitchParts xs
   where
-    fixPart s (JSCase _ e _ ss) = JSCase emptyAnnot (fixCase e) emptyAnnot (fixStatementList s ss)
-    fixPart s (JSDefault _ _ ss) = JSDefault emptyAnnot emptyAnnot (fixStatementList s ss)
+    fixPart s' (JSCase _ e _ stmts) = JSCase emptyAnnot (fixCase e) emptyAnnot (fixStatementList s' stmts)
+    fixPart s' (JSDefault _ _ stmts) = JSDefault emptyAnnot emptyAnnot (fixStatementList s' stmts)
 
 fixCase :: JSExpression -> JSExpression
 fixCase (JSStringLiteral _ s) = JSStringLiteral emptyAnnot s
 fixCase e = fix spaceAnnot e
 
 instance MinifyJS JSBlock where
-  fix _ (JSBlock _ ss _) = JSBlock emptyAnnot (fixStatementList noSemi ss) emptyAnnot
+  fix _ (JSBlock _ stmts _) = JSBlock emptyAnnot (fixStatementList noSemi stmts) emptyAnnot
 
 instance MinifyJS JSObjectProperty where
   fix a (JSPropertyNameandValue n _ vs) = JSPropertyNameandValue (fix a n) emptyAnnot (fmap fixEmpty vs)

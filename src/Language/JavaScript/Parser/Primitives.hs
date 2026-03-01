@@ -33,6 +33,9 @@ module Language.JavaScript.Parser.Primitives
   ( -- * Parser Type
     JSParser,
 
+    -- * Parse Error Type
+    ParseError (..),
+
     -- * Basic Parser Combinators
     satisfy,
     some,
@@ -58,18 +61,43 @@ module Language.JavaScript.Parser.Primitives
   )
 where
 
-import Data.ByteString (ByteString)
+import Control.DeepSeq (NFData(..))
 import Data.Char (GeneralCategory(..), generalCategory, isLetter, toLower)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import FlatParse.Basic (Parser, many, empty, satisfy, some)
+import qualified FlatParse.Basic as FP
+import FlatParse.Basic (Parser, many, satisfy, some)
+import qualified Language.JavaScript.Parser.Pos as JSPos
+
+-- ---------------------------------------------------------------------
+-- Parse Error Type
+-- ---------------------------------------------------------------------
+
+-- | Structured parse error with position and context information.
+--
+-- Used as the error type for the FlatParse 'Parser', enabling rich error
+-- messages that propagate through the parsing pipeline.
+data ParseError
+  = SyntaxError !JSPos.Pos !Text ![Text]     -- ^ Position, message, suggestions
+  | UnexpectedEOF !JSPos.Pos                 -- ^ Unexpected end of input
+  | UnexpectedChar !JSPos.Pos !Char !Text    -- ^ Position, found char, expected description
+  | InvalidEscape !JSPos.Pos !Text           -- ^ Position, escape sequence
+  | InvalidNumeric !JSPos.Pos !Text          -- ^ Position, numeric format description
+  deriving (Eq, Show)
+
+instance NFData ParseError where
+  rnf (SyntaxError pos msg suggestions) = rnf pos `seq` rnf msg `seq` rnf suggestions
+  rnf (UnexpectedEOF pos) = rnf pos
+  rnf (UnexpectedChar pos c desc) = rnf pos `seq` rnf c `seq` rnf desc
+  rnf (InvalidEscape pos desc) = rnf pos `seq` rnf desc
+  rnf (InvalidNumeric pos desc) = rnf pos `seq` rnf desc
 
 -- ---------------------------------------------------------------------
 -- Core Parser Infrastructure
 -- ---------------------------------------------------------------------
 
--- | High-performance JavaScript parser using flatparse.
-type JSParser = Parser ByteString
+-- | High-performance JavaScript parser using flatparse with structured errors.
+type JSParser = Parser ParseError
 
 -- ---------------------------------------------------------------------
 -- Character Classification
@@ -150,10 +178,16 @@ stringCI txt = asciiCI (Text.unpack txt)
 -- Error Handling
 -- ---------------------------------------------------------------------
 
--- | Signal parse error.
-err :: String -> JSParser a
-err _msg = empty
+-- | Signal a recoverable parse error (backtrackable failure).
+-- Uses 'FP.empty' so that alternatives can be tried.
+err :: Text -> JSParser a
+err _msg = FP.empty
 
--- | Signal fatal parse error that prevents recovery.
-fatal :: String -> JSParser a
-fatal _msg = empty
+-- | Signal a fatal parse error that prevents recovery.
+-- Captures current FlatParse position for accurate error reporting.
+-- Position is stored as remaining-bytes in line field (column=0 sentinel)
+-- for resolution by 'formatParseError'.
+fatal :: Text -> JSParser a
+fatal msg = do
+  fpPos <- FP.getPos
+  FP.err (SyntaxError (JSPos.mkPos (FP.unPos fpPos) 0) msg [])

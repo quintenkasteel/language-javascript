@@ -20,7 +20,7 @@ import Language.JavaScript.Parser.AST
     JSPropertyName (..),
     JSTemplatePart (..),
   )
-import Language.JavaScript.Parser.Parser (parseExpression, parseUsing)
+import Language.JavaScript.Parser.Parser (parseExpression)
 import Test.Hspec
 
 testExpressionParser :: Spec
@@ -1056,4 +1056,4 @@ testExpressionParser = describe "Parse expressions:" $ do
       result -> expectationFailure ("Expected named class expression with multiple static features, got: " ++ show result)
 
 testExpr :: String -> Either String JSAST
-testExpr str = parseUsing parseExpression str "src"
+testExpr str = parseExpression str "src"

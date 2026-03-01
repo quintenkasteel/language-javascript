@@ -22,12 +22,10 @@ module Integration.Language.Javascript.Parser.AdvancedFeatures
   )
 where
 
-import Data.Either (isLeft, isRight)
-import Data.Text (Text)
+import Data.Either (isRight)
 import qualified Data.Text as Text
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
-import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Validator
 import Test.Hspec
 
@@ -37,9 +35,6 @@ noAnnot = JSNoAnnot
 
 auto :: JSSemi
 auto = JSSemiAuto
-
-noPos :: TokenPosn
-noPos = TokenPn 0 0 0
 
 -- | Main test suite for advanced JavaScript features
 testAdvancedJavaScriptFeatures :: Spec
@@ -71,7 +66,7 @@ es2023PlusFeatureTests = describe "ES2023+ Feature Support" $ do
                           ( JSExpressionBinary
                               (JSIdentifier noAnnot "x")
                               (JSBinOpGt noAnnot)
-                              (JSDecimal noAnnot "5")
+                              (JSDecimal noAnnot 5)
                           )
                       )
                   )
@@ -289,7 +284,7 @@ typeScriptDeclarationTests = describe "TypeScript Declaration File Support" $ do
                       ( JSPropertyNameandValue
                           (JSPropertyIdent noAnnot "age")
                           noAnnot
-                          [JSDecimal noAnnot "30"]
+                          [JSDecimal noAnnot 30]
                       )
                   )
               )
@@ -410,11 +405,12 @@ jsxSyntaxTests = describe "JSX Syntax Support" $ do
                                   )
                               )
                           )
+                          noAnnot
                       )
                   )
+                  noAnnot
+                  (JSStringLiteral noAnnot "Click")
               )
-              noAnnot
-              (JSLOne (JSStringLiteral noAnnot "Click"))
               noAnnot
       validateExpression emptyContext jsxWithProps `shouldSatisfy` null
 
@@ -442,6 +438,7 @@ jsxSyntaxTests = describe "JSX Syntax Support" $ do
                               )
                           )
                       )
+                      noAnnot
                   )
               )
               noAnnot
@@ -604,7 +601,7 @@ flowTypeAnnotationTests = describe "Flow Type Annotation Support" $ do
                       ( JSPropertyNameandValue
                           (JSPropertyIdent noAnnot "age")
                           noAnnot
-                          [JSDecimal noAnnot "30"]
+                          [JSDecimal noAnnot 30]
                       )
                   )
               )
@@ -625,6 +622,7 @@ flowTypeAnnotationTests = describe "Flow Type Annotation Support" $ do
                       )
                   )
               )
+              noAnnot
       validateExpression emptyContext optionalProp `shouldSatisfy` null
 
   describe "generic type parameters" $ do
@@ -666,13 +664,13 @@ flowTypeAnnotationTests = describe "Flow Type Annotation Support" $ do
                       ( JSBlock
                           noAnnot
                           [ JSExpressionStatement
-                              ( JSAssignmentExpression
-                                  (JSAssignOpAssign noAnnot)
+                              ( JSAssignExpression
                                   ( JSMemberDot
                                       (JSIdentifier noAnnot "this")
                                       noAnnot
                                       (JSIdentifier noAnnot "value")
                                   )
+                                  (JSAssign noAnnot)
                                   (JSIdentifier noAnnot "value")
                               )
                               auto
@@ -703,11 +701,10 @@ frameworkCompatibilityTests = describe "Framework-Specific Syntax Compatibility"
                               ( JSVarInitExpression
                                   ( JSArrayLiteral
                                       noAnnot
-                                      ( JSLCons
-                                          (JSLOne (JSElision noAnnot))
-                                          noAnnot
-                                          (JSElision noAnnot)
-                                      )
+                                      [ JSArrayElement (JSIdentifier noAnnot "state")
+                                      , JSArrayComma noAnnot
+                                      , JSArrayElement (JSIdentifier noAnnot "setState")
+                                      ]
                                       noAnnot
                                   )
                                   ( JSVarInit
@@ -715,7 +712,7 @@ frameworkCompatibilityTests = describe "Framework-Specific Syntax Compatibility"
                                       ( JSCallExpression
                                           (JSIdentifier noAnnot "useState")
                                           noAnnot
-                                          (JSLOne (JSDecimal noAnnot "0"))
+                                          (JSLOne (JSDecimal noAnnot 0))
                                           noAnnot
                                       )
                                   )
@@ -770,7 +767,7 @@ frameworkCompatibilityTests = describe "Framework-Specific Syntax Compatibility"
       -- Simple Angular component test that should pass validation
       let angularCode = "angular.module('app').component('myComponent', { template: '<div>Hello</div>', controller: function() { this.message = 'test'; } });"
       case parse (Text.unpack angularCode) "angular-component" of
-        Right ast -> validate ast `shouldSatisfy` null
+        Right ast -> validate ast `shouldSatisfy` isRight
         Left _ -> expectationFailure "Failed to parse Angular component"
 
   describe "Vue.js patterns" $ do
@@ -778,7 +775,7 @@ frameworkCompatibilityTests = describe "Framework-Specific Syntax Compatibility"
       -- Simple Vue component test that should pass validation
       let vueCode = "new Vue({ el: '#app', data: { message: 'Hello' }, methods: { greet: function() { console.log(this.message); } } });"
       case parse (Text.unpack vueCode) "vue-component" of
-        Right ast -> validate ast `shouldSatisfy` null
+        Right ast -> validate ast `shouldSatisfy` isRight
         Left _ -> expectationFailure "Failed to parse Vue component"
   {-
   let vueComponent = JSObjectLiteral noAnnot
@@ -891,5 +888,3 @@ emptyContext =
 emptyModuleContext :: ValidationContext
 emptyModuleContext = emptyContext {contextInModule = True}
 
-standardContext :: ValidationContext
-standardContext = emptyContext

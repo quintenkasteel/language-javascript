@@ -1498,7 +1498,7 @@ shrinkJSStatement stmt = case stmt of
 shrinkJSAST :: JSAST -> [JSAST]
 shrinkJSAST ast = case ast of
   JSAstProgram stmts annot ->
-    [JSAstProgram ss annot | ss <- shrink stmts]
+    [JSAstProgram s annot | s <- shrink stmts]
   JSAstStatement stmt annot ->
     [JSAstStatement s annot | s <- shrink stmt]
   JSAstExpression expr annot ->

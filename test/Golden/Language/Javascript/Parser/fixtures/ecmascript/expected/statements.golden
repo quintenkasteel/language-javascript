@@ -1,2 +1,3 @@
 PARSE_ERROR:
-test/Golden/Language/Javascript/Parser/fixtures/ecmascript/inputs/statements.js: SyntaxError 1:1 "lexical error" []
+test/Golden/Language/Javascript/Parser/fixtures/ecmascript/inputs/statements.js: Syntax Error at 1:1
+  unexpected input

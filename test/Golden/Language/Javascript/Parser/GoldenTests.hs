@@ -144,12 +144,12 @@ parseJavaScriptGolden inputFile = do
 
 -- | Parse JavaScript with error capture for error message testing.
 --
--- Uses 'Parser.readJsSafe' which returns @Either String JSAST@,
+-- Uses 'Parser.parse' which returns @Either String JSAST@,
 -- capturing both parse successes and failures without exceptions.
 parseWithErrorCapture :: FilePath -> IO String
 parseWithErrorCapture inputFile = do
   content <- readFile inputFile
-  pure (formatParseResult (Parser.readJsSafe content))
+  pure (formatParseResult (Parser.parse content "src"))
 
 -- | Parse JavaScript and format pretty printer output.
 --

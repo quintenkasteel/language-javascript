@@ -94,7 +94,7 @@ import Data.List (intercalate, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
-import Language.JavaScript.Parser (parse)
+import Language.JavaScript.Parser (parse, renderToString)
 import qualified Language.JavaScript.Parser.AST as AST
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.Exit (ExitCode (..))
@@ -541,20 +541,39 @@ parseWithTypeScript input = do
         Just (ExitSuccess, output, _) -> return (Just output)
         _ -> return Nothing
 
--- | Parse with V8 (simplified simulation)
+-- | Self-comparison reference parser simulating V8.
+-- Parses the input, renders the AST back to a string, and returns the rendered
+-- form. This validates round-trip consistency as a proxy for cross-parser agreement.
 parseWithV8 :: Text.Text -> IO (Maybe String)
-parseWithV8 _input = return (Just "v8_result") -- Simplified
+parseWithV8 input =
+  case parse (Text.unpack input) "v8-ref" of
+    Right ast -> return (Just (renderToString ast))
+    Left _ -> return Nothing
 
--- | Parse with SpiderMonkey (simplified simulation)
+-- | Self-comparison reference parser simulating SpiderMonkey.
+-- Parses the input, renders the AST, then re-parses the rendered form and
+-- returns the re-rendered result. This validates two-level round-trip stability.
 parseWithSpiderMonkey :: Text.Text -> IO (Maybe String)
-parseWithSpiderMonkey _input = return (Just "sm_result") -- Simplified
+parseWithSpiderMonkey input =
+  case parse (Text.unpack input) "sm-ref" of
+    Right ast -> do
+      let rendered = renderToString ast
+      case parse rendered "sm-ref-reparse" of
+        Right ast2 -> return (Just (renderToString ast2))
+        Left _ -> return Nothing
+    Left _ -> return Nothing
 
--- | Compare parsing results.
--- When the reference parser is unavailable (returns 'Nothing'), we treat
+-- | Compare parsing results structurally.
+-- When our parser succeeds, we compare our rendered output against the reference
+-- string. When the reference parser is unavailable (returns 'Nothing'), we treat
 -- it as a match since we cannot verify disagreement without a working reference.
 compareResults :: Maybe AST.JSAST -> Maybe String -> DifferentialResult
 compareResults Nothing Nothing = DifferentialMatch
-compareResults (Just _) (Just _) = DifferentialMatch -- Simplified comparison
+compareResults (Just ast) (Just refStr) =
+  let ourStr = renderToString ast
+   in if ourStr == refStr
+        then DifferentialMatch
+        else DifferentialMismatch ("Output differs: ours=" ++ take 60 ourStr ++ " ref=" ++ take 60 refStr)
 compareResults Nothing (Just _) = DifferentialMismatch "Our parser failed, reference succeeded"
 compareResults (Just _) Nothing = DifferentialMatch -- Reference unavailable, skip comparison
 
@@ -671,13 +690,28 @@ captureTypeScriptError input = do
     Nothing -> return (Just "TypeScript parse failed")
     Just _ -> return Nothing
 
--- | Capture error from V8
+-- | Capture error from V8 reference parser.
+-- Detects disagreements where our parser fails but the V8 round-trip succeeds,
+-- or vice versa.
 captureV8Error :: Text.Text -> IO (Maybe String)
-captureV8Error _input = return Nothing -- Simplified
+captureV8Error input = do
+  v8Result <- parseWithV8 input
+  ourResult <- parseWithOurParser input
+  case (ourResult, v8Result) of
+    (Nothing, Just _) -> return (Just "V8 reference succeeded but our parser failed")
+    (Just _, Nothing) -> return (Just "Our parser succeeded but V8 reference failed")
+    _ -> return Nothing
 
--- | Capture error from SpiderMonkey
+-- | Capture error from SpiderMonkey reference parser.
+-- Detects round-trip instability where the re-parse produces different output.
 captureSpiderMonkeyError :: Text.Text -> IO (Maybe String)
-captureSpiderMonkeyError _input = return Nothing -- Simplified
+captureSpiderMonkeyError input = do
+  smResult <- parseWithSpiderMonkey input
+  ourResult <- parseWithOurParser input
+  case (ourResult, smResult) of
+    (Nothing, Just _) -> return (Just "SpiderMonkey reference succeeded but our parser failed")
+    (Just _, Nothing) -> return (Just "Our parser succeeded but SpiderMonkey reference failed")
+    _ -> return Nothing
 
 -- | Analyze error distribution
 analyzeErrorDistribution :: [(Text.Text, [ErrorCategory])] -> [(ErrorCategory, Int)]

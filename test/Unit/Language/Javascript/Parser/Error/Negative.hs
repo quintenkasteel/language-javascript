@@ -27,7 +27,7 @@ module Unit.Language.Javascript.Parser.Error.Negative
   )
 where
 
-import Language.JavaScript.Parser (readJsSafe, readJsModuleSafe)
+import Language.JavaScript.Parser (parse, parseModule)
 import Test.Hspec
 
 -- | Comprehensive negative testing for all parser components
@@ -460,7 +460,7 @@ shouldFailToParse :: String -> String -> Expectation
 shouldFailToParse input errorMsg =
   either (const (pure ())) (const (expectationFailure errorMsg)) result
   where
-    result = readJsSafe input
+    result = parse input "negative-test"
 
 -- | Assert that a JavaScript module fails to parse.
 --
@@ -470,7 +470,7 @@ shouldFailToParseModule :: String -> String -> Expectation
 shouldFailToParseModule input errorMsg =
   either (const (pure ())) (const (expectationFailure errorMsg)) result
   where
-    result = readJsModuleSafe input
+    result = parseModule input "negative-test"
 
 -- | Assert that a JavaScript program is accepted by the parser.
 --
@@ -480,7 +480,7 @@ shouldAcceptAsScript :: String -> Expectation
 shouldAcceptAsScript input =
   either reportUnexpectedFailure (const (pure ())) result
   where
-    result = readJsSafe input
+    result = parse input "negative-test"
 
     reportUnexpectedFailure :: String -> Expectation
     reportUnexpectedFailure err =

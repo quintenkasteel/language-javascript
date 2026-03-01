@@ -1199,6 +1199,7 @@ isValidExpression expr =
     AST.JSAsyncGeneratorExpression {} -> True
     AST.JSImportCall {} -> True
     AST.JSMemberPrivateDot {} -> True
+    AST.JSPrivateIdentifier {} -> True
 
 isValidStatement :: AST.JSStatement -> Bool
 isValidStatement stmt =

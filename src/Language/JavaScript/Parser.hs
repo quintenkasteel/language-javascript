@@ -5,33 +5,27 @@
 --
 -- Three API tiers are available, from highest to lowest performance:
 --
---   * 'parseBS' / 'parseModuleBS' — zero-copy 'ByteString' input
+--   * 'parseByteString' / 'parseModuleByteString' — zero-copy 'ByteString' input
 --   * 'parseText' / 'parseModuleText' — 'Text' input (UTF-8 encoded internally)
---   * 'parse' / 'readJsSafe' — 'String' input (backward compatible)
+--   * 'parse' / 'parseModule' — 'String' input (backward compatible)
 --
 -- @since 0.5.0.0
 module Language.JavaScript.Parser
-  ( -- * String-based Parsing (backward compatible)
+  ( -- * String-based Parsing
     PA.parse,
     PA.parseModule,
-    PA.readJs,
-    PA.readJsModule,
-    PA.readJsSafe,
-    PA.readJsModuleSafe,
-    PA.parseFile,
-    PA.parseFileUtf8,
 
     -- * ByteString Parsing (zero-copy, highest performance)
-    PA.parseBS,
-    PA.parseModuleBS,
-    PA.parseSafeBS,
-    PA.parseModuleSafeBS,
+    PA.parseByteString,
+    PA.parseModuleByteString,
 
     -- * Text Parsing (convenience for Text-based applications)
     PA.parseText,
     PA.parseModuleText,
-    PA.parseSafeText,
-    PA.parseModuleSafeText,
+
+    -- * File Parsing (safe — does not throw on parse error)
+    PA.parseFileSafe,
+    PA.parseFileUtf8Safe,
 
     -- * Structured Parsing (rich error types via "Language.JavaScript.Parser.Core")
     Core.parseProgramByteString,
@@ -44,9 +38,20 @@ module Language.JavaScript.Parser
     Core.formatParseError,
     Core.parseErrorPosition,
 
+    -- * Input Validation
+    PA.maxInputSize,
+
     -- * Display Utilities
     PA.showStripped,
     PA.showStrippedMaybe,
+
+    -- * Deprecated (kept for backward compatibility)
+    PA.parseBS,
+    PA.parseModuleBS,
+    PA.readJsSafe,
+    PA.readJsModuleSafe,
+    PA.parseFile,
+    PA.parseFileUtf8,
 
     -- * AST Elements
     JSExpression (..),

@@ -1,2 +1,3 @@
 PARSE_ERROR:
-src: SyntaxError 1:1 "lexical error" []
+src: Syntax Error at 1:1
+  unexpected input

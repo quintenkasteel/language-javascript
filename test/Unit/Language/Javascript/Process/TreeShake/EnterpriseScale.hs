@@ -337,9 +337,10 @@ testComplexInheritanceHierarchies = describe "Complex Inheritance Hierarchies" $
         optimizedSource `shouldContain` "getCached"
         optimizedSource `shouldContain` "getAuditLog"
 
-        -- Basic tree shaking test - method-level removal not fully implemented yet
-        -- Currently preserves mixin methods - advanced analysis planned for future releases
-        True `shouldBe` True  -- Placeholder
+        -- Verify optimized output is valid JavaScript (round-trip check)
+        case parse optimizedSource "re-parse" of
+          Right _ -> pure ()
+          Left rpErr -> expectationFailure $ "Optimized output is not valid JS: " ++ rpErr
 
       Left err -> expectationFailure $ "Parse failed: " ++ err
 
@@ -457,9 +458,10 @@ testEventEmitterPatterns = describe "Event Emitter Patterns" $ do
         optimizedSource `shouldContain` "emit"
         optimizedSource `shouldContain` "getMetrics"
 
-        -- Basic tree shaking test - currently preserves all methods
-        -- Advanced dead code elimination for method-level removal is planned for future releases
-        True `shouldBe` True  -- Placeholder for current capabilities
+        -- Verify optimized output is valid JavaScript (round-trip check)
+        case parse optimizedSource "re-parse" of
+          Right _ -> pure ()
+          Left rpErr -> expectationFailure $ "Optimized output is not valid JS: " ++ rpErr
         optimizedSource `shouldNotContain` "unusedHandler"
 
       Left err -> expectationFailure $ "Parse failed: " ++ err
@@ -586,9 +588,8 @@ testPluginArchitectureDynamic = describe "Plugin Architecture Dynamic Loading" $
         optimizedSource `shouldContain` "executeHook"
         optimizedSource `shouldContain` "getLoadedPlugins"
 
-        -- Current tree shaking preserves all methods - advanced removal planned
-        -- Method-level tree shaking requires sophisticated usage analysis
-        True `shouldBe` True  -- Placeholder for current capabilities
+        -- Verify optimized output is non-empty (tree shaker preserved content)
+        optimizedSource `shouldSatisfy` (not . null)
 
       Left err -> expectationFailure $ "Parse failed: " ++ err
 
@@ -600,14 +601,9 @@ testPerformanceBenchmarks = describe "Performance Benchmarks" $ do
 
     case parse largeFunctionSet "large-functions" of
       Right ast -> do
-        let startTime = 0  -- Placeholder for actual timing
         let analysis = analyzeUsage ast
-        let endTime = 1000  -- Placeholder for actual timing
 
-        -- Analysis should complete within reasonable time
-        (endTime - startTime) `shouldSatisfy` (< 5000)  -- Less than 5 seconds
-
-        -- Should provide meaningful results
+        -- Should provide meaningful results for 500 functions
         analysis ^. totalIdentifiers `shouldSatisfy` (> 400)
         analysis ^. estimatedReduction `shouldSatisfy` (> 0.5)
 
@@ -648,12 +644,12 @@ testMemoryEfficiency = describe "Memory Efficiency" $ do
         let analysis = analyzeUsageWithOptions defaultOptions ast
 
         -- Should handle large analysis without excessive memory
-        analysis ^. totalIdentifiers `shouldSatisfy` (> 150)  -- Adjusted based on actual analysis results
-        -- Module dependencies analysis may return empty for generated code without imports/exports
-        True `shouldBe` True  -- Placeholder for dependency analysis
+        analysis ^. totalIdentifiers `shouldSatisfy` (> 150)
 
-        -- Memory usage test (placeholder - would need actual memory profiling)
-        True `shouldBe` True
+        -- Verify the analysis produces a valid tree-shake result
+        let optimized = treeShake defaultOptions ast
+        let optimizedSource = renderToString optimized
+        length optimizedSource `shouldSatisfy` (> 0)
 
       Left err -> expectationFailure $ "Very large code parse failed: " ++ err
 

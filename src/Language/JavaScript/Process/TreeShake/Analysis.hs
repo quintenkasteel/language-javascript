@@ -463,6 +463,7 @@ analyzeExpression expr = case expr of
   JSRegEx {} -> pure ()
   JSImportMeta {} -> pure ()
   JSImportCall _ _ subExpr _ -> analyzeExpression subExpr
+  JSPrivateIdentifier {} -> pure ()
 
   -- Additional expression patterns
   JSAsyncFunctionExpression _ _ ident _ params _ body -> do
@@ -954,16 +955,18 @@ hasSideEffects ast = case ast of
   where
     hasStatementSideEffects stmt = case stmt of
       JSExpressionStatement expr _ -> hasExpressionSideEffects expr
+      JSMethodCall {} -> True  -- Method calls always have side effects
+      JSAssignStatement {} -> True  -- Assignments always have side effects
       JSVariable _ decls _ -> any hasVarDeclSideEffects (fromCommaList decls)
-      JSLet _ decls _ -> any hasVarDeclSideEffects (fromCommaList decls) 
+      JSLet _ decls _ -> any hasVarDeclSideEffects (fromCommaList decls)
       JSConstant _ decls _ -> any hasVarDeclSideEffects (fromCommaList decls)
       JSReturn _ (Just expr) _ -> hasExpressionSideEffects expr
       JSThrow _ _expr _ -> True  -- Always has side effects
-      JSIf _ _ test _ thenStmt -> 
-        hasExpressionSideEffects test || 
+      JSIf _ _ test _ thenStmt ->
+        hasExpressionSideEffects test ||
         hasStatementSideEffects thenStmt
       JSIfElse _ _ test _ thenStmt _ elseStmt ->
-        hasExpressionSideEffects test || 
+        hasExpressionSideEffects test ||
         hasStatementSideEffects thenStmt ||
         hasStatementSideEffects elseStmt
       JSStatementBlock _ stmts _ _ -> any hasStatementSideEffects stmts
@@ -982,6 +985,7 @@ hasSideEffects ast = case ast of
       JSCallExpression {} -> True
       JSCallExpressionDot {} -> True
       JSCallExpressionSquare {} -> True
+      JSMemberExpression {} -> True
       JSNewExpression {} -> True
       JSExpressionPostfix _ (JSUnaryOpIncr _) -> True
       JSExpressionPostfix _ (JSUnaryOpDecr _) -> True

@@ -2,9 +2,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 
--- | Test module for QuickCheck generators
+-- | Test module for QuickCheck generators.
 --
--- Simple test to verify that the generators compile and work correctly.
+-- Validates that generated AST values are well-formed by checking that
+-- they can be pretty-printed without crashing and that their ShowStripped
+-- representations are non-empty. This provides meaningful validation
+-- beyond mere type-level guarantees.
 module Properties.Language.Javascript.Parser.GeneratorsTest
   ( testGenerators,
   )
@@ -12,7 +15,7 @@ where
 
 import qualified Data.ByteString.Char8 as BS8
 import Language.JavaScript.Parser.AST
-import Properties.Language.Javascript.Parser.Generators
+import Properties.Language.Javascript.Parser.Generators (genValidIdentifier)
 import Test.Hspec
 import Test.QuickCheck
 
@@ -20,31 +23,31 @@ import Test.QuickCheck
 testGenerators :: Spec
 testGenerators = describe "QuickCheck Generators" $ do
   describe "Expression generators" $ do
-    it "generates valid JSExpression instances" $
+    it "generates JSExpression with non-empty stripped representation" $
       property $
-        \expr -> isValidExpression (expr :: JSExpression)
+        \expr -> not (null (ss (expr :: JSExpression)))
 
-    it "generates JSBinOp instances" $
+    it "generates JSBinOp with non-empty stripped representation" $
       property $
-        \op -> isValidBinOp (op :: JSBinOp)
+        \op -> not (null (ss (op :: JSBinOp)))
 
-    it "generates JSUnaryOp instances" $
+    it "generates JSUnaryOp with non-empty stripped representation" $
       property $
-        \op -> isValidUnaryOp (op :: JSUnaryOp)
+        \op -> not (null (ss (op :: JSUnaryOp)))
 
   describe "Statement generators" $ do
-    it "generates valid JSStatement instances" $
+    it "generates JSStatement with non-empty stripped representation" $
       property $
-        \stmt -> isValidStatement (stmt :: JSStatement)
+        \stmt -> not (null (ss (stmt :: JSStatement)))
 
-    it "generates JSBlock instances" $
+    it "generates JSBlock with non-empty stripped representation" $
       property $
-        \block -> isValidBlock (block :: JSBlock)
+        \block -> not (null (ss (block :: JSBlock)))
 
   describe "Program generators" $ do
-    it "generates valid JSAST instances" $
+    it "generates JSAST with non-empty showStripped representation" $
       property $
-        \ast -> isValidJSAST (ast :: JSAST)
+        \ast -> not (null (showStripped (ast :: JSAST)))
 
     it "generates valid identifier strings" $
       property $ do
@@ -52,104 +55,17 @@ testGenerators = describe "QuickCheck Generators" $ do
         return $ not (BS8.null ident) && BS8.all (`elem` (['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] ++ "_$")) ident
 
   describe "Complex structure generators" $ do
-    it "generates JSObjectProperty instances" $
+    it "generates JSObjectProperty with non-empty stripped representation" $
       property $
-        \prop -> isValidObjectProperty (prop :: JSObjectProperty)
+        \prop -> not (null (ss (prop :: JSObjectProperty)))
 
-    it "generates JSCommaList instances" $
+    it "generates JSCommaList with valid structure" $
       property $
-        \list -> isValidCommaList (list :: JSCommaList JSExpression)
+        \list -> commaListLength (list :: JSCommaList JSExpression) >= 0
+          && commaListLength list == length (fromCommaList list)
 
--- Helper functions for validation
-isValidExpression :: JSExpression -> Bool
-isValidExpression expr = case expr of
-  JSIdentifier _ _ -> True
-  JSDecimal _ _ -> True
-  JSLiteral _ _ -> True
-  JSExpressionBinary _ _ _ -> True
-  JSExpressionTernary _ _ _ _ _ -> True
-  JSCallExpression _ _ _ _ -> True
-  JSMemberDot _ _ _ -> True
-  JSArrayLiteral _ _ _ -> True
-  JSObjectLiteral _ _ _ -> True
-  JSArrowExpression _ _ _ -> True
-  JSFunctionExpression _ _ _ _ _ _ -> True
-  _ -> True -- Accept all valid AST nodes
-
-isValidBinOp :: JSBinOp -> Bool
-isValidBinOp op = case op of
-  JSBinOpAnd _ -> True
-  JSBinOpBitAnd _ -> True
-  JSBinOpBitOr _ -> True
-  JSBinOpBitXor _ -> True
-  JSBinOpDivide _ -> True
-  JSBinOpEq _ -> True
-  JSBinOpGe _ -> True
-  JSBinOpGt _ -> True
-  JSBinOpLe _ -> True
-  JSBinOpLt _ -> True
-  JSBinOpMinus _ -> True
-  JSBinOpMod _ -> True
-  JSBinOpNeq _ -> True
-  JSBinOpOr _ -> True
-  JSBinOpPlus _ -> True
-  JSBinOpTimes _ -> True
-  _ -> True -- Accept all valid binary operators
-
-isValidUnaryOp :: JSUnaryOp -> Bool
-isValidUnaryOp op = case op of
-  JSUnaryOpDecr _ -> True
-  JSUnaryOpDelete _ -> True
-  JSUnaryOpIncr _ -> True
-  JSUnaryOpMinus _ -> True
-  JSUnaryOpNot _ -> True
-  JSUnaryOpPlus _ -> True
-  JSUnaryOpTilde _ -> True
-  JSUnaryOpTypeof _ -> True
-  JSUnaryOpVoid _ -> True
-
-isValidStatement :: JSStatement -> Bool
-isValidStatement stmt = case stmt of
-  JSStatementBlock _ _ _ _ -> True
-  JSBreak _ _ _ -> True
-  JSConstant _ _ _ -> True
-  JSContinue _ _ _ -> True
-  JSDoWhile _ _ _ _ _ _ _ -> True
-  JSFor _ _ _ _ _ _ _ _ _ -> True
-  JSForIn _ _ _ _ _ _ _ -> True
-  JSForVar _ _ _ _ _ _ _ _ _ _ -> True
-  JSFunction _ _ _ _ _ _ _ -> True
-  JSIf _ _ _ _ _ -> True
-  JSIfElse _ _ _ _ _ _ _ -> True
-  JSLabelled _ _ _ -> True
-  JSReturn _ _ _ -> True
-  JSSwitch _ _ _ _ _ _ _ _ -> True
-  JSThrow _ _ _ -> True
-  JSTry _ _ _ _ -> True
-  JSVariable _ _ _ -> True
-  JSWhile _ _ _ _ _ -> True
-  JSWith _ _ _ _ _ _ -> True
-  _ -> True -- Accept all valid statements
-
-isValidBlock :: JSBlock -> Bool
-isValidBlock (JSBlock _ _ _) = True
-
-isValidJSAST :: JSAST -> Bool
-isValidJSAST ast = case ast of
-  JSAstProgram _ _ -> True
-  JSAstModule _ _ -> True
-  JSAstStatement _ _ -> True
-  JSAstExpression _ _ -> True
-  JSAstLiteral _ _ -> True
-
-isValidObjectProperty :: JSObjectProperty -> Bool
-isValidObjectProperty prop = case prop of
-  JSPropertyNameandValue _ _ _ -> True
-  JSPropertyIdentRef _ _ -> True
-  JSObjectMethod _ -> True
-  JSObjectSpread _ _ -> True
-
-isValidCommaList :: JSCommaList a -> Bool
-isValidCommaList JSLNil = True
-isValidCommaList (JSLOne _) = True
-isValidCommaList (JSLCons _ _ _) = True
+-- | Count elements in a comma list.
+commaListLength :: JSCommaList a -> Int
+commaListLength JSLNil = 0
+commaListLength (JSLOne _) = 1
+commaListLength (JSLCons rest _ _) = 1 + commaListLength rest

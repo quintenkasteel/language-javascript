@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | Self-contained literal parsers for JavaScript.
 --
@@ -129,10 +130,17 @@ classifyNumeric a s
 
 -- | Parse a decimal numeric string to Double, stripping numeric separators.
 -- Handles leading-dot decimals like @.5@ which Haskell's 'read' rejects.
--- Returns 0 for malformed input rather than crashing.
+-- Uses a fast path for simple integers (no dot, no separator, no exponent)
+-- to avoid unpacking to String. Returns 0 for malformed input.
 parseDecimalValue :: ByteString -> Double
-parseDecimalValue bs = fromMaybe 0 (readMaybe cleaned)
+parseDecimalValue bs
+  | BS8.null bs = 0
+  | isSimpleInt = fromIntegral (parseSimpleInt bs)
+  | otherwise = fromMaybe 0 (readMaybe cleaned)
   where
+    isSimpleInt = BS8.all isPlainDigit bs
+    isPlainDigit c = c >= '0' && c <= '9'
+    parseSimpleInt = BS8.foldl' (\acc c -> acc * 10 + fromIntegral (fromEnum c - fromEnum '0')) (0 :: Integer)
     cleaned = prependZero (filter (/= '_') (BS8.unpack bs))
     prependZero ('.':rest) = '0' : '.' : rest
     prependZero other = other
@@ -167,7 +175,9 @@ parseOctalValue bs
 -- (evaluates scientific notation then truncates) for parser tolerance.
 -- Returns 0 for malformed input rather than crashing.
 parseBigIntValue :: ByteString -> Integer
-parseBigIntValue bs = classifyAndParse (BS8.init bs)
+parseBigIntValue bs
+  | BS8.null bs = 0
+  | otherwise = classifyAndParse (BS8.take (BS8.length bs - 1) bs)
   where
     classifyAndParse s
       | "0x" `BS8.isPrefixOf` s || "0X" `BS8.isPrefixOf` s = parseHexValue s

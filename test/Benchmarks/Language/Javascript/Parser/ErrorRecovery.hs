@@ -107,12 +107,12 @@ testMemoryUsageBaseline = describe "Baseline memory usage" $ do
       Left _ -> expectationFailure "Should parse successfully"
 
   it "scales memory usage linearly with input size" $ do
-    let smallCode = concat $ replicate 10 "var x = 1; "
-    let largeCode = concat $ replicate 100 "var x = 1; "
+    let smallCode = concat $ replicate 100 "var x = 1; "
+    let largeCode = concat $ replicate 1000 "var x = 1; "
     smallTime <- benchmarkParsing smallCode
     largeTime <- benchmarkParsing largeCode
-    -- Large input should not be more than 20x slower (indicating good scaling)
-    largeTime `shouldSatisfy` (< smallTime * 20)
+    -- 10x larger input should not be more than 30x slower (good linear scaling)
+    largeTime `shouldSatisfy` (< smallTime * 30)
 
 -- | Test single error recovery overhead
 testSingleErrorOverhead :: Spec

@@ -69,14 +69,15 @@ where
 
 import Control.Exception (SomeException, catch, evaluate)
 import Control.Monad (forM, when)
-import Data.List (sortBy)
+import Data.List (nub, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Text as Text
 import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import Language.JavaScript.Parser (parse, renderToString)
 import qualified Language.JavaScript.Parser.AST as AST
 import Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
-  ( CoverageData (..),
+  ( BranchCoverage (..),
+    CoverageData (..),
     CoverageMetrics (..),
     guidedGeneration,
     measureCoverage,
@@ -527,29 +528,64 @@ testParseStrictly input =
     handleCrash :: SomeException -> IO (Either String ())
     handleCrash ex = return (Left (show ex))
 
--- | Check AST invariants and return violations
+-- | Check AST invariants and return violations.
+-- Validates:
+--   1. Round-trip stability: parse -> render -> re-parse -> render produces same output
+--   2. ShowStripped produces non-empty output for any valid AST
+--   3. Rendered output is non-empty for any valid AST
 checkASTInvariants :: AST.JSAST -> IO [String]
-checkASTInvariants _ast = return [] -- Simplified for now
+checkASTInvariants ast = do
+  let rendered = renderToString ast
+      violations = concat [checkRoundTrip rendered, checkRenderedNonEmpty rendered, checkShowStripped ast]
+  return violations
+  where
+    checkRenderedNonEmpty r
+      | null r = ["Rendered AST is empty"]
+      | otherwise = []
+    checkShowStripped a =
+      let stripped = show a
+       in if null stripped
+            then ["show AST produced empty string"]
+            else []
+    checkRoundTrip r =
+      case parse r "invariant-check" of
+        Left _ -> ["Round-trip failed: re-parse of rendered output returned error"]
+        Right ast2 ->
+          let reRendered = renderToString ast2
+           in if r == reRendered
+                then []
+                else ["Round-trip mismatch: original render differs from re-rendered output"]
 
--- | Combine multiple coverage measurements
+-- | Combine multiple coverage measurements by merging their data.
+-- Deduplicates covered lines and branches, concatenates paths, and
+-- recomputes aggregate metrics from the merged data.
 combineCoverageData :: [CoverageData] -> CoverageData
-combineCoverageData _coverages =
+combineCoverageData [] =
   CoverageData
     { coveredLines = [],
       branchCoverage = [],
       pathCoverage = [],
       coverageMetrics = CoverageMetrics 0 0 0 0 0 0 0.0
     }
+combineCoverageData coverages =
+  let mergedLines = nub (concatMap coveredLines coverages)
+      mergedBranches = nub (concatMap branchCoverage coverages)
+      mergedPaths = nub (concatMap pathCoverage coverages)
+      mergedMetrics = CoverageMetrics
+        { linesCovered = length mergedLines
+        , totalLines = maximum (map (totalLines . coverageMetrics) coverages)
+        , branchesCovered = length (filter branchTaken mergedBranches)
+        , totalBranches = length mergedBranches
+        , pathsCovered = length mergedPaths
+        , totalPaths = maximum (map (totalPaths . coverageMetrics) coverages)
+        , coveragePercentage = 0.0
+        }
+   in CoverageData mergedLines mergedBranches mergedPaths mergedMetrics
 
--- | Update coverage with new measurement
+-- | Update coverage by merging a new measurement into existing data.
+-- Delegates to 'combineCoverageData' to deduplicate and recompute metrics.
 updateCoverage :: CoverageData -> CoverageData -> CoverageData
-updateCoverage _old _new =
-  CoverageData
-    { coveredLines = [],
-      branchCoverage = [],
-      pathCoverage = [],
-      coverageMetrics = CoverageMetrics 0 0 0 0 0 0 0.0
-    }
+updateCoverage old new = combineCoverageData [old, new]
 
 -- | Minimize input while preserving failure
 minimizeInput :: Text.Text -> IO Text.Text

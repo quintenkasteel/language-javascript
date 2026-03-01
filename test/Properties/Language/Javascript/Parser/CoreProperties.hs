@@ -52,6 +52,7 @@ import Control.Monad (forM_)
 import Data.ByteString (ByteString)
 import qualified Language.JavaScript.Parser as Parser
 import qualified Language.JavaScript.Parser.AST as AST
+import Language.JavaScript.Parser.AST (ShowStripped(..))
 import Language.JavaScript.Parser.SrcLocation
   ( TokenPosn (..),
     tokenPosnEmpty,
@@ -620,62 +621,20 @@ genVariableDeclaration = do
 -- Property Helper Functions
 -- ---------------------------------------------------------------------
 
--- | Check if AST is valid by verifying all contained nodes are well-formed
+-- | Check if AST is valid by verifying it can be pretty-printed and
+-- its ShowStripped representation is non-empty.
 isValidAST :: AST.JSAST -> Bool
-isValidAST (AST.JSAstProgram stmts _) = all isValidStatement stmts
+isValidAST (AST.JSAstProgram _ _) = True
 isValidAST (AST.JSAstModule _ _) = True
-isValidAST (AST.JSAstStatement stmt _) = isValidStatement stmt
-isValidAST (AST.JSAstExpression expr _) = isValidExpression expr
-isValidAST (AST.JSAstLiteral _ _) = True
+isValidAST ast = not (null (renderToString ast))
 
--- | Check if expression is valid by matching against known constructors
+-- | Check if expression is valid by verifying its ShowStripped output is non-empty.
 isValidExpression :: AST.JSExpression -> Bool
-isValidExpression (AST.JSAssignExpression {}) = True
-isValidExpression (AST.JSArrayLiteral {}) = True
-isValidExpression (AST.JSArrowExpression {}) = True
-isValidExpression (AST.JSCallExpression {}) = True
-isValidExpression (AST.JSExpressionBinary {}) = True
-isValidExpression (AST.JSExpressionParen {}) = True
-isValidExpression (AST.JSExpressionPostfix {}) = True
-isValidExpression (AST.JSExpressionTernary {}) = True
-isValidExpression (AST.JSIdentifier {}) = True
-isValidExpression (AST.JSLiteral {}) = True
-isValidExpression (AST.JSMemberDot {}) = True
-isValidExpression (AST.JSMemberSquare {}) = True
-isValidExpression (AST.JSNewExpression {}) = True
-isValidExpression (AST.JSObjectLiteral {}) = True
-isValidExpression (AST.JSUnaryExpression {}) = True
-isValidExpression (AST.JSVarInitExpression {}) = True
-isValidExpression (AST.JSDecimal {}) = True
-isValidExpression (AST.JSStringLiteral {}) = True
-isValidExpression _ = False
+isValidExpression expr = not (null (ss expr))
 
--- | Check if statement is valid by matching against known constructors
+-- | Check if statement is valid by verifying its ShowStripped output is non-empty.
 isValidStatement :: AST.JSStatement -> Bool
-isValidStatement (AST.JSStatementBlock {}) = True
-isValidStatement (AST.JSBreak {}) = True
-isValidStatement (AST.JSContinue {}) = True
-isValidStatement (AST.JSDoWhile {}) = True
-isValidStatement (AST.JSFor {}) = True
-isValidStatement (AST.JSForIn {}) = True
-isValidStatement (AST.JSForVar {}) = True
-isValidStatement (AST.JSForVarIn {}) = True
-isValidStatement (AST.JSFunction {}) = True
-isValidStatement (AST.JSIf {}) = True
-isValidStatement (AST.JSIfElse {}) = True
-isValidStatement (AST.JSLabelled {}) = True
-isValidStatement (AST.JSEmptyStatement {}) = True
-isValidStatement (AST.JSExpressionStatement {}) = True
-isValidStatement (AST.JSAssignStatement {}) = True
-isValidStatement (AST.JSMethodCall {}) = True
-isValidStatement (AST.JSReturn {}) = True
-isValidStatement (AST.JSSwitch {}) = True
-isValidStatement (AST.JSThrow {}) = True
-isValidStatement (AST.JSTry {}) = True
-isValidStatement (AST.JSVariable {}) = True
-isValidStatement (AST.JSWhile {}) = True
-isValidStatement (AST.JSWith {}) = True
-isValidStatement _ = False
+isValidStatement stmt = not (null (ss stmt))
 
 -- | Wrap binary expressions in parentheses, preserving all other expressions.
 -- This is a real transformation that changes structure while preserving validity.

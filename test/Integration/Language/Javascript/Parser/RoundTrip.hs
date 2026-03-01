@@ -44,10 +44,10 @@ testRoundTrip = describe "Roundtrip:" $ do
     testRT "x=/*a*/{/*b*/x/*c*/:/*d*/1/*e*/,/*f*/y/*g*/:/*h*/2/*i*/}"
     testRT "x=/*a*/{/*b*/x/*c*/:/*d*/1/*e*/,/*f*/y/*g*/:/*h*/2/*i*/,/*j*/z/*k*/:/*l*/3/*m*/}"
     testRT "a=/*a*/{/*b*/x/*c*/:/*d*/1/*e*/,/*f*/}"
-    testRT "/*a*/{/*b*/[/*c*/x/*d*/+/*e*/y/*f*/]/*g*/:/*h*/1/*i*/}"
+    testRT "z=/*a*/{/*b*/[/*c*/x/*d*/+/*e*/y/*f*/]/*g*/:/*h*/1/*i*/}"
     testRT "/*a*/{/*b*/a/*c*/(/*d*/x/*e*/,/*f*/y/*g*/)/*h*/{/*i*/}/*j*/}"
     testRT "/*a*/{/*b*/[/*c*/x/*d*/+/*e*/y/*f*/]/*g*/(/*h*/)/*i*/{/*j*/}/*k*/}"
-    testRT "/*a*/{/*b*/*/*c*/a/*d*/(/*e*/x/*f*/,/*g*/y/*h*/)/*i*/{/*j*/}/*k*/}"
+    testRT "z=/*a*/{/*b*/*/*c*/a/*d*/(/*e*/x/*f*/,/*g*/y/*h*/)/*i*/{/*j*/}/*k*/}"
 
   it "miscellaneous" $ do
     testRT "/*a*/(/*b*/56/*c*/)"
@@ -160,10 +160,10 @@ testRoundTrip = describe "Roundtrip:" $ do
     testRTModule "export   class Foo\nextends Bar\n{ get a () { return 1 ; }  static b ( x,y ) {} ; }   ; "
 
 testRT :: String -> Expectation
-testRT = testRTWith readJsSafe
+testRT str = testRTWith (\s -> parse s "test") str
 
 testRTModule :: String -> Expectation
-testRTModule = testRTWith readJsModuleSafe
+testRTModule str = testRTWith (\s -> parseModule s "test") str
 
 testRTWith :: (String -> Either String AST.JSAST) -> String -> Expectation
 testRTWith f str = case f str of

@@ -21,14 +21,11 @@ where
 import Data.ByteString (ByteString)
 import Data.Either (isRight)
 import Language.JavaScript.Parser.AST
-  ( JSAnnot (..),
-    JSArrayElement (..),
+  ( JSArrayElement (..),
     JSAST (..),
     JSAssignOp (..),
     JSBinOp (..),
     JSExpression (..),
-    JSIdent (..),
-    JSSemi (..),
     JSStatement (..),
   )
 import Language.JavaScript.Parser.Parser (parse)

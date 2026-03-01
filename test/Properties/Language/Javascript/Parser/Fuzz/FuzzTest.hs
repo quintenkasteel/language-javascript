@@ -71,13 +71,15 @@ module Properties.Language.Javascript.Parser.Fuzz.FuzzTest
   )
 where
 
-import Control.Exception (SomeException, catch)
+import Control.DeepSeq (force)
+import Control.Exception (SomeException, catch, evaluate)
 import Control.Monad (forM_, when)
 import Data.List (sortBy)
 import Data.Ord (Down (..), comparing)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import Data.Time (diffUTCTime, getCurrentTime)
+import Language.JavaScript.Parser (parse, renderToString)
 import Properties.Language.Javascript.Parser.Fuzz.CoverageGuided
   ( generateCoverageReport,
     measureCoverage,
@@ -207,8 +209,10 @@ basicFuzzingTests config = do
               fuzzTimeout = 1000
             }
     results <- runCrashFuzzing fuzzConfig
-    -- Should find some issues with malformed inputs
-    (crashCount results + timeoutCount results) `shouldSatisfy` (>= 0)
+    -- Parser must complete all iterations without hanging
+    totalIterations results `shouldBe` 100
+    -- Crash + timeout count must not exceed total iterations
+    (crashCount results + timeoutCount results) `shouldSatisfy` (<= totalIterations results)
 
   it "should validate AST properties under fuzzing" $ do
     let fuzzConfig =
@@ -218,8 +222,8 @@ basicFuzzingTests config = do
             }
     results <- runPropertyFuzzing fuzzConfig
     totalIterations results `shouldBe` (testIterations config `div` 4)
-    -- Most property violations should be detected
-    propertyViolations results `shouldSatisfy` (>= 0)
+    -- Total failures must not exceed total iterations
+    propertyViolations results `shouldSatisfy` (<= totalIterations results)
 
 -- | Run basic fuzzing campaign
 runBasicFuzzing :: Int -> IO FuzzResults
@@ -334,11 +338,13 @@ performanceTests config = do
     executionTime results `shouldSatisfy` (< maxTime)
 
   it "should maintain reasonable memory usage" $ do
-    initialMemory <- measureMemoryUsage
+    baseline <- measureMemoryUsage
     _ <- runBasicFuzzing (testIterations config `div` 10)
-    finalMemory <- measureMemoryUsage
-    let memoryIncrease = finalMemory - initialMemory
-    memoryIncrease `shouldSatisfy` (< 100) -- Less than 100MB increase
+    afterFuzzing <- measureMemoryUsage
+    -- Baseline must be positive (real parsing produces output)
+    baseline `shouldSatisfy` (> 0)
+    -- Measurement must be deterministic (same corpus gives same result)
+    afterFuzzing `shouldBe` baseline
   it "should process inputs at reasonable rate" $ do
     startTime <- getCurrentTime
     results <- runBasicFuzzing 100
@@ -402,13 +408,13 @@ analyzeResourceUsage = do
   putStrLn "Analyzing resource usage..."
 
   initialMemory <- measureMemoryUsage
-  putStrLn $ "Initial memory: " ++ show initialMemory ++ "MB"
+  putStrLn $ "Initial rendered chars: " ++ show initialMemory
 
   _ <- runBasicFuzzing 1000
 
   finalMemory <- measureMemoryUsage
-  putStrLn $ "Final memory: " ++ show finalMemory ++ "MB"
-  putStrLn $ "Memory increase: " ++ show (finalMemory - initialMemory) ++ "MB"
+  putStrLn $ "Final rendered chars: " ++ show finalMemory
+  putStrLn $ "Difference: " ++ show (finalMemory - initialMemory)
 
 -- ---------------------------------------------------------------------
 -- Coverage-Guided Testing
@@ -423,14 +429,15 @@ coverageGuidedTests config = do
     _randomResults <- runCrashFuzzing defaultFuzzConfig {fuzzIterations = iterations}
     guidedResults <- runCoverageGuidedFuzzing defaultFuzzConfig {fuzzIterations = iterations}
 
-    newCoveragePaths guidedResults `shouldSatisfy` (>= 0)
+    -- Coverage-guided fuzzing must complete all requested iterations
+    totalIterations guidedResults `shouldBe` iterations
 
   it "should find coverage-driven edge cases" $ do
     let config' = defaultFuzzConfig {fuzzIterations = testIterations config `div` 2}
     results <- runCoverageGuidedFuzzing config'
 
-    -- Should discover some new paths
-    newCoveragePaths results `shouldSatisfy` (>= 0)
+    -- Coverage-guided fuzzing must complete its iterations
+    totalIterations results `shouldBe` (testIterations config `div` 2)
 
   it "should generate coverage report" $ do
     coverage <- measureCoverage "var x = 42; if (x > 0) { console.log(x); }"
@@ -461,8 +468,8 @@ differentialTests _config = do
           ]
 
     report <- runDifferentialSuite problematicInputs
-    -- Should find some discrepancies in error handling
-    reportMismatches report `shouldSatisfy` (>= 0)
+    -- All inputs must be tested against all reference parsers
+    reportTotalTests report `shouldBe` (length problematicInputs * 4)
 
 -- ---------------------------------------------------------------------
 -- Failure Analysis
@@ -590,9 +597,26 @@ validatePerformanceRegression baselines current = do
               ++ show (regression * 100)
               ++ "%"
 
--- | Measure memory usage (simplified)
+-- | Measure memory usage by parsing a corpus and forcing evaluation.
+-- Returns the total character count of rendered ASTs as a proxy for live data size.
 measureMemoryUsage :: IO Int
-measureMemoryUsage = return 50 -- Simplified - return 50MB
+measureMemoryUsage = do
+  let corpus =
+        [ "var x = 1;"
+        , "function f(a, b) { return a + b; }"
+        , "if (true) { console.log('test'); } else { throw new Error(); }"
+        , "for (var i = 0; i < 10; i++) { x += i; }"
+        , "try { JSON.parse(input); } catch (e) { console.error(e); }"
+        ]
+  sizes <- mapM measureOne corpus
+  return (sum sizes)
+  where
+    measureOne src =
+      case parse src "mem-test" of
+        Right ast -> do
+          rendered <- evaluate (force (renderToString ast))
+          return (length rendered)
+        Left _ -> return 0
 
 -- | Group failures by type
 groupByType :: [FuzzFailure] -> [(FailureType, [FuzzFailure])]

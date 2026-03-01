@@ -1,11 +1,11 @@
+Cabal-version:   2.4
 Name:                language-javascript
 Version:             0.8.0.0
 Synopsis:            Parser for JavaScript
-Description:         Parses Javascript into an Abstract Syntax Tree (AST).  Initially intended as frontend to hjsmin.
+Description:         High-performance JavaScript parser built on FlatParse. Parses JavaScript into an Abstract Syntax Tree (AST) with support for ES2022+ features.
                      .
-                     Note: Version 0.5.0 breaks compatibility with prior versions, the AST has been reworked to allow
-                     round trip processing of JavaScript.
-License:             BSD3
+                     Note: Version 0.8.0 uses FlatParse for 5-10x faster parsing compared to the previous Alex/Happy implementation. The AST supports round-trip processing of JavaScript.
+License:             BSD-3-Clause
 License-file:        LICENSE
 Author:              Alan Zimmerman
 Maintainer:          Erik de Castro Lopo <erikd@mega-nerd.com>
@@ -22,10 +22,6 @@ Extra-source-files:  README.md
                      test/Unicode.js
                      test/fixtures/k.js
                      test/fixtures/unicode.txt
-                     -- Note: Removed Lexer.x as we now use flatparse for lexing
-
--- Version requirement upped for test support in later Cabal
-Cabal-version:   >= 1.9.2
 
 Tested-with:     GHC == 9.2.8, GHC == 9.4.8, GHC == 9.6.4, GHC == 9.8.2
 
@@ -37,7 +33,6 @@ Library
                    , blaze-builder    >= 0.2     && < 0.5
                    , bytestring       >= 0.9.1   && < 0.13
                    , text             >= 1.2     && < 2.2
-                   , utf8-string      >= 0.3.7   && < 2
                    , deepseq          >= 1.3     && < 1.6
                    , microlens        >= 0.4     && < 0.5
                    , microlens-th     >= 0.4     && < 0.5
@@ -45,14 +40,12 @@ Library
                    , vector           >= 0.12    && < 0.14
                    , template-haskell >= 2.16    && < 2.22
                    , haskell-src-meta >= 0.8     && < 0.9
-  if !impl(ghc>=8.0)
-    build-depends:   semigroups       >= 0.16.1
 
   hs-source-dirs: src
   Exposed-modules:     Language.JavaScript.Parser
                        Language.JavaScript.Parser.AST
                        Language.JavaScript.Parser.Parser
-                       Language.JavaScript.Parser.ParseError
+
                        Language.JavaScript.Parser.SrcLocation
                        Language.JavaScript.Parser.Token
                        Language.JavaScript.Parser.Build
@@ -68,9 +61,9 @@ Library
                        Language.JavaScript.Process.Minify
                        Language.JavaScript.Process.TreeShake
                        Language.JavaScript.Process.TreeShake.Types
-                       Language.JavaScript.Parser.Core
-                       Language.JavaScript.Parser.Grammar
-  Other-modules:       Language.JavaScript.Process.TreeShake.Analysis
+  Other-modules:       Language.JavaScript.Parser.Core
+                     , Language.JavaScript.Parser.Grammar
+                     , Language.JavaScript.Process.TreeShake.Analysis
                      , Language.JavaScript.Process.TreeShake.Elimination
                      , Language.JavaScript.Parser.Pos
                      , Language.JavaScript.Parser.Primitives
@@ -139,9 +132,6 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Parser.AST.Generic
                     Unit.Language.Javascript.Parser.AST.SrcLocation
 
-                    -- Unit Tests - JSDoc
-                    -- Test.Language.Javascript.JSDocTest  -- Temporarily disabled
-
                     -- Unit Tests - Pretty Printing
                     Unit.Language.Javascript.Parser.Pretty.JSONTest
                     Unit.Language.Javascript.Parser.Pretty.XMLTest
@@ -177,11 +167,14 @@ Test-Suite testsuite
                     Unit.Language.Javascript.Process.TreeShake.LibraryPatterns
                     Unit.Language.Javascript.Process.TreeShake.IntegrationScenarios
                     Unit.Language.Javascript.Process.TreeShake.EnterpriseScale
+                    Unit.Language.Javascript.Process.TreeShake.Usage
+                    Unit.Language.Javascript.Process.TreeShake.Elimination
+                    Unit.Language.Javascript.Process.TreeShake.ModernJS
 
                     -- Integration Tests
                     Integration.Language.Javascript.Parser.RoundTrip
-                    -- Integration.Language.Javascript.Parser.AdvancedFeatures  -- Temporarily disabled
                     Integration.Language.Javascript.Parser.Minification
+                    Integration.Language.Javascript.Parser.AdvancedFeatures
                     Integration.Language.Javascript.Process.TreeShake
 
                     -- Golden Tests

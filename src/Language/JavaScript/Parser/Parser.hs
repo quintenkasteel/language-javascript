@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -O2 #-}
 -- | High-performance JavaScript parser using flatparse backend.
 --
 -- This module provides the main parsing interface for JavaScript source code,
@@ -18,48 +19,51 @@
 --
 --   * 'parse' - Parse complete JavaScript programs
 --   * 'parseModule' - Parse ES6 modules
---   * 'readJs' / 'readJsModule' - Parse with error handling
+
 --   * 'parseFile' / 'parseFileUtf8' - Parse from files
 --
 -- @since 0.8.0.0
 module Language.JavaScript.Parser.Parser
-  ( -- * String-based Parsing (backward compatible)
+  ( -- * String-based Parsing
     parse,
     parseModule,
-    readJs,
-    readJsModule,
-    readJsSafe,
-    readJsModuleSafe,
-    parseFile,
-    parseFileUtf8,
 
     -- * ByteString Parsing (zero-copy, highest performance)
-    parseBS,
-    parseModuleBS,
-    parseSafeBS,
-    parseModuleSafeBS,
+    parseByteString,
+    parseModuleByteString,
 
     -- * Text Parsing (convenience for Text-based applications)
     parseText,
     parseModuleText,
-    parseSafeText,
-    parseModuleSafeText,
+
+    -- * File Parsing (safe — does not throw on parse error)
+    parseFileSafe,
+    parseFileUtf8Safe,
 
     -- * Expression and Statement Parsing
-    parseProgram,
     parseExpression,
     parseStatement,
-    parseUsing,
 
     -- * Display Utilities
     showStripped,
     showStrippedMaybe,
-    showStrippedString,
-    showStrippedMaybeString,
+
+    -- * Input Validation
+    maxInputSize,
+
+    -- * Deprecated (kept for backward compatibility)
+    parseBS,
+    parseModuleBS,
+    parseProgram,
+    readJsSafe,
+    readJsModuleSafe,
+    parseFile,
+    parseFileUtf8,
   )
 where
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -69,6 +73,34 @@ import qualified Language.JavaScript.Parser.Grammar as Grammar
 import qualified FlatParse.Basic as FP
 import Language.JavaScript.Parser.Lexer (whitespace)
 import System.IO
+
+-- ---------------------------------------------------------------------
+-- Input Validation
+-- ---------------------------------------------------------------------
+
+-- | Maximum allowed input size (10 MB).
+-- Inputs exceeding this limit are rejected to prevent unbounded memory allocation.
+maxInputSize :: Int
+maxInputSize = 10 * 1024 * 1024
+
+-- | Validate ByteString input: check size and UTF-8 encoding.
+-- Returns 'Left' with a descriptive error message on failure.
+validateInput :: ByteString -> Either String ByteString
+validateInput input
+  | BS.length input > maxInputSize =
+      Left ("Input too large: " <> show (BS.length input)
+            <> " bytes (maximum: " <> show maxInputSize <> ")")
+  | not (isValidUtf8 input) =
+      Left "Invalid UTF-8 encoding in input"
+  | otherwise = Right input
+  where
+    isValidUtf8 bs = case Text.decodeUtf8' bs of
+      Right _ -> True
+      Left _ -> False
+
+-- ---------------------------------------------------------------------
+-- String-based Parsing (backward compatible)
+-- ---------------------------------------------------------------------
 
 -- | Parse JavaScript Program (Script)
 --
@@ -126,35 +158,39 @@ parseFlatparse = parseText . Text.pack
 -- String/Text conversions. The input must be valid UTF-8 encoded JavaScript.
 -- Uses FlatParse's zero-copy slicing internally for minimal allocation.
 --
+-- Input validation: rejects inputs larger than 10 MB and invalid UTF-8.
+--
 -- ==== Examples
 --
--- >>> parseBS "var x = 42;"
+-- >>> parseByteString "var x = 42;"
 -- Right (JSAstProgram ...)
 --
--- >>> parseBS "invalid {"
+-- >>> parseByteString "invalid {"
 -- Left "..."
 --
--- @since 0.8.0.0
-parseBS :: ByteString -> Either String AST.JSAST
-parseBS = handleResult . FlatParser.parseProgramByteString
+-- @since 0.9.0.0
+parseByteString :: ByteString -> Either String AST.JSAST
+parseByteString input = validateInput input >>= handleResult . FlatParser.parseProgramByteString
 
 -- | Parse a JavaScript ES6 module from a UTF-8 encoded 'ByteString'.
 --
--- Like 'parseBS' but expects module-level syntax (import/export declarations).
+-- Like 'parseByteString' but expects module-level syntax (import/export declarations).
+-- Input validation: rejects inputs larger than 10 MB and invalid UTF-8.
 --
--- @since 0.8.0.0
+-- @since 0.9.0.0
+parseModuleByteString :: ByteString -> Either String AST.JSAST
+parseModuleByteString input = validateInput input >>= handleResult . FlatParser.parseModuleProgramByteString
+
+-- | Deprecated alias for 'parseByteString'.
+{-# DEPRECATED parseBS "Use 'parseByteString' instead." #-}
+parseBS :: ByteString -> Either String AST.JSAST
+parseBS = parseByteString
+
+-- | Deprecated alias for 'parseModuleByteString'.
+{-# DEPRECATED parseModuleBS "Use 'parseModuleByteString' instead." #-}
 parseModuleBS :: ByteString -> Either String AST.JSAST
-parseModuleBS = handleResult . FlatParser.parseModuleProgramByteString
+parseModuleBS = parseModuleByteString
 
--- | Deprecated: Use 'parseBS' instead. Identical behavior.
-{-# DEPRECATED parseSafeBS "Use parseBS instead — they are identical" #-}
-parseSafeBS :: ByteString -> Either String AST.JSAST
-parseSafeBS = parseBS
-
--- | Deprecated: Use 'parseModuleBS' instead. Identical behavior.
-{-# DEPRECATED parseModuleSafeBS "Use parseModuleBS instead — they are identical" #-}
-parseModuleSafeBS :: ByteString -> Either String AST.JSAST
-parseModuleSafeBS = parseModuleBS
 
 -- ---------------------------------------------------------------------
 -- Text API (convenience for Text-based applications)
@@ -162,35 +198,27 @@ parseModuleSafeBS = parseModuleBS
 
 -- | Parse a JavaScript program from 'Text'.
 --
--- Encodes the Text to UTF-8 and delegates to 'parseBS'. Useful for
+-- Encodes the Text to UTF-8 and delegates to 'parseByteString'. Useful for
 -- applications that already work with 'Text' values.
 --
 -- @since 0.8.0.0
 parseText :: Text -> Either String AST.JSAST
-parseText = parseBS . Text.encodeUtf8
+parseText = parseByteString . Text.encodeUtf8
 
 -- | Parse a JavaScript ES6 module from 'Text'.
 --
 -- @since 0.8.0.0
 parseModuleText :: Text -> Either String AST.JSAST
-parseModuleText = parseModuleBS . Text.encodeUtf8
+parseModuleText = parseModuleByteString . Text.encodeUtf8
 
--- | Deprecated: Use 'parseText' instead. Identical behavior.
-{-# DEPRECATED parseSafeText "Use parseText instead — they are identical" #-}
-parseSafeText :: Text -> Either String AST.JSAST
-parseSafeText = parseText
-
--- | Deprecated: Use 'parseModuleText' instead. Identical behavior.
-{-# DEPRECATED parseModuleSafeText "Use parseModuleText instead — they are identical" #-}
-parseModuleSafeText :: Text -> Either String AST.JSAST
-parseModuleSafeText = parseModuleText
 
 -- | Convert a 'ParseResult' to 'Either String a'.
+-- Uses 'formatParseError' for human-readable error messages.
 handleResult :: FlatParser.ParseResult a -> Either String a
 handleResult (FlatParser.ParseOK success) =
   Right (FlatParser.parseResult success)
 handleResult (FlatParser.ParseError failure) =
-  Left (show (FlatParser.parseError failure))
+  Left (Text.unpack (FlatParser.formatParseError failure))
 
 -- ---------------------------------------------------------------------
 -- String-based API (backward compatible)
@@ -212,39 +240,50 @@ readJsSafe input = parse input "src"
 readJsModuleSafe :: String -> Either String AST.JSAST
 readJsModuleSafe input = parseModule input "src"
 
--- | Parse JavaScript and return the AST directly.
+-- | Parse a JavaScript file, returning structured errors.
 --
--- __Warning:__ This function throws an exception on parse failure.
--- Prefer 'readJsSafe' for production use.
-{-# DEPRECATED readJs "Partial function: crashes on parse failure. Use 'parse' instead." #-}
-readJs :: String -> AST.JSAST
-readJs input = either (error . show) id (readJsSafe input)
+-- Unlike 'parseFile', this function does not throw exceptions on
+-- parse failure. IO exceptions (file not found, permission denied)
+-- are still possible.
+--
+-- @since 0.9.0.0
+parseFileSafe :: FilePath -> IO (Either String AST.JSAST)
+parseFileSafe filename = do
+  x <- readFile filename
+  pure (parse x filename)
 
--- | Parse a JavaScript module and return the AST directly.
+-- | Parse a JavaScript file with explicit UTF-8 encoding, returning
+-- structured errors.
 --
--- __Warning:__ This function throws an exception on parse failure.
--- Prefer 'readJsModuleSafe' for production use.
-{-# DEPRECATED readJsModule "Partial function: crashes on parse failure. Use 'parseModule' instead." #-}
-readJsModule :: String -> AST.JSAST
-readJsModule input = either (error . show) id (readJsModuleSafe input)
+-- Unlike 'parseFileUtf8', this function does not throw exceptions on
+-- parse failure. IO exceptions (file not found, permission denied)
+-- are still possible.
+--
+-- @since 0.9.0.0
+parseFileUtf8Safe :: FilePath -> IO (Either String AST.JSAST)
+parseFileUtf8Safe filename = do
+  h <- openFile filename ReadMode
+  hSetEncoding h utf8
+  x <- hGetContents h
+  pure (parse x filename)
 
--- | Parse the given file.
---
--- For UTF-8 support, make sure your locale is set such that
--- "System.IO.localeEncoding" returns "utf8".
+-- | Parse the given file. Throws an IO exception on parse failure.
+-- Prefer 'parseFileSafe' for production use.
+{-# DEPRECATED parseFile "Use 'parseFileSafe' instead (does not throw on parse error)." #-}
 parseFile :: FilePath -> IO AST.JSAST
 parseFile filename = do
   x <- readFile filename
-  either fail pure (readJsSafe x)
+  either fail pure (parse x filename)
 
--- | Parse the given file, explicitly setting the encoding to UTF8
--- when reading it.
+-- | Parse the given file with UTF-8 encoding. Throws an IO exception on parse failure.
+-- Prefer 'parseFileUtf8Safe' for production use.
+{-# DEPRECATED parseFileUtf8 "Use 'parseFileUtf8Safe' instead (does not throw on parse error)." #-}
 parseFileUtf8 :: FilePath -> IO AST.JSAST
 parseFileUtf8 filename = do
   h <- openFile filename ReadMode
   hSetEncoding h utf8
   x <- hGetContents h
-  either fail pure (readJsSafe x)
+  either fail pure (parse x filename)
 
 showStripped :: AST.JSAST -> String
 showStripped = AST.showStripped
@@ -255,27 +294,9 @@ showStrippedMaybe maybeAst =
     Left msg -> "Left (" <> (show msg <> ")")
     Right p -> "Right (" <> (AST.showStripped p <> ")")
 
--- | Deprecated: Use 'showStripped' instead. Identical behavior.
-{-# DEPRECATED showStrippedString "Use showStripped instead — they are identical" #-}
-showStrippedString :: AST.JSAST -> String
-showStrippedString = AST.showStripped
 
--- | Deprecated: Use 'showStrippedMaybe' instead. Identical behavior.
-{-# DEPRECATED showStrippedMaybeString "Use showStrippedMaybe instead — they are identical" #-}
-showStrippedMaybeString :: Show a => Either a AST.JSAST -> String
-showStrippedMaybeString = showStrippedMaybe
-
--- | Parse one compound statement, or a sequence of simple statements.
---
--- Generally used for interactive input, such as from the command line of an interpreter.
--- Return comments in addition to the parsed statements.
---
--- Note: This function signature is maintained for backward compatibility,
--- but the parser parameter is ignored since we now use flatparse internally.
--- | Parse JavaScript program from String input.
---
--- This function parses a complete JavaScript program, returning the full AST.
--- Equivalent to 'parse' but with a different function signature for compatibility.
+-- | Deprecated: identical to 'parse'. Use 'parse' directly.
+{-# DEPRECATED parseProgram "Use 'parse' instead (identical function)." #-}
 parseProgram ::
   -- | The input stream (JavaScript source code).
   String ->
@@ -298,7 +319,9 @@ parseExpression ::
   -- | An error or the abstract syntax tree (AST) of the expression.
   Either String AST.JSAST
 parseExpression input _srcName =
-  fmap wrapExpressionResult (handleResult (FlatParser.parseExpression (Text.pack input)))
+  let bs = Text.encodeUtf8 (Text.pack input)
+  in validateInput bs >>= \_ ->
+     fmap wrapExpressionResult (handleResult (FlatParser.parseExpression (Text.pack input)))
 
 -- | Wrap expression result as JSAstLiteral or JSAstExpression.
 -- Literals (null, true, false, numbers, strings) use JSAstLiteral.
@@ -333,26 +356,11 @@ parseStatement ::
   Either String AST.JSAST
 parseStatement input _srcName =
   let bs = Text.encodeUtf8 (Text.pack input)
-  in case FP.runParser (whitespace *> Grammar.statement) bs of
+  in validateInput bs >>= \_ -> case FP.runParser (whitespace *> Grammar.statement) bs of
     FP.OK stmt _ ->
       Right (FlatParser.fixPositions bs (AST.JSAstStatement stmt AST.JSNoAnnot))
     FP.Fail ->
-      Left "lexical error"
+      Left "unexpected input"
     FP.Err e ->
-      Left ("lexical error: " ++ show e)
+      Left (Text.unpack (FlatParser.formatParseError (FlatParser.ParseFailure e bs 0)))
 
--- | Parse using a specific parser function.
---
--- Dispatches to the appropriate parser based on the function argument.
--- Supports 'parseExpression', 'parseStatement', and 'parseProgram'.
-parseUsing ::
-  -- | The parser to be used.
-  (String -> String -> Either String AST.JSAST) ->
-  -- | The input stream (Javascript source code).
-  String ->
-  -- | The name of the Javascript source (filename or input device).
-  String ->
-  -- | An error or maybe the abstract syntax tree (AST) of zero
-  -- or more Javascript statements, plus comments.
-  Either String AST.JSAST
-parseUsing parser input srcName = parser input srcName

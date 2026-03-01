@@ -16,7 +16,7 @@ testGenericNFData :: Spec
 testGenericNFData = describe "Generic and NFData instances" $ do
   describe "NFData instances" $ do
     it "can deep evaluate simple expressions" $ do
-      case parseUsing parseExpression "42" "test" of
+      case parseExpression "42" "test" of
         Right ast -> do
           -- Test that NFData deep evaluation completes without exception
           let !evaluated = rnf ast `seq` ast
@@ -28,7 +28,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
         Left _ -> expectationFailure "Parse failed"
 
     it "can deep evaluate complex expressions" $ do
-      case parseUsing parseExpression "foo.bar[baz](arg1, arg2)" "test" of
+      case parseExpression "foo.bar[baz](arg1, arg2)" "test" of
         Right ast -> do
           -- Test that NFData handles complex nested structures
           let !evaluated = rnf ast `seq` ast
@@ -39,7 +39,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
         Left _ -> expectationFailure "Parse failed"
 
     it "can deep evaluate object literals" $ do
-      case parseUsing parseExpression "{a: 1, b: 2, ...obj}" "test" of
+      case parseExpression "{a: 1, b: 2, ...obj}" "test" of
         Right ast -> do
           -- Test NFData with object literal containing spread syntax
           let !evaluated = rnf ast `seq` ast
@@ -50,7 +50,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
         Left _ -> expectationFailure "Parse failed"
 
     it "can deep evaluate arrow functions" $ do
-      case parseUsing parseExpression "(x, y) => x + y" "test" of
+      case parseExpression "(x, y) => x + y" "test" of
         Right ast -> do
           -- Test NFData with arrow function expressions
           let !evaluated = rnf ast `seq` ast
@@ -61,7 +61,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
         Left _ -> expectationFailure "Parse failed"
 
     it "can deep evaluate statements" $ do
-      case parseUsing parseStatement "function foo(x) { return x * 2; }" "test" of
+      case parseStatement "function foo(x) { return x * 2; }" "test" of
         Right ast -> do
           -- Test NFData with function declaration statements
           let !evaluated = rnf ast `seq` ast
@@ -72,7 +72,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
         Left _ -> expectationFailure "Parse failed"
 
     it "can deep evaluate complete programs" $ do
-      case parseUsing parseProgram "var x = 42; function add(a, b) { return a + b; }" "test" of
+      case parseProgram "var x = 42; function add(a, b) { return a + b; }" "test" of
         Right ast -> do
           -- Test NFData with complete program ASTs
           let !evaluated = rnf ast `seq` ast
@@ -132,7 +132,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
 
   describe "NFData performance benefits" $ do
     it "enables complete evaluation for benchmarking" $ do
-      case parseUsing parseProgram complexJavaScript "test" of
+      case parseProgram complexJavaScript "test" of
         Right ast -> do
           -- Test that NFData enables complete evaluation for performance testing
           let !evaluated = rnf ast `seq` ast
@@ -145,7 +145,7 @@ testGenericNFData = describe "Generic and NFData instances" $ do
         Left _ -> expectationFailure "Parse failed"
 
     it "prevents space leaks in large ASTs" $ do
-      case parseUsing parseProgram largeJavaScript "test" of
+      case parseProgram largeJavaScript "test" of
         Right ast -> do
           -- Test that NFData prevents space leaks in large, nested ASTs
           let !evaluated = rnf ast `seq` ast

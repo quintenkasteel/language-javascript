@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | JavaScript Abstract Syntax Tree definitions and utilities.
 --
@@ -79,6 +80,7 @@ module Language.JavaScript.Parser.AST
     JSExportClause (..),
     JSExportSpecifier (..),
     HasAnnot (..),
+    ShowStripped (..),
     binOpEq,
     showStripped,
     fromCommaList,
@@ -122,480 +124,1395 @@ data JSAnnot
 --
 -- Represents different kinds of JavaScript source units (programs, modules,
 -- individual statements or expressions) with efficient memory usage.
+-- Every variant carries a trailing 'JSAnnot' for end-of-input whitespace
+-- and comments.
 data JSAST
-  = -- | Complete program: source elements, trailing whitespace
+  = -- | A complete JavaScript program (script mode).
+    --
+    -- Contains a list of top-level statements and trailing annotation.
+    --
+    -- JavaScript: @var x = 1; function foo() {}@
     JSAstProgram ![JSStatement] !JSAnnot
-  | -- | ES6 module: module items, trailing whitespace
+  | -- | An ES6 module containing import\/export declarations and statements.
+    --
+    -- Contains a list of module items (imports, exports, statements) and
+    -- trailing annotation.
+    --
+    -- JavaScript: @import { foo } from 'bar'; export default 42;@
     JSAstModule ![JSModuleItem] !JSAnnot
-  | -- | Individual statement with annotation
+  | -- | A single JavaScript statement wrapped as a top-level AST node.
+    --
+    -- Used when parsing a standalone statement rather than a full program.
+    --
+    -- JavaScript: @if (x) return 42;@
     JSAstStatement !JSStatement !JSAnnot
-  | -- | Individual expression with annotation
+  | -- | A single JavaScript expression wrapped as a top-level AST node.
+    --
+    -- Used when parsing a standalone expression rather than a full program.
+    --
+    -- JavaScript: @x + y * z@
     JSAstExpression !JSExpression !JSAnnot
-  | -- | Individual literal with annotation
+  | -- | A single JavaScript literal wrapped as a top-level AST node.
+    --
+    -- Used when parsing a standalone literal value.
+    --
+    -- JavaScript: @42@, @"hello"@, @true@
     JSAstLiteral !JSExpression !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
--- Shift AST
--- https://github.com/shapesecurity/shift-spec/blob/83498b92c436180cc0e2115b225a68c08f43c53e/spec.idl#L229-L234
+-- | An item within an ES6 module body.
+--
+-- A module body consists of import declarations, export declarations,
+-- and regular statements. Based on the
+-- <https://github.com/shapesecurity/shift-spec Shift AST specification>.
 data JSModuleItem
-  = -- | import,decl
+  = -- | An import declaration within a module.
+    --
+    -- Fields: @import@ keyword annotation, import declaration body.
+    --
+    -- JavaScript: @import { foo } from 'module';@
     JSModuleImportDeclaration !JSAnnot !JSImportDeclaration
-  | -- | export,decl
+  | -- | An export declaration within a module.
+    --
+    -- Fields: @export@ keyword annotation, export declaration body.
+    --
+    -- JavaScript: @export function bar() {}@
     JSModuleExportDeclaration !JSAnnot !JSExportDeclaration
-  | JSModuleStatementListItem !JSStatement
+  | -- | A regular statement within a module body.
+    --
+    -- Any statement that is not an import or export declaration.
+    --
+    -- JavaScript: @const x = 42;@ (inside a module)
+    JSModuleStatementListItem !JSStatement
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An ES6 import declaration specifying what to import and from where.
 data JSImportDeclaration
-  = -- | imports, module, optional attributes, semi
+  = -- | Import with bindings from a module specifier.
+    --
+    -- Fields: import clause, from clause, optional import attributes, semicolon.
+    --
+    -- JavaScript: @import { foo, bar } from 'module';@
     JSImportDeclaration !JSImportClause !JSFromClause !(Maybe JSImportAttributes) !JSSemi
-  | -- | import, module, optional attributes, semi
+  | -- | Bare import for side effects only (no bindings).
+    --
+    -- Fields: @import@ annotation, module specifier string, optional import
+    -- attributes, semicolon.
+    --
+    -- JavaScript: @import 'module';@ (executes module for side effects)
     JSImportDeclarationBare !JSAnnot !ByteString !(Maybe JSImportAttributes) !JSSemi
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | Import attributes (TC39 proposal), providing metadata for module loading.
+--
+-- JavaScript: @import json from './data.json' with { type: 'json' };@
 data JSImportAttributes
-  = -- | {, attributes, }
+  = -- | Braced list of key-value import attributes.
+    --
+    -- Fields: opening brace annotation, comma-separated attributes, closing
+    -- brace annotation.
+    --
+    -- JavaScript: @with { type: 'json' }@
     JSImportAttributes !JSAnnot !(JSCommaList JSImportAttribute) !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A single key-value pair in an import attributes block.
 data JSImportAttribute
-  = -- | key, :, value
+  = -- | A key-colon-value attribute pair.
+    --
+    -- Fields: attribute key identifier, colon annotation, attribute value
+    -- expression (typically a string literal).
+    --
+    -- JavaScript: @type: 'json'@ (within @with { ... }@)
     JSImportAttribute !JSIdent !JSAnnot !JSExpression
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | The import clause specifying which bindings to import.
+--
+-- ES6 imports support several forms: default imports, namespace imports,
+-- named imports, and combinations of default with namespace or named.
 data JSImportClause
-  = -- | default
+  = -- | Default import only.
+    --
+    -- Fields: local binding name for the default export.
+    --
+    -- JavaScript: @import foo from 'module';@
     JSImportClauseDefault !JSIdent
-  | -- | namespace
+  | -- | Namespace import (import everything as a single object).
+    --
+    -- Fields: namespace import specifier.
+    --
+    -- JavaScript: @import * as ns from 'module';@
     JSImportClauseNameSpace !JSImportNameSpace
-  | -- | named imports
+  | -- | Named imports (destructured from module exports).
+    --
+    -- Fields: named imports specifier list.
+    --
+    -- JavaScript: @import { foo, bar } from 'module';@
     JSImportClauseNamed !JSImportsNamed
-  | -- | default, comma, namespace
+  | -- | Default import combined with a namespace import.
+    --
+    -- Fields: default binding name, comma annotation, namespace import.
+    --
+    -- JavaScript: @import foo, * as ns from 'module';@
     JSImportClauseDefaultNameSpace !JSIdent !JSAnnot !JSImportNameSpace
-  | -- | default, comma, named imports
+  | -- | Default import combined with named imports.
+    --
+    -- Fields: default binding name, comma annotation, named imports.
+    --
+    -- JavaScript: @import foo, { bar, baz } from 'module';@
     JSImportClauseDefaultNamed !JSIdent !JSAnnot !JSImportsNamed
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | The @from@ clause in an import or export declaration, specifying the
+-- module specifier.
 data JSFromClause
-  = -- | from, string literal, string literal contents
+  = -- | A @from 'module-specifier'@ clause.
+    --
+    -- Fields: @from@ keyword annotation, string literal annotation,
+    -- module specifier string (the raw content between quotes).
+    --
+    -- JavaScript: @from 'lodash'@, @from './utils.js'@
     JSFromClause !JSAnnot !JSAnnot !ByteString
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
--- | Import namespace, e.g. '* as whatever'
+-- | Import namespace binding, importing all exports as a single object.
 data JSImportNameSpace
-  = -- | *, as, ident
+  = -- | Namespace import: @* as localName@.
+    --
+    -- Fields: star operator (@*@), @as@ keyword annotation, local binding
+    -- name.
+    --
+    -- JavaScript: @* as utils@ (within @import * as utils from 'module';@)
     JSImportNameSpace !JSBinOp !JSAnnot !JSIdent
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
--- | Named imports, e.g. '{ foo, bar, baz as quux }'
+-- | Named imports enclosed in braces, selecting specific exports by name.
 data JSImportsNamed
-  = -- | lb, specifiers, rb
+  = -- | Braced list of named import specifiers.
+    --
+    -- Fields: opening brace annotation, comma-separated import specifiers,
+    -- closing brace annotation.
+    --
+    -- JavaScript: @{ foo, bar as baz }@ (within @import { ... } from 'module';@)
     JSImportsNamed !JSAnnot !(JSCommaList JSImportSpecifier) !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
--- |
--- Note that this data type is separate from ExportSpecifier because the
+-- | A single named import specifier within a braced import list.
+--
+-- Note: this data type is separate from 'JSExportSpecifier' because the
 -- grammar is slightly different (e.g. in handling of reserved words).
 data JSImportSpecifier
-  = -- | ident
+  = -- | Import a binding using its original exported name.
+    --
+    -- Fields: exported name (used as local binding).
+    --
+    -- JavaScript: @foo@ (within @import { foo } from 'module';@)
     JSImportSpecifier !JSIdent
-  | -- | ident, as, ident
+  | -- | Import a binding with a local alias.
+    --
+    -- Fields: exported name, @as@ keyword annotation, local alias name.
+    --
+    -- JavaScript: @foo as bar@ (within @import { foo as bar } from 'module';@)
     JSImportSpecifierAs !JSIdent !JSAnnot !JSIdent
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | The body of an ES6 export declaration, specifying what is exported.
 data JSExportDeclaration
-  = -- | star, module, semi
+  = -- | Re-export all exports from another module.
+    --
+    -- Fields: star operator (@*@), from clause, semicolon.
+    --
+    -- JavaScript: @export * from 'module';@
     JSExportAllFrom !JSBinOp JSFromClause !JSSemi
-  | -- | star, as, ident, module, semi
+  | -- | Re-export all exports from another module under a namespace.
+    --
+    -- Fields: star operator (@*@), @as@ annotation, namespace name, from
+    -- clause, semicolon.
+    --
+    -- JavaScript: @export * as ns from 'module';@
     JSExportAllAsFrom !JSBinOp !JSAnnot !JSIdent JSFromClause !JSSemi
-  | -- | exports, module, semi
+  | -- | Re-export specific named bindings from another module.
+    --
+    -- Fields: export clause with specifiers, from clause, semicolon.
+    --
+    -- JavaScript: @export { foo, bar } from 'module';@
     JSExportFrom JSExportClause JSFromClause !JSSemi
-  | -- | exports, autosemi
+  | -- | Export specific local bindings by name.
+    --
+    -- Fields: export clause with specifiers, semicolon.
+    --
+    -- JavaScript: @export { foo, bar };@
     JSExportLocals JSExportClause !JSSemi
-  | -- | default, declaration/expression, autosemi
+  | -- | Export a default value (expression or declaration).
+    --
+    -- Fields: @default@ keyword annotation, exported statement\/expression,
+    -- semicolon.
+    --
+    -- JavaScript: @export default function() {}@, @export default 42;@
     JSExportDefault !JSAnnot !JSStatement !JSSemi
-  | -- | body, autosemi
+  | -- | Export a declaration directly (non-default).
+    --
+    -- Fields: exported declaration statement, semicolon.
+    --
+    -- JavaScript: @export function foo() {}@, @export const x = 1;@
     JSExport !JSStatement !JSSemi
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | Braced list of export specifiers naming which bindings to export.
 data JSExportClause
-  = -- | lb, specifiers, rb
+  = -- | Braced list of named export specifiers.
+    --
+    -- Fields: opening brace annotation, comma-separated export specifiers,
+    -- closing brace annotation.
+    --
+    -- JavaScript: @{ foo, bar as baz }@ (within @export { ... };@)
     JSExportClause !JSAnnot !(JSCommaList JSExportSpecifier) !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A single named export specifier within a braced export list.
 data JSExportSpecifier
-  = -- | ident
+  = -- | Export a binding using its original local name.
+    --
+    -- Fields: local binding name.
+    --
+    -- JavaScript: @foo@ (within @export { foo };@)
     JSExportSpecifier !JSIdent
-  | -- | ident1, as, ident2
+  | -- | Export a binding with a different public name.
+    --
+    -- Fields: local name, @as@ keyword annotation, exported name.
+    --
+    -- JavaScript: @foo as bar@ (within @export { foo as bar };@)
     JSExportSpecifierAs !JSIdent !JSAnnot !JSIdent
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | JavaScript statement AST nodes.
+--
+-- Covers all JavaScript statement types: declarations, control flow,
+-- iteration, and expression statements.
 data JSStatement
-  = -- | lbrace, stmts, rbrace, autosemi
+  = -- | A block statement enclosed in braces.
+    --
+    -- Fields: opening brace, statements, closing brace, auto-semicolon.
+    --
+    -- JavaScript: @{ stmt1; stmt2; }@
     JSStatementBlock !JSAnnot ![JSStatement] !JSAnnot !JSSemi
-  | -- | break,optional identifier, autosemi
+  | -- | A @break@ statement, optionally targeting a label.
+    --
+    -- Fields: @break@ annotation, optional label identifier, auto-semicolon.
+    --
+    -- JavaScript: @break;@, @break myLabel;@
     JSBreak !JSAnnot !JSIdent !JSSemi
-  | -- | const, decl, autosemi
+  | -- | A @let@ variable declaration.
+    --
+    -- Fields: @let@ annotation, comma-separated declarators, auto-semicolon.
+    --
+    -- JavaScript: @let x = 1, y = 2;@
     JSLet !JSAnnot !(JSCommaList JSExpression) !JSSemi
-  | -- | class, name, optional extends clause, lb, body, rb, autosemi
+  | -- | A @class@ declaration statement.
+    --
+    -- Fields: @class@ annotation, class name, optional extends clause,
+    -- opening brace, class body elements, closing brace, auto-semicolon.
+    --
+    -- JavaScript: @class Foo extends Bar { method() {} }@
     JSClass !JSAnnot !JSIdent !JSClassHeritage !JSAnnot ![JSClassElement] !JSAnnot !JSSemi
-  | -- | const, decl, autosemi
+  | -- | A @const@ variable declaration.
+    --
+    -- Fields: @const@ annotation, comma-separated declarators, auto-semicolon.
+    --
+    -- JavaScript: @const PI = 3.14, E = 2.718;@
     JSConstant !JSAnnot !(JSCommaList JSExpression) !JSSemi
-  | -- | continue, optional identifier,autosemi
+  | -- | A @continue@ statement, optionally targeting a label.
+    --
+    -- Fields: @continue@ annotation, optional label identifier, auto-semicolon.
+    --
+    -- JavaScript: @continue;@, @continue outerLoop;@
     JSContinue !JSAnnot !JSIdent !JSSemi
-  | -- | do,stmt,while,lb,expr,rb,autosemi
+  | -- | A @do...while@ loop statement.
+    --
+    -- Fields: @do@ annotation, body statement, @while@ annotation, opening
+    -- paren, condition expression, closing paren, auto-semicolon.
+    --
+    -- JavaScript: @do { x++; } while (x \< 10);@
     JSDoWhile !JSAnnot !JSStatement !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSSemi
-  | -- | for,lb,expr,semi,expr,semi,expr,rb.stmt
+  | -- | A C-style @for@ loop with three clauses.
+    --
+    -- Fields: @for@ annotation, opening paren, init expressions, first
+    -- semicolon, condition expressions, second semicolon, update expressions,
+    -- closing paren, body statement.
+    --
+    -- JavaScript: @for (i = 0; i \< 10; i++) stmt@
     JSFor !JSAnnot !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSStatement
-  | -- | for,lb,expr,in,expr,rb,stmt
+  | -- | A @for...in@ loop iterating over object properties.
+    --
+    -- Fields: @for@ annotation, opening paren, loop variable expression,
+    -- @in@ operator, object expression, closing paren, body statement.
+    --
+    -- JavaScript: @for (key in obj) stmt@
     JSForIn !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,semi,expr,semi,expr,rb,stmt
+  | -- | A @for (var ...; ...; ...)@ loop with @var@ declarations.
+    --
+    -- Fields: @for@ annotation, opening paren, @var@ annotation, declarators,
+    -- first semicolon, condition, second semicolon, update, closing paren,
+    -- body statement.
+    --
+    -- JavaScript: @for (var i = 0; i \< 10; i++) stmt@
     JSForVar !JSAnnot !JSAnnot !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,in,expr,rb,stmt
+  | -- | A @for (var ... in ...)@ loop with @var@ declaration.
+    --
+    -- Fields: @for@ annotation, opening paren, @var@ annotation, variable
+    -- declarator, @in@ operator, object expression, closing paren, body.
+    --
+    -- JavaScript: @for (var key in obj) stmt@
     JSForVarIn !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,semi,expr,semi,expr,rb,stmt
+  | -- | A @for (let ...; ...; ...)@ loop with @let@ declarations.
+    --
+    -- Fields: @for@ annotation, opening paren, @let@ annotation, declarators,
+    -- first semicolon, condition, second semicolon, update, closing paren,
+    -- body statement.
+    --
+    -- JavaScript: @for (let i = 0; i \< 10; i++) stmt@
     JSForLet !JSAnnot !JSAnnot !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,in,expr,rb,stmt
+  | -- | A @for (let ... in ...)@ loop with @let@ declaration.
+    --
+    -- Fields: @for@ annotation, opening paren, @let@ annotation, variable
+    -- declarator, @in@ operator, object expression, closing paren, body.
+    --
+    -- JavaScript: @for (let key in obj) stmt@
     JSForLetIn !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,in,expr,rb,stmt
+  | -- | A @for (let ... of ...)@ loop with @let@ declaration.
+    --
+    -- Fields: @for@ annotation, opening paren, @let@ annotation, variable
+    -- declarator, @of@ operator, iterable expression, closing paren, body.
+    --
+    -- JavaScript: @for (let item of array) stmt@
     JSForLetOf !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,semi,expr,semi,expr,rb,stmt
+  | -- | A @for (const ...; ...; ...)@ loop with @const@ declarations.
+    --
+    -- Fields: @for@ annotation, opening paren, @const@ annotation, declarators,
+    -- first semicolon, condition, second semicolon, update, closing paren,
+    -- body statement.
+    --
+    -- JavaScript: @for (const i = 0; i \< 10; i++) stmt@
     JSForConst !JSAnnot !JSAnnot !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,in,expr,rb,stmt
+  | -- | A @for (const ... in ...)@ loop with @const@ declaration.
+    --
+    -- Fields: @for@ annotation, opening paren, @const@ annotation, variable
+    -- declarator, @in@ operator, object expression, closing paren, body.
+    --
+    -- JavaScript: @for (const key in obj) stmt@
     JSForConstIn !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,in,expr,rb,stmt
+  | -- | A @for (const ... of ...)@ loop with @const@ declaration.
+    --
+    -- Fields: @for@ annotation, opening paren, @const@ annotation, variable
+    -- declarator, @of@ operator, iterable expression, closing paren, body.
+    --
+    -- JavaScript: @for (const item of array) stmt@
     JSForConstOf !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,expr,in,expr,rb,stmt
+  | -- | A @for...of@ loop without a variable declaration keyword.
+    --
+    -- Fields: @for@ annotation, opening paren, loop variable expression,
+    -- @of@ operator, iterable expression, closing paren, body statement.
+    --
+    -- JavaScript: @for (x of iterable) stmt@
     JSForOf !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for,lb,var,vardecl,in,expr,rb,stmt
+  | -- | A @for (var ... of ...)@ loop with @var@ declaration.
+    --
+    -- Fields: @for@ annotation, opening paren, @var@ annotation, variable
+    -- declarator, @of@ operator, iterable expression, closing paren, body.
+    --
+    -- JavaScript: @for (var item of array) stmt@
     JSForVarOf !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | fn,name, lb,parameter list,rb,block,autosemi
+  | -- | An @async function@ declaration.
+    --
+    -- Fields: @async@ annotation, @function@ annotation, function name,
+    -- opening paren, parameter list, closing paren, function body block,
+    -- auto-semicolon.
+    --
+    -- JavaScript: @async function fetchData(url) { ... }@
     JSAsyncFunction !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock !JSSemi
-  | -- | fn,name, lb,parameter list,rb,block,autosemi
+  | -- | A @function@ declaration.
+    --
+    -- Fields: @function@ annotation, function name, opening paren, parameter
+    -- list, closing paren, function body block, auto-semicolon.
+    --
+    -- JavaScript: @function add(a, b) { return a + b; }@
     JSFunction !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock !JSSemi
-  | -- | fn,*,name, lb,parameter list,rb,block,autosemi
+  | -- | A generator @function*@ declaration.
+    --
+    -- Fields: @function@ annotation, star annotation, generator name,
+    -- opening paren, parameter list, closing paren, function body block,
+    -- auto-semicolon.
+    --
+    -- JavaScript: @function* range(start, end) { ... }@
     JSGenerator !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock !JSSemi
-  | -- | if,(,expr,),stmt
+  | -- | An @if@ statement without an @else@ branch.
+    --
+    -- Fields: @if@ annotation, opening paren, condition expression, closing
+    -- paren, consequent statement.
+    --
+    -- JavaScript: @if (x > 0) doSomething();@
     JSIf !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSStatement
-  | -- | if,(,expr,),stmt,else,rest
+  | -- | An @if...else@ statement with both branches.
+    --
+    -- Fields: @if@ annotation, opening paren, condition expression, closing
+    -- paren, consequent statement, @else@ annotation, alternate statement.
+    --
+    -- JavaScript: @if (x > 0) doA(); else doB();@
     JSIfElse !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSStatement !JSAnnot !JSStatement
-  | -- | identifier,colon,stmt
+  | -- | A labelled statement.
+    --
+    -- Fields: label identifier, colon annotation, labelled statement.
+    --
+    -- JavaScript: @outer: for (;;) { ... }@
     JSLabelled !JSIdent !JSAnnot !JSStatement
-  | JSEmptyStatement !JSAnnot
-  | JSExpressionStatement !JSExpression !JSSemi
-  | -- | lhs, assignop, rhs, autosemi
+  | -- | An empty statement (bare semicolon).
+    --
+    -- Fields: semicolon annotation.
+    --
+    -- JavaScript: @;@
+    JSEmptyStatement !JSAnnot
+  | -- | An expression used as a statement.
+    --
+    -- Fields: expression, auto-semicolon.
+    --
+    -- JavaScript: @foo();@, @x + 1;@
+    JSExpressionStatement !JSExpression !JSSemi
+  | -- | An assignment statement (shorthand for expression statement with assignment).
+    --
+    -- Fields: left-hand side, assignment operator, right-hand side, auto-semicolon.
+    --
+    -- JavaScript: @x = 42;@, @arr[0] += 1;@
     JSAssignStatement !JSExpression !JSAssignOp !JSExpression !JSSemi
-  | JSMethodCall !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSSemi
-  | -- | optional expression,autosemi
+  | -- | A method call statement (expression followed by arguments).
+    --
+    -- Fields: callee expression, opening paren, arguments, closing paren,
+    -- auto-semicolon.
+    --
+    -- JavaScript: @console.log("hello");@
+    JSMethodCall !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSSemi
+  | -- | A @return@ statement with an optional return value.
+    --
+    -- Fields: @return@ annotation, optional return expression, auto-semicolon.
+    --
+    -- JavaScript: @return;@, @return x + 1;@
     JSReturn !JSAnnot !(Maybe JSExpression) !JSSemi
-  | -- | switch,lb,expr,rb,caseblock,autosemi
+  | -- | A @switch@ statement with case\/default blocks.
+    --
+    -- Fields: @switch@ annotation, opening paren, discriminant expression,
+    -- closing paren, opening brace, switch parts (cases\/defaults), closing
+    -- brace, auto-semicolon.
+    --
+    -- JavaScript: @switch (x) { case 1: break; default: break; }@
     JSSwitch !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSAnnot ![JSSwitchParts] !JSAnnot !JSSemi
-  | -- | throw val autosemi
+  | -- | A @throw@ statement.
+    --
+    -- Fields: @throw@ annotation, thrown expression, auto-semicolon.
+    --
+    -- JavaScript: @throw new Error("oops");@
     JSThrow !JSAnnot !JSExpression !JSSemi
-  | -- | try,block,catches,finally
+  | -- | A @try@ statement with optional catch and finally blocks.
+    --
+    -- Fields: @try@ annotation, try block, catch clauses, finally clause.
+    --
+    -- JavaScript: @try { ... } catch (e) { ... } finally { ... }@
     JSTry !JSAnnot !JSBlock ![JSTryCatch] !JSTryFinally
-  | -- | var, decl, autosemi
+  | -- | A @var@ variable declaration.
+    --
+    -- Fields: @var@ annotation, comma-separated declarators, auto-semicolon.
+    --
+    -- JavaScript: @var x = 1, y = 2;@
     JSVariable !JSAnnot !(JSCommaList JSExpression) !JSSemi
-  | -- | while,lb,expr,rb,stmt
+  | -- | A @while@ loop statement.
+    --
+    -- Fields: @while@ annotation, opening paren, condition expression,
+    -- closing paren, body statement.
+    --
+    -- JavaScript: @while (x \< 10) x++;@
     JSWhile !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSStatement
-  | -- | with,lb,expr,rb,stmt list
+  | -- | A @with@ statement (deprecated in strict mode).
+    --
+    -- Fields: @with@ annotation, opening paren, object expression, closing
+    -- paren, body statement, auto-semicolon.
+    --
+    -- JavaScript: @with (Math) { log(PI); }@
     JSWith !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSStatement !JSSemi
-  | -- | debugger, autosemi
+  | -- | A @debugger@ statement.
+    --
+    -- Fields: @debugger@ annotation, auto-semicolon.
+    --
+    -- JavaScript: @debugger;@
     JSDebugger !JSAnnot !JSSemi
-  | -- | async, function, *, name, lb, params, rb, block, autosemi
+  | -- | An @async function*@ (async generator) declaration.
+    --
+    -- Fields: @async@ annotation, @function@ annotation, star annotation,
+    -- generator name, opening paren, parameter list, closing paren,
+    -- function body block, auto-semicolon.
+    --
+    -- JavaScript: @async function* stream() { yield await fetch(url); }@
     JSAsyncGenerator !JSAnnot !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock !JSSemi
-  | -- | for, await, lb, expr, of, iter, rb, stmt
+  | -- | A @for await...of@ loop without a declaration keyword.
+    --
+    -- Fields: @for@ annotation, @await@ annotation, opening paren, loop
+    -- variable expression, @of@ operator, iterable expression, closing
+    -- paren, body statement.
+    --
+    -- JavaScript: @for await (chunk of stream) stmt@
     JSForAwaitOf !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for, await, lb, var, expr, of, iter, rb, stmt
+  | -- | A @for await (var ... of ...)@ loop.
+    --
+    -- Fields: @for@ annotation, @await@ annotation, opening paren, @var@
+    -- annotation, variable declarator, @of@ operator, iterable expression,
+    -- closing paren, body statement.
+    --
+    -- JavaScript: @for await (var chunk of stream) stmt@
     JSForAwaitVarOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for, await, lb, let, expr, of, iter, rb, stmt
+  | -- | A @for await (let ... of ...)@ loop.
+    --
+    -- Fields: @for@ annotation, @await@ annotation, opening paren, @let@
+    -- annotation, variable declarator, @of@ operator, iterable expression,
+    -- closing paren, body statement.
+    --
+    -- JavaScript: @for await (let chunk of stream) stmt@
     JSForAwaitLetOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
-  | -- | for, await, lb, const, expr, of, iter, rb, stmt
+  | -- | A @for await (const ... of ...)@ loop.
+    --
+    -- Fields: @for@ annotation, @await@ annotation, opening paren, @const@
+    -- annotation, variable declarator, @of@ operator, iterable expression,
+    -- closing paren, body statement.
+    --
+    -- JavaScript: @for await (const chunk of stream) stmt@
     JSForAwaitConstOf !JSAnnot !JSAnnot !JSAnnot !JSAnnot !JSExpression !JSBinOp !JSExpression !JSAnnot !JSStatement
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | JavaScript expression AST nodes.
+--
+-- Covers all JavaScript expression types: literals, operators, function
+-- expressions, member access, and modern ES6+ syntax like arrow functions,
+-- template literals, and optional chaining.
 data JSExpression
-  = -- | Terminals
+  = -- | An identifier reference (variable name, function name, etc.).
+    --
+    -- Fields: annotation, identifier name as raw bytes.
+    --
+    -- JavaScript: @foo@, @myVariable@, @$element@
     JSIdentifier !JSAnnot !ByteString
-  | -- | Decimal numeric literal (e.g., @42@, @3.14@, @1e5@)
+  | -- | A decimal numeric literal.
+    --
+    -- Fields: annotation, numeric value as Double.
+    --
+    -- JavaScript: @42@, @3.14@, @1e5@
     JSDecimal !JSAnnot !Double
-  | JSLiteral !JSAnnot !ByteString
-  | -- | Hexadecimal integer literal (e.g., @0xFF@)
+  | -- | A keyword literal (@true@, @false@, @null@, @this@).
+    --
+    -- Fields: annotation, literal text as raw bytes.
+    --
+    -- JavaScript: @true@, @false@, @null@, @this@
+    JSLiteral !JSAnnot !ByteString
+  | -- | A hexadecimal integer literal.
+    --
+    -- Fields: annotation, integer value.
+    --
+    -- JavaScript: @0xFF@, @0x1A3F@
     JSHexInteger !JSAnnot !Integer
-  | -- | Binary integer literal (e.g., @0b1010@)
+  | -- | A binary integer literal (ES2015).
+    --
+    -- Fields: annotation, integer value.
+    --
+    -- JavaScript: @0b1010@, @0b11111111@
     JSBinaryInteger !JSAnnot !Integer
-  | -- | Octal integer literal (e.g., @0o77@)
+  | -- | An octal integer literal (ES2015 @0o@ prefix form).
+    --
+    -- Fields: annotation, integer value.
+    --
+    -- JavaScript: @0o77@, @0o755@
     JSOctal !JSAnnot !Integer
-  | -- | BigInt literal (e.g., @42n@, @0xFFn@)
+  | -- | A BigInt literal (ES2020).
+    --
+    -- Fields: annotation, integer value (without the trailing @n@).
+    --
+    -- JavaScript: @42n@, @0xFFn@, @9007199254740991n@
     JSBigIntLiteral !JSAnnot !Integer
-  | JSStringLiteral !JSAnnot !ByteString
-  | JSRegEx !JSAnnot !ByteString
-  | -- | lb, contents, rb
+  | -- | A string literal (single or double quoted).
+    --
+    -- Fields: annotation, string content as raw bytes (including quotes).
+    --
+    -- JavaScript: @"hello"@, @'world'@
+    JSStringLiteral !JSAnnot !ByteString
+  | -- | A regular expression literal.
+    --
+    -- Fields: annotation, regex pattern and flags as raw bytes.
+    --
+    -- JavaScript: @\/pattern\/gi@
+    JSRegEx !JSAnnot !ByteString
+  | -- | An array literal expression.
+    --
+    -- Fields: opening bracket annotation, array elements (including elisions),
+    -- closing bracket annotation.
+    --
+    -- JavaScript: @[1, 2, 3]@, @[, , x]@
     JSArrayLiteral !JSAnnot ![JSArrayElement] !JSAnnot
-  | -- | lhs, assignop, rhs
+  | -- | An assignment expression.
+    --
+    -- Fields: left-hand side, assignment operator, right-hand side.
+    --
+    -- JavaScript: @x = 42@, @obj.prop += 1@
     JSAssignExpression !JSExpression !JSAssignOp !JSExpression
-  | -- | await, expr
+  | -- | An @await@ expression (inside async functions).
+    --
+    -- Fields: @await@ annotation, awaited expression.
+    --
+    -- JavaScript: @await fetchData()@
     JSAwaitExpression !JSAnnot !JSExpression
-  | -- | expr, bl, args, rb
+  | -- | A function call expression with parenthesized arguments.
+    --
+    -- Fields: callee expression, opening paren, arguments, closing paren.
+    --
+    -- JavaScript: @foo(1, 2)@, @obj.method(arg)@
     JSCallExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot
-  | -- | expr, dot, expr
+  | -- | A dot-access on a call expression result.
+    --
+    -- Fields: call expression, dot annotation, property name expression.
+    --
+    -- JavaScript: @foo().bar@ (the @.bar@ part after a call)
     JSCallExpressionDot !JSExpression !JSAnnot !JSExpression
-  | -- | expr, [, expr, ]
+  | -- | A bracket-access on a call expression result.
+    --
+    -- Fields: call expression, opening bracket, index expression, closing
+    -- bracket.
+    --
+    -- JavaScript: @foo()[0]@ (the @[0]@ part after a call)
     JSCallExpressionSquare !JSExpression !JSAnnot !JSExpression !JSAnnot
-  | -- | class, optional identifier, optional extends clause, lb, body, rb
+  | -- | A class expression (anonymous or named).
+    --
+    -- Fields: @class@ annotation, optional class name, optional extends
+    -- clause, opening brace, class body elements, closing brace.
+    --
+    -- JavaScript: @class {}@, @class Foo extends Bar { method() {} }@
     JSClassExpression !JSAnnot !JSIdent !JSClassHeritage !JSAnnot ![JSClassElement] !JSAnnot
-  | -- | expression components
+  | -- | A comma expression (sequence of two expressions).
+    --
+    -- Fields: left expression, comma annotation, right expression.
+    --
+    -- JavaScript: @a, b@ (evaluates both, returns last)
     JSCommaExpression !JSExpression !JSAnnot !JSExpression
-  | -- | lhs, op, rhs
+  | -- | A binary operator expression.
+    --
+    -- Fields: left operand, binary operator, right operand.
+    --
+    -- JavaScript: @x + y@, @a && b@, @i \< 10@
     JSExpressionBinary !JSExpression !JSBinOp !JSExpression
-  | -- | lb,expression,rb
+  | -- | A parenthesized expression.
+    --
+    -- Fields: opening paren, inner expression, closing paren.
+    --
+    -- JavaScript: @(x + y)@
     JSExpressionParen !JSAnnot !JSExpression !JSAnnot
-  | -- | expression, operator
+  | -- | A postfix unary expression.
+    --
+    -- Fields: operand expression, postfix operator.
+    --
+    -- JavaScript: @x++@, @y--@
     JSExpressionPostfix !JSExpression !JSUnaryOp
-  | -- | cond, ?, trueval, :, falseval
+  | -- | A ternary (conditional) expression.
+    --
+    -- Fields: condition, question mark annotation, true branch, colon
+    -- annotation, false branch.
+    --
+    -- JavaScript: @cond ? trueVal : falseVal@
     JSExpressionTernary !JSExpression !JSAnnot !JSExpression !JSAnnot !JSExpression
-  | -- | parameter list,arrow,body`
+  | -- | An arrow function expression.
+    --
+    -- Fields: parameter list, arrow (@=>@) annotation, concise body.
+    --
+    -- JavaScript: @x => x + 1@, @(a, b) => { return a + b; }@
     JSArrowExpression !JSArrowParameterList !JSAnnot !JSConciseBody
-  | -- | fn,name,lb, parameter list,rb,block`
+  | -- | A function expression (anonymous or named).
+    --
+    -- Fields: @function@ annotation, optional function name, opening paren,
+    -- parameter list, closing paren, function body block.
+    --
+    -- JavaScript: @function() {}@, @function add(a, b) { return a + b; }@
     JSFunctionExpression !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | fn,*,name,lb, parameter list,rb,block`
+  | -- | A generator function expression.
+    --
+    -- Fields: @function@ annotation, star annotation, optional name, opening
+    -- paren, parameter list, closing paren, function body block.
+    --
+    -- JavaScript: @function*() { yield 1; }@
     JSGeneratorExpression !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | async,fn,name,lb, parameter list,rb,block`
+  | -- | An async function expression.
+    --
+    -- Fields: @async@ annotation, @function@ annotation, optional name,
+    -- opening paren, parameter list, closing paren, function body block.
+    --
+    -- JavaScript: @async function() { await fetch(url); }@
     JSAsyncFunctionExpression !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | async, parameter list, arrow, body
+  | -- | An async arrow function expression.
+    --
+    -- Fields: @async@ annotation, parameter list, arrow (@=>@) annotation,
+    -- concise body.
+    --
+    -- JavaScript: @async x => await x@, @async (a, b) => { ... }@
     JSAsyncArrowExpression !JSAnnot !JSArrowParameterList !JSAnnot !JSConciseBody
-  | -- | async, fn, *, name, lb, parameter list, rb, block
+  | -- | An async generator function expression.
+    --
+    -- Fields: @async@ annotation, @function@ annotation, star annotation,
+    -- optional name, opening paren, parameter list, closing paren, body block.
+    --
+    -- JavaScript: @async function*() { yield await fetch(url); }@
     JSAsyncGeneratorExpression !JSAnnot !JSAnnot !JSAnnot !JSIdent !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | firstpart, dot, name
+  | -- | Dot-notation member access.
+    --
+    -- Fields: object expression, dot annotation, property name expression.
+    --
+    -- JavaScript: @obj.prop@, @arr.length@
     JSMemberDot !JSExpression !JSAnnot !JSExpression
-  | -- | firstpart, dot, hash, private field name (e.g. @obj.#field@)
+  | -- | Private field dot-notation member access (ES2022).
+    --
+    -- Fields: object expression, dot annotation, hash annotation, private
+    -- field name (without the @#@ prefix).
+    --
+    -- JavaScript: @obj.#field@
     JSMemberPrivateDot !JSExpression !JSAnnot !JSAnnot !ByteString
-  | JSMemberExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot -- expr, lb, args, rb
-  | -- | new, name, lb, args, rb
+  | -- | Function call via member expression (method invocation).
+    --
+    -- Fields: callee expression, opening paren, arguments, closing paren.
+    --
+    -- JavaScript: @obj.method(arg1, arg2)@
+    JSMemberExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot
+  | -- | A @new@ expression with arguments.
+    --
+    -- Fields: @new@ annotation, constructor expression, opening paren,
+    -- arguments, closing paren.
+    --
+    -- JavaScript: @new Foo(1, 2)@
     JSMemberNew !JSAnnot !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot
-  | -- | firstpart, lb, expr, rb
+  | -- | Bracket-notation (computed) member access.
+    --
+    -- Fields: object expression, opening bracket, index expression, closing
+    -- bracket.
+    --
+    -- JavaScript: @obj["prop"]@, @arr[0]@
     JSMemberSquare !JSExpression !JSAnnot !JSExpression !JSAnnot
-  | -- | new, expr
+  | -- | A @new@ expression without arguments.
+    --
+    -- Fields: @new@ annotation, constructor expression.
+    --
+    -- JavaScript: @new Foo@
     JSNewExpression !JSAnnot !JSExpression
-  | -- | firstpart, ?., name
+  | -- | Optional chaining dot-notation member access (ES2020).
+    --
+    -- Fields: object expression, @?.@ annotation, property name expression.
+    --
+    -- JavaScript: @obj?.prop@
     JSOptionalMemberDot !JSExpression !JSAnnot !JSExpression
-  | -- | firstpart, ?.[, expr, ]
+  | -- | Optional chaining bracket-notation member access (ES2020).
+    --
+    -- Fields: object expression, @?.[@ annotation, index expression,
+    -- closing bracket.
+    --
+    -- JavaScript: @obj?.[key]@
     JSOptionalMemberSquare !JSExpression !JSAnnot !JSExpression !JSAnnot
-  | -- | expr, ?.(, args, )
+  | -- | Optional chaining function call (ES2020).
+    --
+    -- Fields: callee expression, @?.(@ annotation, arguments, closing paren.
+    --
+    -- JavaScript: @obj?.method(arg)@
     JSOptionalCallExpression !JSExpression !JSAnnot !(JSCommaList JSExpression) !JSAnnot
-  | -- | lbrace contents rbrace
+  | -- | An object literal expression.
+    --
+    -- Fields: opening brace annotation, property list, closing brace annotation.
+    --
+    -- JavaScript: @{ key: value, method() {} }@
     JSObjectLiteral !JSAnnot !JSObjectPropertyList !JSAnnot
-  | JSSpreadExpression !JSAnnot !JSExpression
-  | -- | optional tag, lquot, head, parts
+  | -- | A spread expression (ES2015).
+    --
+    -- Fields: @...@ annotation, spread operand expression.
+    --
+    -- JavaScript: @...arr@, @...obj@ (in array literals, function calls, etc.)
+    JSSpreadExpression !JSAnnot !JSExpression
+  | -- | A template literal, optionally tagged.
+    --
+    -- Fields: optional tag expression, opening backtick annotation, head
+    -- string (before first @${@), template parts (expression + suffix pairs).
+    --
+    -- JavaScript: @\`hello ${name}\`@, @html\`\<div>${content}\<\/div>\`@
     JSTemplateLiteral !(Maybe JSExpression) !JSAnnot !ByteString ![JSTemplatePart]
-  | JSUnaryExpression !JSUnaryOp !JSExpression
-  | -- | identifier, initializer
+  | -- | A prefix unary expression.
+    --
+    -- Fields: unary operator, operand expression.
+    --
+    -- JavaScript: @!x@, @-y@, @typeof z@, @++i@
+    JSUnaryExpression !JSUnaryOp !JSExpression
+  | -- | A variable declarator with optional initializer.
+    --
+    -- Fields: variable name expression (may be a pattern), initializer.
+    -- Used within @var@\/@let@\/@const@ declarations.
+    --
+    -- JavaScript: @x = 42@ (within @var x = 42;@)
     JSVarInitExpression !JSExpression !JSVarInitializer
-  | -- | yield, optional expr
+  | -- | A @yield@ expression (inside generator functions).
+    --
+    -- Fields: @yield@ annotation, optional yielded expression.
+    --
+    -- JavaScript: @yield@, @yield value@
     JSYieldExpression !JSAnnot !(Maybe JSExpression)
-  | -- | yield, *, expr
+  | -- | A @yield*@ (delegating yield) expression.
+    --
+    -- Fields: @yield@ annotation, star annotation, delegated iterable
+    -- expression.
+    --
+    -- JavaScript: @yield* otherGenerator()@
     JSYieldFromExpression !JSAnnot !JSAnnot !JSExpression
-  | -- | import, .meta
+  | -- | The @import.meta@ meta-property (ES2020).
+    --
+    -- Fields: @import@ annotation, @.meta@ annotation.
+    --
+    -- JavaScript: @import.meta@, @import.meta.url@
     JSImportMeta !JSAnnot !JSAnnot
-  | -- | import, lb, expr, rb
+  | -- | A dynamic @import()@ call expression (ES2020).
+    --
+    -- Fields: @import@ annotation, opening paren, module specifier expression,
+    -- closing paren.
+    --
+    -- JavaScript: @import('./module.js')@
     JSImportCall !JSAnnot !JSAnnot !JSExpression !JSAnnot
+  | -- | A private identifier (ES2022), used for private-in-object checks.
+    --
+    -- Fields: hash annotation, private name (without the @#@ prefix).
+    --
+    -- JavaScript: @#x@ (in @#x in obj@)
+    JSPrivateIdentifier !JSAnnot !ByteString
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | Parameter list for an arrow function expression.
+--
+-- Arrow functions accept either a single unparenthesized identifier or a
+-- parenthesized comma-separated parameter list.
 data JSArrowParameterList
-  = JSUnparenthesizedArrowParameter !JSIdent
-  | JSParenthesizedArrowParameterList !JSAnnot !(JSCommaList JSExpression) !JSAnnot
+  = -- | A single identifier parameter without parentheses.
+    --
+    -- Fields: parameter identifier.
+    --
+    -- JavaScript: @x@ (in @x => x + 1@)
+    JSUnparenthesizedArrowParameter !JSIdent
+  | -- | A parenthesized parameter list (zero or more parameters).
+    --
+    -- Fields: opening paren, comma-separated parameter expressions, closing
+    -- paren.
+    --
+    -- JavaScript: @(a, b)@ (in @(a, b) => a + b@), @()@ (in @() => 42@)
+    JSParenthesizedArrowParameterList !JSAnnot !(JSCommaList JSExpression) !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | The body of an arrow function, either a block or a concise expression.
 data JSConciseBody
-  = JSConciseFunctionBody !JSBlock
-  | JSConciseExpressionBody !JSExpression
+  = -- | A block body enclosed in braces (requires explicit @return@).
+    --
+    -- Fields: function body block.
+    --
+    -- JavaScript: @{ return a + b; }@ (in @(a, b) => { return a + b; }@)
+    JSConciseFunctionBody !JSBlock
+  | -- | A concise expression body (implicit return of the expression value).
+    --
+    -- Fields: body expression.
+    --
+    -- JavaScript: @a + b@ (in @(a, b) => a + b@)
+    JSConciseExpressionBody !JSExpression
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | JavaScript binary operators.
+--
+-- Each constructor carries a 'JSAnnot' for the operator token's position
+-- and surrounding whitespace\/comments.
 data JSBinOp
-  = JSBinOpAnd !JSAnnot
-  | JSBinOpBitAnd !JSAnnot
-  | JSBinOpBitOr !JSAnnot
-  | JSBinOpBitXor !JSAnnot
-  | JSBinOpDivide !JSAnnot
-  | JSBinOpEq !JSAnnot
-  | JSBinOpExponentiation !JSAnnot
-  | JSBinOpGe !JSAnnot
-  | JSBinOpGt !JSAnnot
-  | JSBinOpIn !JSAnnot
-  | JSBinOpInstanceOf !JSAnnot
-  | JSBinOpLe !JSAnnot
-  | JSBinOpLsh !JSAnnot
-  | JSBinOpLt !JSAnnot
-  | JSBinOpMinus !JSAnnot
-  | JSBinOpMod !JSAnnot
-  | JSBinOpNeq !JSAnnot
-  | JSBinOpOf !JSAnnot
-  | JSBinOpOr !JSAnnot
-  | JSBinOpNullishCoalescing !JSAnnot
-  | JSBinOpPlus !JSAnnot
-  | JSBinOpRsh !JSAnnot
-  | JSBinOpStrictEq !JSAnnot
-  | JSBinOpStrictNeq !JSAnnot
-  | JSBinOpTimes !JSAnnot
-  | JSBinOpUrsh !JSAnnot
+  = -- | Logical AND operator (@&&@). Short-circuits: right operand not evaluated if left is falsy.
+    JSBinOpAnd !JSAnnot
+  | -- | Bitwise AND operator (@&@). Performs bitwise AND on integer operands.
+    JSBinOpBitAnd !JSAnnot
+  | -- | Bitwise OR operator (@|@). Performs bitwise OR on integer operands.
+    JSBinOpBitOr !JSAnnot
+  | -- | Bitwise XOR operator (@^@). Performs bitwise exclusive OR on integer operands.
+    JSBinOpBitXor !JSAnnot
+  | -- | Division operator (@\/@).
+    JSBinOpDivide !JSAnnot
+  | -- | Loose equality operator (@==@). Performs type coercion before comparison.
+    JSBinOpEq !JSAnnot
+  | -- | Exponentiation operator (@**@, ES2016). Equivalent to @Math.pow@.
+    JSBinOpExponentiation !JSAnnot
+  | -- | Greater-than-or-equal operator (@>=@).
+    JSBinOpGe !JSAnnot
+  | -- | Greater-than operator (@>@).
+    JSBinOpGt !JSAnnot
+  | -- | The @in@ operator. Tests whether a property exists in an object.
+    JSBinOpIn !JSAnnot
+  | -- | The @instanceof@ operator. Tests prototype chain membership.
+    JSBinOpInstanceOf !JSAnnot
+  | -- | Less-than-or-equal operator (@\<=@).
+    JSBinOpLe !JSAnnot
+  | -- | Left shift operator (@\<\<@). Shifts bits left, filling with zeros.
+    JSBinOpLsh !JSAnnot
+  | -- | Less-than operator (@\<@).
+    JSBinOpLt !JSAnnot
+  | -- | Subtraction operator (@-@).
+    JSBinOpMinus !JSAnnot
+  | -- | Remainder (modulo) operator (@%@).
+    JSBinOpMod !JSAnnot
+  | -- | Loose inequality operator (@!=@). Performs type coercion before comparison.
+    JSBinOpNeq !JSAnnot
+  | -- | The @of@ keyword used as an operator in @for...of@ loops.
+    JSBinOpOf !JSAnnot
+  | -- | Logical OR operator (@||@). Short-circuits: right operand not evaluated if left is truthy.
+    JSBinOpOr !JSAnnot
+  | -- | Nullish coalescing operator (@??@, ES2020). Returns right operand when left is @null@ or @undefined@.
+    JSBinOpNullishCoalescing !JSAnnot
+  | -- | Addition operator (@+@). Also performs string concatenation.
+    JSBinOpPlus !JSAnnot
+  | -- | Signed right shift operator (@>>@). Shifts bits right, preserving sign.
+    JSBinOpRsh !JSAnnot
+  | -- | Strict equality operator (@===@). No type coercion.
+    JSBinOpStrictEq !JSAnnot
+  | -- | Strict inequality operator (@!==@). No type coercion.
+    JSBinOpStrictNeq !JSAnnot
+  | -- | Multiplication operator (@*@).
+    JSBinOpTimes !JSAnnot
+  | -- | Unsigned right shift operator (@>>>@). Shifts bits right, filling with zeros.
+    JSBinOpUrsh !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | JavaScript unary operators (prefix and postfix).
+--
+-- Used in both prefix (@++x@, @!x@) and postfix (@x++@, @x--@) positions.
+-- Each constructor carries a 'JSAnnot' for the operator token's position.
 data JSUnaryOp
-  = JSUnaryOpDecr !JSAnnot
-  | JSUnaryOpDelete !JSAnnot
-  | JSUnaryOpIncr !JSAnnot
-  | JSUnaryOpMinus !JSAnnot
-  | JSUnaryOpNot !JSAnnot
-  | JSUnaryOpPlus !JSAnnot
-  | JSUnaryOpTilde !JSAnnot
-  | JSUnaryOpTypeof !JSAnnot
-  | JSUnaryOpVoid !JSAnnot
+  = -- | Decrement operator (@--@). Used as prefix (@--x@) or postfix (@x--@).
+    JSUnaryOpDecr !JSAnnot
+  | -- | The @delete@ operator. Removes a property from an object.
+    JSUnaryOpDelete !JSAnnot
+  | -- | Increment operator (@++@). Used as prefix (@++x@) or postfix (@x++@).
+    JSUnaryOpIncr !JSAnnot
+  | -- | Unary negation operator (@-@). Negates its numeric operand.
+    JSUnaryOpMinus !JSAnnot
+  | -- | Logical NOT operator (@!@). Returns @true@ if operand is falsy.
+    JSUnaryOpNot !JSAnnot
+  | -- | Unary plus operator (@+@). Attempts to convert operand to a number.
+    JSUnaryOpPlus !JSAnnot
+  | -- | Bitwise NOT operator (@~@). Inverts all bits of its operand.
+    JSUnaryOpTilde !JSAnnot
+  | -- | The @typeof@ operator. Returns a string indicating the type of its operand.
+    JSUnaryOpTypeof !JSAnnot
+  | -- | The @void@ operator. Evaluates expression and returns @undefined@.
+    JSUnaryOpVoid !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | Semicolon representation, distinguishing explicit from automatically
+-- inserted semicolons (ASI).
 data JSSemi
-  = JSSemi !JSAnnot
-  | JSSemiAuto
+  = -- | An explicit semicolon token present in the source.
+    --
+    -- Fields: semicolon token annotation.
+    --
+    -- JavaScript: the @;@ in @var x = 1;@
+    JSSemi !JSAnnot
+  | -- | An automatically inserted semicolon (ASI).
+    --
+    -- Represents a semicolon that was not present in the source but was
+    -- inferred by JavaScript's automatic semicolon insertion rules.
+    --
+    -- JavaScript: the implicit @;@ after @return x@ when followed by a newline
+    JSSemiAuto
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | JavaScript assignment operators.
+--
+-- Includes simple assignment and all compound assignment operators.
+-- Each constructor carries a 'JSAnnot' for the operator token's position.
 data JSAssignOp
-  = JSAssign !JSAnnot
-  | JSTimesAssign !JSAnnot
-  | JSDivideAssign !JSAnnot
-  | JSModAssign !JSAnnot
-  | JSPlusAssign !JSAnnot
-  | JSMinusAssign !JSAnnot
-  | JSLshAssign !JSAnnot
-  | JSRshAssign !JSAnnot
-  | JSUrshAssign !JSAnnot
-  | JSBwAndAssign !JSAnnot
-  | JSBwXorAssign !JSAnnot
-  | JSBwOrAssign !JSAnnot
-  | JSLogicalAndAssign !JSAnnot -- &&=
-  | JSLogicalOrAssign !JSAnnot
-  | -- | |=
-    JSNullishAssign !JSAnnot -- ??=
-  | JSExponentiationAssign !JSAnnot -- **=
+  = -- | Simple assignment operator (@=@).
+    JSAssign !JSAnnot
+  | -- | Multiplication assignment operator (@*=@).
+    JSTimesAssign !JSAnnot
+  | -- | Division assignment operator (@\/=@).
+    JSDivideAssign !JSAnnot
+  | -- | Remainder assignment operator (@%=@).
+    JSModAssign !JSAnnot
+  | -- | Addition assignment operator (@+=@).
+    JSPlusAssign !JSAnnot
+  | -- | Subtraction assignment operator (@-=@).
+    JSMinusAssign !JSAnnot
+  | -- | Left shift assignment operator (@\<\<=@).
+    JSLshAssign !JSAnnot
+  | -- | Signed right shift assignment operator (@>>=@).
+    JSRshAssign !JSAnnot
+  | -- | Unsigned right shift assignment operator (@>>>=@).
+    JSUrshAssign !JSAnnot
+  | -- | Bitwise AND assignment operator (@&=@).
+    JSBwAndAssign !JSAnnot
+  | -- | Bitwise XOR assignment operator (@^=@).
+    JSBwXorAssign !JSAnnot
+  | -- | Bitwise OR assignment operator (@|=@).
+    JSBwOrAssign !JSAnnot
+  | -- | Logical AND assignment operator (@&&=@, ES2021). Assigns only if left operand is truthy.
+    JSLogicalAndAssign !JSAnnot
+  | -- | Logical OR assignment operator (@||=@, ES2021). Assigns only if left operand is falsy.
+    JSLogicalOrAssign !JSAnnot
+  | -- | Nullish coalescing assignment operator (@??=@, ES2021). Assigns only if left is @null@\/@undefined@.
+    JSNullishAssign !JSAnnot
+  | -- | Exponentiation assignment operator (@**=@, ES2016).
+    JSExponentiationAssign !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A @catch@ clause in a @try@ statement.
 data JSTryCatch
-  = -- | catch,lb,ident,rb,block
+  = -- | A standard @catch@ clause with a parameter binding.
+    --
+    -- Fields: @catch@ annotation, opening paren, catch parameter expression,
+    -- closing paren, catch body block.
+    --
+    -- JavaScript: @catch (e) { handleError(e); }@
     JSCatch !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSBlock
-  | -- | catch,lb,ident,if,expr,rb,block
+  | -- | A conditional @catch@ clause (Mozilla extension, non-standard).
+    --
+    -- Fields: @catch@ annotation, opening paren, catch parameter, @if@
+    -- annotation, guard expression, closing paren, catch body block.
+    --
+    -- JavaScript: @catch (e if e instanceof TypeError) { ... }@
     JSCatchIf !JSAnnot !JSAnnot !JSExpression !JSAnnot !JSExpression !JSAnnot !JSBlock
-  | -- | catch,block (ES2019 optional catch binding)
+  | -- | A @catch@ clause without a parameter binding (ES2019 optional catch binding).
+    --
+    -- Fields: @catch@ annotation, catch body block.
+    --
+    -- JavaScript: @catch { handleError(); }@
     JSCatchNoParam !JSAnnot !JSBlock
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An optional @finally@ clause in a @try@ statement.
 data JSTryFinally
-  = -- | finally,block
+  = -- | A @finally@ clause that always executes after try\/catch.
+    --
+    -- Fields: @finally@ annotation, finally body block.
+    --
+    -- JavaScript: @finally { cleanup(); }@
     JSFinally !JSAnnot !JSBlock
-  | JSNoFinally
+  | -- | No @finally@ clause present.
+    JSNoFinally
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A brace-delimited block of statements.
+--
+-- Used for function bodies, control flow bodies, and standalone blocks.
 data JSBlock
-  = -- | lbrace, stmts, rbrace
+  = -- | A block statement enclosed in braces.
+    --
+    -- Fields: opening brace annotation, list of statements, closing brace
+    -- annotation.
+    --
+    -- JavaScript: @{ stmt1; stmt2; }@
     JSBlock !JSAnnot ![JSStatement] !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A @case@ or @default@ clause within a @switch@ statement body.
 data JSSwitchParts
-  = -- | expr,colon,stmtlist
+  = -- | A @case@ clause matching a specific value.
+    --
+    -- Fields: @case@ annotation, match expression, colon annotation,
+    -- consequent statements.
+    --
+    -- JavaScript: @case 42: doSomething(); break;@
     JSCase !JSAnnot !JSExpression !JSAnnot ![JSStatement]
-  | -- | colon,stmtlist
+  | -- | A @default@ clause (fallback when no case matches).
+    --
+    -- Fields: @default@ annotation, colon annotation, consequent statements.
+    --
+    -- JavaScript: @default: handleDefault(); break;@
     JSDefault !JSAnnot !JSAnnot ![JSStatement]
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An optional variable initializer (the @= value@ part of a declaration).
 data JSVarInitializer
-  = -- | assignop, initializer
+  = -- | An initializer with an equals sign and expression.
+    --
+    -- Fields: equals sign annotation, initializer expression.
+    --
+    -- JavaScript: @= 42@ (in @var x = 42;@)
     JSVarInit !JSAnnot !JSExpression
-  | JSVarInitNone
+  | -- | No initializer present (variable declared without assignment).
+    --
+    -- JavaScript: @var x;@ (the @x@ has no initializer)
+    JSVarInitNone
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A property definition within an object literal.
 data JSObjectProperty
-  = -- | name, colon, value
+  = -- | A key-value property with explicit colon syntax.
+    --
+    -- Fields: property name, colon annotation, value expressions.
+    --
+    -- JavaScript: @key: value@ (in @{ key: value }@)
     JSPropertyNameandValue !JSPropertyName !JSAnnot ![JSExpression]
-  | JSPropertyIdentRef !JSAnnot !ByteString
-  | JSObjectMethod !JSMethodDefinition
-  | -- | ..., expression
+  | -- | A shorthand property using an identifier reference (ES2015).
+    --
+    -- Fields: annotation, identifier name. The property name and value
+    -- are both the same identifier.
+    --
+    -- JavaScript: @x@ (in @{ x }@, equivalent to @{ x: x }@)
+    JSPropertyIdentRef !JSAnnot !ByteString
+  | -- | A method definition within an object literal.
+    --
+    -- JavaScript: @method() {}@ (in @{ method() {} }@)
+    JSObjectMethod !JSMethodDefinition
+  | -- | A spread property (ES2018 object spread).
+    --
+    -- Fields: @...@ annotation, spread operand expression.
+    --
+    -- JavaScript: @...other@ (in @{ ...other, x: 1 }@)
     JSObjectSpread !JSAnnot !JSExpression
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A method definition, used in object literals and class bodies.
 data JSMethodDefinition
-  = JSMethodDefinition !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock -- name, lb, params, rb, block
-  | -- | *, name, lb, params, rb, block
+  = -- | A regular method definition.
+    --
+    -- Fields: method name, opening paren, parameter list, closing paren,
+    -- method body block.
+    --
+    -- JavaScript: @foo(a, b) { return a + b; }@
+    JSMethodDefinition !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
+  | -- | A generator method definition.
+    --
+    -- Fields: star annotation, method name, opening paren, parameter list,
+    -- closing paren, method body block.
+    --
+    -- JavaScript: @*items() { yield 1; yield 2; }@
     JSGeneratorMethodDefinition !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | async, name, lb, params, rb, block
+  | -- | An async method definition.
+    --
+    -- Fields: @async@ annotation, method name, opening paren, parameter list,
+    -- closing paren, method body block.
+    --
+    -- JavaScript: @async fetch(url) { return await fetch(url); }@
     JSAsyncMethodDefinition !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | get/set, name, lb, params, rb, block
+  | -- | A getter or setter accessor method.
+    --
+    -- Fields: accessor type (get\/set), property name, opening paren,
+    -- parameter list, closing paren, method body block.
+    --
+    -- JavaScript: @get name() { return this._name; }@, @set name(v) { this._name = v; }@
     JSPropertyAccessor !JSAccessor !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | The name of a property in an object literal, class method, or similar context.
 data JSPropertyName
-  = JSPropertyIdent !JSAnnot !ByteString
-  | JSPropertyString !JSAnnot !ByteString
-  | JSPropertyNumber !JSAnnot !ByteString
-  | -- | lb, expr, rb
+  = -- | An identifier property name.
+    --
+    -- Fields: annotation, identifier name.
+    --
+    -- JavaScript: @foo@ (in @{ foo: 1 }@)
+    JSPropertyIdent !JSAnnot !ByteString
+  | -- | A string literal property name.
+    --
+    -- Fields: annotation, string content (including quotes).
+    --
+    -- JavaScript: @"foo"@ (in @{ "foo": 1 }@)
+    JSPropertyString !JSAnnot !ByteString
+  | -- | A numeric literal property name.
+    --
+    -- Fields: annotation, numeric literal text.
+    --
+    -- JavaScript: @42@ (in @{ 42: "answer" }@)
+    JSPropertyNumber !JSAnnot !ByteString
+  | -- | A computed property name (ES2015).
+    --
+    -- Fields: opening bracket annotation, name expression, closing bracket
+    -- annotation.
+    --
+    -- JavaScript: @[expr]@ (in @{ [Symbol.iterator]() {} }@)
     JSPropertyComputed !JSAnnot !JSExpression !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
 type JSObjectPropertyList = JSCommaTrailingList JSObjectProperty
 
--- | Accessors for JSObjectProperty is either 'get' or 'set'.
+-- | Accessor type for getter and setter property definitions.
 data JSAccessor
-  = JSAccessorGet !JSAnnot
-  | JSAccessorSet !JSAnnot
+  = -- | A getter accessor (@get@). Defines a property that is read by calling a function.
+    --
+    -- JavaScript: @get@ (in @get name() { return this._name; }@)
+    JSAccessorGet !JSAnnot
+  | -- | A setter accessor (@set@). Defines a property that is written by calling a function.
+    --
+    -- JavaScript: @set@ (in @set name(v) { this._name = v; }@)
+    JSAccessorSet !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An optional identifier, used where a name may or may not be present
+-- (e.g. function names, break\/continue labels, class names).
 data JSIdent
-  = JSIdentName !JSAnnot !ByteString
-  | JSIdentNone
+  = -- | A named identifier.
+    --
+    -- Fields: annotation, identifier name as raw bytes.
+    --
+    -- JavaScript: @foo@ (in @function foo() {}@)
+    JSIdentName !JSAnnot !ByteString
+  | -- | No identifier present (anonymous function, unlabelled break, etc.).
+    --
+    -- JavaScript: the absent name in @function() {}@ or @break;@
+    JSIdentNone
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An element within an array literal, which may be an expression or
+-- an elision (hole).
 data JSArrayElement
-  = JSArrayElement !JSExpression
-  | JSArrayComma !JSAnnot
+  = -- | An array element containing an expression.
+    --
+    -- Fields: element expression.
+    --
+    -- JavaScript: @42@ (in @[42, "hello"]@)
+    JSArrayElement !JSExpression
+  | -- | An elision (hole) represented by a comma without a preceding expression.
+    --
+    -- Fields: comma annotation.
+    --
+    -- JavaScript: the missing element in @[1, , 3]@ (the gap between commas)
+    JSArrayComma !JSAnnot
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A comma-separated list that preserves comma annotations.
+--
+-- Represents zero or more elements separated by commas, as found in
+-- function parameter lists, argument lists, variable declarations, etc.
+-- Use 'fromCommaList' to convert to a regular Haskell list.
 data JSCommaList a
-  = -- | head, comma, a
+  = -- | A list with at least two elements: a head list, a comma, and a
+    -- tail element.
+    --
+    -- Fields: preceding comma list, comma annotation, last element.
+    --
+    -- JavaScript: @a, b, c@ is represented as @JSLCons (JSLCons (JSLOne a) comma b) comma c@
     JSLCons !(JSCommaList a) !JSAnnot !a
-  | -- | single element (no comma)
+  | -- | A single-element list (no comma).
+    --
+    -- Fields: the single element.
+    --
+    -- JavaScript: @x@ (a list with exactly one item)
     JSLOne !a
-  | JSLNil
+  | -- | An empty list (no elements).
+    --
+    -- JavaScript: the empty parameter list in @function() {}@
+    JSLNil
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A comma-separated list that may have a trailing comma.
+--
+-- Used for object properties and other contexts where JavaScript allows
+-- an optional trailing comma after the last element.
 data JSCommaTrailingList a
-  = -- | list, trailing comma
+  = -- | A list with a trailing comma after the last element.
+    --
+    -- Fields: comma list of elements, trailing comma annotation.
+    --
+    -- JavaScript: @a, b, c,@ (note the trailing comma)
     JSCTLComma !(JSCommaList a) !JSAnnot
-  | -- | list
+  | -- | A list without a trailing comma.
+    --
+    -- Fields: comma list of elements.
+    --
+    -- JavaScript: @a, b, c@ (no trailing comma)
     JSCTLNone !(JSCommaList a)
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | A part of a template literal containing an interpolated expression
+-- followed by a string suffix.
 data JSTemplatePart
-  = -- | expr, rb, suffix
+  = -- | An interpolated expression within a template literal.
+    --
+    -- Fields: interpolated expression (between @${@ and @}@), closing brace
+    -- annotation, string suffix (text after @}@ until the next @${@ or
+    -- closing backtick).
+    --
+    -- JavaScript: @${name} world@ (in @\`hello ${name} world\`@)
     JSTemplatePart !JSExpression !JSAnnot !ByteString
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An optional class heritage (extends) clause.
 data JSClassHeritage
-  = JSExtends !JSAnnot !JSExpression
-  | JSExtendsNone
+  = -- | An @extends@ clause specifying a superclass.
+    --
+    -- Fields: @extends@ annotation, superclass expression.
+    --
+    -- JavaScript: @extends BaseClass@ (in @class Foo extends BaseClass {}@)
+    JSExtends !JSAnnot !JSExpression
+  | -- | No @extends@ clause (class has no explicit superclass).
+    --
+    -- JavaScript: @class Foo {}@ (no extends)
+    JSExtendsNone
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
+-- | An element within a class body (method, field, or static block).
 data JSClassElement
-  = JSClassInstanceMethod !JSMethodDefinition
-  | JSClassStaticMethod !JSAnnot !JSMethodDefinition
-  | JSClassSemi !JSAnnot
-  | -- | #, name, =, optional initializer, autosemi
+  = -- | An instance method definition.
+    --
+    -- JavaScript: @method() {}@ (in a class body)
+    JSClassInstanceMethod !JSMethodDefinition
+  | -- | A static method definition.
+    --
+    -- Fields: @static@ annotation, method definition.
+    --
+    -- JavaScript: @static create() { return new this(); }@
+    JSClassStaticMethod !JSAnnot !JSMethodDefinition
+  | -- | An empty class element (bare semicolon in class body).
+    --
+    -- Fields: semicolon annotation.
+    --
+    -- JavaScript: @;@ (in a class body)
+    JSClassSemi !JSAnnot
+  | -- | A private instance field (ES2022).
+    --
+    -- Fields: hash annotation, field name (without @#@), equals annotation,
+    -- optional initializer expression, auto-semicolon.
+    --
+    -- JavaScript: @#count = 0;@
     JSPrivateField !JSAnnot !ByteString !JSAnnot !(Maybe JSExpression) !JSSemi
-  | -- | #, name, lb, params, rb, block
+  | -- | A private instance method (ES2022).
+    --
+    -- Fields: hash annotation, method name (without @#@), opening paren,
+    -- parameter list, closing paren, method body block.
+    --
+    -- JavaScript: @#validate(input) { ... }@
     JSPrivateMethod !JSAnnot !ByteString !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | get/set, #, name, lb, params, rb, block
+  | -- | A private getter or setter accessor (ES2022).
+    --
+    -- Fields: accessor type (get\/set), hash annotation, field name
+    -- (without @#@), opening paren, parameter list, closing paren, body block.
+    --
+    -- JavaScript: @get #value() { return this.#_value; }@
     JSPrivateAccessor !JSAccessor !JSAnnot !ByteString !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
-  | -- | name, =, optional initializer, autosemi
+  | -- | A public instance field (ES2022).
+    --
+    -- Fields: field name, equals annotation, optional initializer expression,
+    -- auto-semicolon.
+    --
+    -- JavaScript: @count = 0;@ (in a class body)
     JSClassField !JSPropertyName !JSAnnot !(Maybe JSExpression) !JSSemi
-  | -- | static, name, =, optional initializer, autosemi
+  | -- | A static field (ES2022).
+    --
+    -- Fields: @static@ annotation, field name, equals annotation, optional
+    -- initializer expression, auto-semicolon.
+    --
+    -- JavaScript: @static defaultValue = 42;@
     JSClassStaticField !JSAnnot !JSPropertyName !JSAnnot !(Maybe JSExpression) !JSSemi
-  | -- | static, block
+  | -- | A static initialization block (ES2022).
+    --
+    -- Fields: @static@ annotation, block body.
+    --
+    -- JavaScript: @static { this.initialize(); }@
     JSClassStaticBlock !JSAnnot !JSBlock
-  | -- | async, *, name, lb, params, rb, block
+  | -- | An async generator method definition in a class body.
+    --
+    -- Fields: @async@ annotation, star annotation, method name, opening paren,
+    -- parameter list, closing paren, method body block.
+    --
+    -- JavaScript: @async *stream() { yield await fetch(url); }@
     JSAsyncGeneratorMethodDefinition !JSAnnot !JSAnnot !JSPropertyName !JSAnnot !(JSCommaList JSExpression) !JSAnnot !JSBlock
   deriving (Data, Eq, Generic, NFData, Show, Typeable)
 
@@ -608,7 +1525,13 @@ class HasAnnot a where
   -- | Apply a function to every JSAnnot in the structure.
   mapAnnot :: (JSAnnot -> JSAnnot) -> a -> a
   -- | Collect values from every JSAnnot in the structure.
+  -- Uses difference lists internally for O(n) instead of O(n²) concatenation.
   foldAnnot :: (JSAnnot -> [b]) -> a -> [b]
+  foldAnnot f x = foldAnnotDL f x []
+  -- | Difference list version of 'foldAnnot' for O(n) accumulation.
+  foldAnnotDL :: (JSAnnot -> [b]) -> a -> [b] -> [b]
+  foldAnnotDL f x rest = foldAnnot f x ++ rest
+  {-# MINIMAL mapAnnot, (foldAnnot | foldAnnotDL) #-}
 
 instance HasAnnot JSAnnot where
   mapAnnot f a = f a
@@ -743,92 +1666,92 @@ instance HasAnnot JSIdent where
 instance HasAnnot JSVarInitializer where
   mapAnnot f (JSVarInit a e) = JSVarInit (f a) (mapAnnot f e)
   mapAnnot _ JSVarInitNone = JSVarInitNone
-  foldAnnot f (JSVarInit a e) = f a ++ foldAnnot f e
-  foldAnnot _ JSVarInitNone = []
+  foldAnnotDL f (JSVarInit a e) rest = f a ++ foldAnnotDL f e rest
+  foldAnnotDL _ JSVarInitNone rest = rest
 
 instance HasAnnot JSClassHeritage where
   mapAnnot f (JSExtends a e) = JSExtends (f a) (mapAnnot f e)
   mapAnnot _ JSExtendsNone = JSExtendsNone
-  foldAnnot f (JSExtends a e) = f a ++ foldAnnot f e
-  foldAnnot _ JSExtendsNone = []
+  foldAnnotDL f (JSExtends a e) rest = f a ++ foldAnnotDL f e rest
+  foldAnnotDL _ JSExtendsNone rest = rest
 
 instance HasAnnot JSTryFinally where
   mapAnnot f (JSFinally a b) = JSFinally (f a) (mapAnnot f b)
   mapAnnot _ JSNoFinally = JSNoFinally
-  foldAnnot f (JSFinally a b) = f a ++ foldAnnot f b
-  foldAnnot _ JSNoFinally = []
+  foldAnnotDL f (JSFinally a b) rest = f a ++ foldAnnotDL f b rest
+  foldAnnotDL _ JSNoFinally rest = rest
 
 instance HasAnnot JSBlock where
   mapAnnot f (JSBlock a1 stmts a2) = JSBlock (f a1) (map (mapAnnot f) stmts) (f a2)
-  foldAnnot f (JSBlock a1 stmts a2) = f a1 ++ concatMap (foldAnnot f) stmts ++ f a2
+  foldAnnotDL f (JSBlock a1 stmts a2) rest = f a1 ++ foldr (foldAnnotDL f) (f a2 ++ rest) stmts
 
 instance HasAnnot a => HasAnnot (JSCommaList a) where
   mapAnnot f (JSLCons xs a x) = JSLCons (mapAnnot f xs) (f a) (mapAnnot f x)
   mapAnnot f (JSLOne x) = JSLOne (mapAnnot f x)
   mapAnnot _ JSLNil = JSLNil
-  foldAnnot f (JSLCons xs a x) = foldAnnot f xs ++ f a ++ foldAnnot f x
-  foldAnnot f (JSLOne x) = foldAnnot f x
-  foldAnnot _ JSLNil = []
+  foldAnnotDL f (JSLCons xs a x) rest = foldAnnotDL f xs (f a ++ foldAnnotDL f x rest)
+  foldAnnotDL f (JSLOne x) rest = foldAnnotDL f x rest
+  foldAnnotDL _ JSLNil rest = rest
 
 instance HasAnnot a => HasAnnot (JSCommaTrailingList a) where
   mapAnnot f (JSCTLComma xs a) = JSCTLComma (mapAnnot f xs) (f a)
   mapAnnot f (JSCTLNone xs) = JSCTLNone (mapAnnot f xs)
-  foldAnnot f (JSCTLComma xs a) = foldAnnot f xs ++ f a
-  foldAnnot f (JSCTLNone xs) = foldAnnot f xs
+  foldAnnotDL f (JSCTLComma xs a) rest = foldAnnotDL f xs (f a ++ rest)
+  foldAnnotDL f (JSCTLNone xs) rest = foldAnnotDL f xs rest
 
 instance HasAnnot JSArrayElement where
   mapAnnot f (JSArrayElement e) = JSArrayElement (mapAnnot f e)
   mapAnnot f (JSArrayComma a) = JSArrayComma (f a)
-  foldAnnot f (JSArrayElement e) = foldAnnot f e
-  foldAnnot f (JSArrayComma a) = f a
+  foldAnnotDL f (JSArrayElement e) rest = foldAnnotDL f e rest
+  foldAnnotDL f (JSArrayComma a) rest = f a ++ rest
 
 instance HasAnnot JSTemplatePart where
   mapAnnot f (JSTemplatePart e a s) = JSTemplatePart (mapAnnot f e) (f a) s
-  foldAnnot f (JSTemplatePart e a _) = foldAnnot f e ++ f a
+  foldAnnotDL f (JSTemplatePart e a _) rest = foldAnnotDL f e (f a ++ rest)
 
 instance HasAnnot JSSwitchParts where
   mapAnnot f (JSCase a1 e a2 stmts) = JSCase (f a1) (mapAnnot f e) (f a2) (map (mapAnnot f) stmts)
   mapAnnot f (JSDefault a1 a2 stmts) = JSDefault (f a1) (f a2) (map (mapAnnot f) stmts)
-  foldAnnot f (JSCase a1 e a2 stmts) = f a1 ++ foldAnnot f e ++ f a2 ++ concatMap (foldAnnot f) stmts
-  foldAnnot f (JSDefault a1 a2 stmts) = f a1 ++ f a2 ++ concatMap (foldAnnot f) stmts
+  foldAnnotDL f (JSCase a1 e a2 stmts) rest = f a1 ++ foldAnnotDL f e (f a2 ++ foldr (foldAnnotDL f) rest stmts)
+  foldAnnotDL f (JSDefault a1 a2 stmts) rest = f a1 ++ f a2 ++ foldr (foldAnnotDL f) rest stmts
 
 instance HasAnnot JSTryCatch where
   mapAnnot f (JSCatch a1 a2 e a3 b) = JSCatch (f a1) (f a2) (mapAnnot f e) (f a3) (mapAnnot f b)
   mapAnnot f (JSCatchIf a1 a2 e1 a3 e2 a4 b) = JSCatchIf (f a1) (f a2) (mapAnnot f e1) (f a3) (mapAnnot f e2) (f a4) (mapAnnot f b)
   mapAnnot f (JSCatchNoParam a1 b) = JSCatchNoParam (f a1) (mapAnnot f b)
-  foldAnnot f (JSCatch a1 a2 e a3 b) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f b
-  foldAnnot f (JSCatchIf a1 a2 e1 a3 e2 a4 b) = f a1 ++ f a2 ++ foldAnnot f e1 ++ f a3 ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f b
-  foldAnnot f (JSCatchNoParam a1 b) = f a1 ++ foldAnnot f b
+  foldAnnotDL f (JSCatch a1 a2 e a3 b) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ foldAnnotDL f b rest)
+  foldAnnotDL f (JSCatchIf a1 a2 e1 a3 e2 a4 b) rest = f a1 ++ f a2 ++ foldAnnotDL f e1 (f a3 ++ foldAnnotDL f e2 (f a4 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSCatchNoParam a1 b) rest = f a1 ++ foldAnnotDL f b rest
 
 instance HasAnnot JSPropertyName where
   mapAnnot f (JSPropertyIdent a s) = JSPropertyIdent (f a) s
   mapAnnot f (JSPropertyString a s) = JSPropertyString (f a) s
   mapAnnot f (JSPropertyNumber a s) = JSPropertyNumber (f a) s
   mapAnnot f (JSPropertyComputed a1 e a2) = JSPropertyComputed (f a1) (mapAnnot f e) (f a2)
-  foldAnnot f (JSPropertyIdent a _) = f a
-  foldAnnot f (JSPropertyString a _) = f a
-  foldAnnot f (JSPropertyNumber a _) = f a
-  foldAnnot f (JSPropertyComputed a1 e a2) = f a1 ++ foldAnnot f e ++ f a2
+  foldAnnotDL f (JSPropertyIdent a _) rest = f a ++ rest
+  foldAnnotDL f (JSPropertyString a _) rest = f a ++ rest
+  foldAnnotDL f (JSPropertyNumber a _) rest = f a ++ rest
+  foldAnnotDL f (JSPropertyComputed a1 e a2) rest = f a1 ++ foldAnnotDL f e (f a2 ++ rest)
 
 instance HasAnnot JSObjectProperty where
   mapAnnot f (JSPropertyNameandValue n a es) = JSPropertyNameandValue (mapAnnot f n) (f a) (map (mapAnnot f) es)
   mapAnnot f (JSPropertyIdentRef a s) = JSPropertyIdentRef (f a) s
   mapAnnot f (JSObjectMethod m) = JSObjectMethod (mapAnnot f m)
   mapAnnot f (JSObjectSpread a e) = JSObjectSpread (f a) (mapAnnot f e)
-  foldAnnot f (JSPropertyNameandValue n a es) = foldAnnot f n ++ f a ++ concatMap (foldAnnot f) es
-  foldAnnot f (JSPropertyIdentRef a _) = f a
-  foldAnnot f (JSObjectMethod m) = foldAnnot f m
-  foldAnnot f (JSObjectSpread a e) = f a ++ foldAnnot f e
+  foldAnnotDL f (JSPropertyNameandValue n a es) rest = foldAnnotDL f n (f a ++ foldr (foldAnnotDL f) rest es)
+  foldAnnotDL f (JSPropertyIdentRef a _) rest = f a ++ rest
+  foldAnnotDL f (JSObjectMethod m) rest = foldAnnotDL f m rest
+  foldAnnotDL f (JSObjectSpread a e) rest = f a ++ foldAnnotDL f e rest
 
 instance HasAnnot JSMethodDefinition where
   mapAnnot f (JSMethodDefinition n a1 ps a2 b) = JSMethodDefinition (mapAnnot f n) (f a1) (mapAnnot f ps) (f a2) (mapAnnot f b)
   mapAnnot f (JSGeneratorMethodDefinition a1 n a2 ps a3 b) = JSGeneratorMethodDefinition (f a1) (mapAnnot f n) (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
   mapAnnot f (JSAsyncMethodDefinition a1 n a2 ps a3 b) = JSAsyncMethodDefinition (f a1) (mapAnnot f n) (f a2) (mapAnnot f ps) (f a3) (mapAnnot f b)
   mapAnnot f (JSPropertyAccessor acc n a1 ps a2 b) = JSPropertyAccessor (mapAnnot f acc) (mapAnnot f n) (f a1) (mapAnnot f ps) (f a2) (mapAnnot f b)
-  foldAnnot f (JSMethodDefinition n a1 ps a2 b) = foldAnnot f n ++ f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
-  foldAnnot f (JSGeneratorMethodDefinition a1 n a2 ps a3 b) = f a1 ++ foldAnnot f n ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
-  foldAnnot f (JSAsyncMethodDefinition a1 n a2 ps a3 b) = f a1 ++ foldAnnot f n ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
-  foldAnnot f (JSPropertyAccessor acc n a1 ps a2 b) = foldAnnot f acc ++ foldAnnot f n ++ f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
+  foldAnnotDL f (JSMethodDefinition n a1 ps a2 b) rest = foldAnnotDL f n (f a1 ++ foldAnnotDL f ps (f a2 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSGeneratorMethodDefinition a1 n a2 ps a3 b) rest = f a1 ++ foldAnnotDL f n (f a2 ++ foldAnnotDL f ps (f a3 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSAsyncMethodDefinition a1 n a2 ps a3 b) rest = f a1 ++ foldAnnotDL f n (f a2 ++ foldAnnotDL f ps (f a3 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSPropertyAccessor acc n a1 ps a2 b) rest = foldAnnotDL f acc (foldAnnotDL f n (f a1 ++ foldAnnotDL f ps (f a2 ++ foldAnnotDL f b rest)))
 
 instance HasAnnot JSClassElement where
   mapAnnot f (JSClassInstanceMethod m) = JSClassInstanceMethod (mapAnnot f m)
@@ -841,54 +1764,54 @@ instance HasAnnot JSClassElement where
   mapAnnot f (JSClassStaticField a1 n a2 mi semi) = JSClassStaticField (f a1) (mapAnnot f n) (f a2) (fmap (mapAnnot f) mi) (mapAnnot f semi)
   mapAnnot f (JSClassStaticBlock a b) = JSClassStaticBlock (f a) (mapAnnot f b)
   mapAnnot f (JSAsyncGeneratorMethodDefinition a1 a2 n a3 ps a4 b) = JSAsyncGeneratorMethodDefinition (f a1) (f a2) (mapAnnot f n) (f a3) (mapAnnot f ps) (f a4) (mapAnnot f b)
-  foldAnnot f (JSClassInstanceMethod m) = foldAnnot f m
-  foldAnnot f (JSClassStaticMethod a m) = f a ++ foldAnnot f m
-  foldAnnot f (JSClassSemi a) = f a
-  foldAnnot f (JSPrivateField a1 _ a2 mi semi) = f a1 ++ f a2 ++ maybe [] (foldAnnot f) mi ++ foldAnnot f semi
-  foldAnnot f (JSPrivateMethod a1 _ a2 ps a3 b) = f a1 ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
-  foldAnnot f (JSPrivateAccessor acc a1 _ a2 ps a3 b) = foldAnnot f acc ++ f a1 ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
-  foldAnnot f (JSClassField n a mi semi) = foldAnnot f n ++ f a ++ maybe [] (foldAnnot f) mi ++ foldAnnot f semi
-  foldAnnot f (JSClassStaticField a1 n a2 mi semi) = f a1 ++ foldAnnot f n ++ f a2 ++ maybe [] (foldAnnot f) mi ++ foldAnnot f semi
-  foldAnnot f (JSClassStaticBlock a b) = f a ++ foldAnnot f b
-  foldAnnot f (JSAsyncGeneratorMethodDefinition a1 a2 n a3 ps a4 b) = f a1 ++ f a2 ++ foldAnnot f n ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b
+  foldAnnotDL f (JSClassInstanceMethod m) rest = foldAnnotDL f m rest
+  foldAnnotDL f (JSClassStaticMethod a m) rest = f a ++ foldAnnotDL f m rest
+  foldAnnotDL f (JSClassSemi a) rest = f a ++ rest
+  foldAnnotDL f (JSPrivateField a1 _ a2 mi semi) rest = f a1 ++ f a2 ++ maybe id (\x -> foldAnnotDL f x) mi (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSPrivateMethod a1 _ a2 ps a3 b) rest = f a1 ++ f a2 ++ foldAnnotDL f ps (f a3 ++ foldAnnotDL f b rest)
+  foldAnnotDL f (JSPrivateAccessor acc a1 _ a2 ps a3 b) rest = foldAnnotDL f acc (f a1 ++ f a2 ++ foldAnnotDL f ps (f a3 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSClassField n a mi semi) rest = foldAnnotDL f n (f a ++ maybe id (\x -> foldAnnotDL f x) mi (foldAnnotDL f semi rest))
+  foldAnnotDL f (JSClassStaticField a1 n a2 mi semi) rest = f a1 ++ foldAnnotDL f n (f a2 ++ maybe id (\x -> foldAnnotDL f x) mi (foldAnnotDL f semi rest))
+  foldAnnotDL f (JSClassStaticBlock a b) rest = f a ++ foldAnnotDL f b rest
+  foldAnnotDL f (JSAsyncGeneratorMethodDefinition a1 a2 n a3 ps a4 b) rest = f a1 ++ f a2 ++ foldAnnotDL f n (f a3 ++ foldAnnotDL f ps (f a4 ++ foldAnnotDL f b rest))
 
 instance HasAnnot JSArrowParameterList where
   mapAnnot f (JSUnparenthesizedArrowParameter i) = JSUnparenthesizedArrowParameter (mapAnnot f i)
   mapAnnot f (JSParenthesizedArrowParameterList a1 ps a2) = JSParenthesizedArrowParameterList (f a1) (mapAnnot f ps) (f a2)
-  foldAnnot f (JSUnparenthesizedArrowParameter i) = foldAnnot f i
-  foldAnnot f (JSParenthesizedArrowParameterList a1 ps a2) = f a1 ++ foldAnnot f ps ++ f a2
+  foldAnnotDL f (JSUnparenthesizedArrowParameter i) rest = foldAnnotDL f i rest
+  foldAnnotDL f (JSParenthesizedArrowParameterList a1 ps a2) rest = f a1 ++ foldAnnotDL f ps (f a2 ++ rest)
 
 instance HasAnnot JSConciseBody where
   mapAnnot f (JSConciseFunctionBody b) = JSConciseFunctionBody (mapAnnot f b)
   mapAnnot f (JSConciseExpressionBody e) = JSConciseExpressionBody (mapAnnot f e)
-  foldAnnot f (JSConciseFunctionBody b) = foldAnnot f b
-  foldAnnot f (JSConciseExpressionBody e) = foldAnnot f e
+  foldAnnotDL f (JSConciseFunctionBody b) rest = foldAnnotDL f b rest
+  foldAnnotDL f (JSConciseExpressionBody e) rest = foldAnnotDL f e rest
 
 instance HasAnnot JSFromClause where
   mapAnnot f (JSFromClause a1 a2 s) = JSFromClause (f a1) (f a2) s
-  foldAnnot f (JSFromClause a1 a2 _) = f a1 ++ f a2
+  foldAnnotDL f (JSFromClause a1 a2 _) rest = f a1 ++ f a2 ++ rest
 
 instance HasAnnot JSImportNameSpace where
   mapAnnot f (JSImportNameSpace op a i) = JSImportNameSpace (mapAnnot f op) (f a) (mapAnnot f i)
-  foldAnnot f (JSImportNameSpace op a i) = foldAnnot f op ++ f a ++ foldAnnot f i
+  foldAnnotDL f (JSImportNameSpace op a i) rest = foldAnnotDL f op (f a ++ foldAnnotDL f i rest)
 
 instance HasAnnot JSImportsNamed where
   mapAnnot f (JSImportsNamed a1 specs a2) = JSImportsNamed (f a1) (mapAnnot f specs) (f a2)
-  foldAnnot f (JSImportsNamed a1 specs a2) = f a1 ++ foldAnnot f specs ++ f a2
+  foldAnnotDL f (JSImportsNamed a1 specs a2) rest = f a1 ++ foldAnnotDL f specs (f a2 ++ rest)
 
 instance HasAnnot JSImportSpecifier where
   mapAnnot f (JSImportSpecifier i) = JSImportSpecifier (mapAnnot f i)
   mapAnnot f (JSImportSpecifierAs i1 a i2) = JSImportSpecifierAs (mapAnnot f i1) (f a) (mapAnnot f i2)
-  foldAnnot f (JSImportSpecifier i) = foldAnnot f i
-  foldAnnot f (JSImportSpecifierAs i1 a i2) = foldAnnot f i1 ++ f a ++ foldAnnot f i2
+  foldAnnotDL f (JSImportSpecifier i) rest = foldAnnotDL f i rest
+  foldAnnotDL f (JSImportSpecifierAs i1 a i2) rest = foldAnnotDL f i1 (f a ++ foldAnnotDL f i2 rest)
 
 instance HasAnnot JSImportAttributes where
   mapAnnot f (JSImportAttributes a1 attrs a2) = JSImportAttributes (f a1) (mapAnnot f attrs) (f a2)
-  foldAnnot f (JSImportAttributes a1 attrs a2) = f a1 ++ foldAnnot f attrs ++ f a2
+  foldAnnotDL f (JSImportAttributes a1 attrs a2) rest = f a1 ++ foldAnnotDL f attrs (f a2 ++ rest)
 
 instance HasAnnot JSImportAttribute where
   mapAnnot f (JSImportAttribute key a val) = JSImportAttribute (mapAnnot f key) (f a) (mapAnnot f val)
-  foldAnnot f (JSImportAttribute key a val) = foldAnnot f key ++ f a ++ foldAnnot f val
+  foldAnnotDL f (JSImportAttribute key a val) rest = foldAnnotDL f key (f a ++ foldAnnotDL f val rest)
 
 instance HasAnnot JSImportClause where
   mapAnnot f (JSImportClauseDefault i) = JSImportClauseDefault (mapAnnot f i)
@@ -896,27 +1819,27 @@ instance HasAnnot JSImportClause where
   mapAnnot f (JSImportClauseNamed n) = JSImportClauseNamed (mapAnnot f n)
   mapAnnot f (JSImportClauseDefaultNameSpace i a ns) = JSImportClauseDefaultNameSpace (mapAnnot f i) (f a) (mapAnnot f ns)
   mapAnnot f (JSImportClauseDefaultNamed i a n) = JSImportClauseDefaultNamed (mapAnnot f i) (f a) (mapAnnot f n)
-  foldAnnot f (JSImportClauseDefault i) = foldAnnot f i
-  foldAnnot f (JSImportClauseNameSpace ns) = foldAnnot f ns
-  foldAnnot f (JSImportClauseNamed n) = foldAnnot f n
-  foldAnnot f (JSImportClauseDefaultNameSpace i a ns) = foldAnnot f i ++ f a ++ foldAnnot f ns
-  foldAnnot f (JSImportClauseDefaultNamed i a n) = foldAnnot f i ++ f a ++ foldAnnot f n
+  foldAnnotDL f (JSImportClauseDefault i) rest = foldAnnotDL f i rest
+  foldAnnotDL f (JSImportClauseNameSpace ns) rest = foldAnnotDL f ns rest
+  foldAnnotDL f (JSImportClauseNamed n) rest = foldAnnotDL f n rest
+  foldAnnotDL f (JSImportClauseDefaultNameSpace i a ns) rest = foldAnnotDL f i (f a ++ foldAnnotDL f ns rest)
+  foldAnnotDL f (JSImportClauseDefaultNamed i a n) rest = foldAnnotDL f i (f a ++ foldAnnotDL f n rest)
 
 instance HasAnnot JSImportDeclaration where
   mapAnnot f (JSImportDeclaration cl from attrs semi) = JSImportDeclaration (mapAnnot f cl) (mapAnnot f from) (fmap (mapAnnot f) attrs) (mapAnnot f semi)
   mapAnnot f (JSImportDeclarationBare a s attrs semi) = JSImportDeclarationBare (f a) s (fmap (mapAnnot f) attrs) (mapAnnot f semi)
-  foldAnnot f (JSImportDeclaration cl from attrs semi) = foldAnnot f cl ++ foldAnnot f from ++ maybe [] (foldAnnot f) attrs ++ foldAnnot f semi
-  foldAnnot f (JSImportDeclarationBare a _ attrs semi) = f a ++ maybe [] (foldAnnot f) attrs ++ foldAnnot f semi
+  foldAnnotDL f (JSImportDeclaration cl from attrs semi) rest = foldAnnotDL f cl (foldAnnotDL f from (maybe id (\x -> foldAnnotDL f x) attrs (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSImportDeclarationBare a _ attrs semi) rest = f a ++ maybe id (\x -> foldAnnotDL f x) attrs (foldAnnotDL f semi rest)
 
 instance HasAnnot JSExportSpecifier where
   mapAnnot f (JSExportSpecifier i) = JSExportSpecifier (mapAnnot f i)
   mapAnnot f (JSExportSpecifierAs i1 a i2) = JSExportSpecifierAs (mapAnnot f i1) (f a) (mapAnnot f i2)
-  foldAnnot f (JSExportSpecifier i) = foldAnnot f i
-  foldAnnot f (JSExportSpecifierAs i1 a i2) = foldAnnot f i1 ++ f a ++ foldAnnot f i2
+  foldAnnotDL f (JSExportSpecifier i) rest = foldAnnotDL f i rest
+  foldAnnotDL f (JSExportSpecifierAs i1 a i2) rest = foldAnnotDL f i1 (f a ++ foldAnnotDL f i2 rest)
 
 instance HasAnnot JSExportClause where
   mapAnnot f (JSExportClause a1 specs a2) = JSExportClause (f a1) (mapAnnot f specs) (f a2)
-  foldAnnot f (JSExportClause a1 specs a2) = f a1 ++ foldAnnot f specs ++ f a2
+  foldAnnotDL f (JSExportClause a1 specs a2) rest = f a1 ++ foldAnnotDL f specs (f a2 ++ rest)
 
 instance HasAnnot JSExportDeclaration where
   mapAnnot f (JSExportAllFrom star from semi) = JSExportAllFrom (mapAnnot f star) (mapAnnot f from) (mapAnnot f semi)
@@ -925,20 +1848,20 @@ instance HasAnnot JSExportDeclaration where
   mapAnnot f (JSExportLocals cl semi) = JSExportLocals (mapAnnot f cl) (mapAnnot f semi)
   mapAnnot f (JSExportDefault a stmt semi) = JSExportDefault (f a) (mapAnnot f stmt) (mapAnnot f semi)
   mapAnnot f (JSExport stmt semi) = JSExport (mapAnnot f stmt) (mapAnnot f semi)
-  foldAnnot f (JSExportAllFrom star from semi) = foldAnnot f star ++ foldAnnot f from ++ foldAnnot f semi
-  foldAnnot f (JSExportAllAsFrom star a i from semi) = foldAnnot f star ++ f a ++ foldAnnot f i ++ foldAnnot f from ++ foldAnnot f semi
-  foldAnnot f (JSExportFrom cl from semi) = foldAnnot f cl ++ foldAnnot f from ++ foldAnnot f semi
-  foldAnnot f (JSExportLocals cl semi) = foldAnnot f cl ++ foldAnnot f semi
-  foldAnnot f (JSExportDefault a stmt semi) = f a ++ foldAnnot f stmt ++ foldAnnot f semi
-  foldAnnot f (JSExport stmt semi) = foldAnnot f stmt ++ foldAnnot f semi
+  foldAnnotDL f (JSExportAllFrom star from semi) rest = foldAnnotDL f star (foldAnnotDL f from (foldAnnotDL f semi rest))
+  foldAnnotDL f (JSExportAllAsFrom star a i from semi) rest = foldAnnotDL f star (f a ++ foldAnnotDL f i (foldAnnotDL f from (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSExportFrom cl from semi) rest = foldAnnotDL f cl (foldAnnotDL f from (foldAnnotDL f semi rest))
+  foldAnnotDL f (JSExportLocals cl semi) rest = foldAnnotDL f cl (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSExportDefault a stmt semi) rest = f a ++ foldAnnotDL f stmt (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSExport stmt semi) rest = foldAnnotDL f stmt (foldAnnotDL f semi rest)
 
 instance HasAnnot JSModuleItem where
   mapAnnot f (JSModuleImportDeclaration a d) = JSModuleImportDeclaration (f a) (mapAnnot f d)
   mapAnnot f (JSModuleExportDeclaration a d) = JSModuleExportDeclaration (f a) (mapAnnot f d)
   mapAnnot f (JSModuleStatementListItem s) = JSModuleStatementListItem (mapAnnot f s)
-  foldAnnot f (JSModuleImportDeclaration a d) = f a ++ foldAnnot f d
-  foldAnnot f (JSModuleExportDeclaration a d) = f a ++ foldAnnot f d
-  foldAnnot f (JSModuleStatementListItem s) = foldAnnot f s
+  foldAnnotDL f (JSModuleImportDeclaration a d) rest = f a ++ foldAnnotDL f d rest
+  foldAnnotDL f (JSModuleExportDeclaration a d) rest = f a ++ foldAnnotDL f d rest
+  foldAnnotDL f (JSModuleStatementListItem s) rest = foldAnnotDL f s rest
 
 instance HasAnnot JSExpression where
   mapAnnot f (JSIdentifier a s) = JSIdentifier (f a) s
@@ -986,51 +1909,53 @@ instance HasAnnot JSExpression where
   mapAnnot f (JSYieldFromExpression a1 a2 e) = JSYieldFromExpression (f a1) (f a2) (mapAnnot f e)
   mapAnnot f (JSImportMeta a1 a2) = JSImportMeta (f a1) (f a2)
   mapAnnot f (JSImportCall a1 a2 e a3) = JSImportCall (f a1) (f a2) (mapAnnot f e) (f a3)
-  foldAnnot f (JSIdentifier a _) = f a
-  foldAnnot f (JSDecimal a _) = f a
-  foldAnnot f (JSLiteral a _) = f a
-  foldAnnot f (JSHexInteger a _) = f a
-  foldAnnot f (JSBinaryInteger a _) = f a
-  foldAnnot f (JSOctal a _) = f a
-  foldAnnot f (JSBigIntLiteral a _) = f a
-  foldAnnot f (JSStringLiteral a _) = f a
-  foldAnnot f (JSRegEx a _) = f a
-  foldAnnot f (JSArrayLiteral a1 es a2) = f a1 ++ concatMap (foldAnnot f) es ++ f a2
-  foldAnnot f (JSAssignExpression e1 op e2) = foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2
-  foldAnnot f (JSAwaitExpression a e) = f a ++ foldAnnot f e
-  foldAnnot f (JSCallExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
-  foldAnnot f (JSCallExpressionDot e a x) = foldAnnot f e ++ f a ++ foldAnnot f x
-  foldAnnot f (JSCallExpressionSquare e a1 x a2) = foldAnnot f e ++ f a1 ++ foldAnnot f x ++ f a2
-  foldAnnot f (JSClassExpression a1 i h a2 es a3) = f a1 ++ foldAnnot f i ++ foldAnnot f h ++ f a2 ++ concatMap (foldAnnot f) es ++ f a3
-  foldAnnot f (JSCommaExpression e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
-  foldAnnot f (JSExpressionBinary e1 op e2) = foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2
-  foldAnnot f (JSExpressionParen a1 e a2) = f a1 ++ foldAnnot f e ++ f a2
-  foldAnnot f (JSExpressionPostfix e op) = foldAnnot f e ++ foldAnnot f op
-  foldAnnot f (JSExpressionTernary e1 a1 e2 a2 e3) = foldAnnot f e1 ++ f a1 ++ foldAnnot f e2 ++ f a2 ++ foldAnnot f e3
-  foldAnnot f (JSArrowExpression ps a b) = foldAnnot f ps ++ f a ++ foldAnnot f b
-  foldAnnot f (JSFunctionExpression a1 i a2 ps a3 b) = f a1 ++ foldAnnot f i ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b
-  foldAnnot f (JSGeneratorExpression a1 a2 i a3 ps a4 b) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b
-  foldAnnot f (JSAsyncFunctionExpression a1 a2 i a3 ps a4 b) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b
-  foldAnnot f (JSAsyncArrowExpression a1 ps a2 b) = f a1 ++ foldAnnot f ps ++ f a2 ++ foldAnnot f b
-  foldAnnot f (JSAsyncGeneratorExpression a1 a2 a3 i a4 ps a5 b) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f i ++ f a4 ++ foldAnnot f ps ++ f a5 ++ foldAnnot f b
-  foldAnnot f (JSMemberDot e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
-  foldAnnot f (JSMemberPrivateDot e1 a1 a2 _name) = foldAnnot f e1 ++ f a1 ++ f a2
-  foldAnnot f (JSMemberExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
-  foldAnnot f (JSMemberNew a1 e a2 args a3) = f a1 ++ foldAnnot f e ++ f a2 ++ foldAnnot f args ++ f a3
-  foldAnnot f (JSMemberSquare e a1 x a2) = foldAnnot f e ++ f a1 ++ foldAnnot f x ++ f a2
-  foldAnnot f (JSNewExpression a e) = f a ++ foldAnnot f e
-  foldAnnot f (JSOptionalMemberDot e1 a e2) = foldAnnot f e1 ++ f a ++ foldAnnot f e2
-  foldAnnot f (JSOptionalMemberSquare e1 a1 e2 a2) = foldAnnot f e1 ++ f a1 ++ foldAnnot f e2 ++ f a2
-  foldAnnot f (JSOptionalCallExpression e a1 args a2) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2
-  foldAnnot f (JSObjectLiteral a1 props a2) = f a1 ++ foldAnnot f props ++ f a2
-  foldAnnot f (JSSpreadExpression a e) = f a ++ foldAnnot f e
-  foldAnnot f (JSTemplateLiteral mt a _ ps) = maybe [] (foldAnnot f) mt ++ f a ++ concatMap (foldAnnot f) ps
-  foldAnnot f (JSUnaryExpression op e) = foldAnnot f op ++ foldAnnot f e
-  foldAnnot f (JSVarInitExpression e vi) = foldAnnot f e ++ foldAnnot f vi
-  foldAnnot f (JSYieldExpression a me) = f a ++ maybe [] (foldAnnot f) me
-  foldAnnot f (JSYieldFromExpression a1 a2 e) = f a1 ++ f a2 ++ foldAnnot f e
-  foldAnnot f (JSImportMeta a1 a2) = f a1 ++ f a2
-  foldAnnot f (JSImportCall a1 a2 e a3) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3
+  mapAnnot f (JSPrivateIdentifier a name) = JSPrivateIdentifier (f a) name
+  foldAnnotDL f (JSIdentifier a _) rest = f a ++ rest
+  foldAnnotDL f (JSDecimal a _) rest = f a ++ rest
+  foldAnnotDL f (JSLiteral a _) rest = f a ++ rest
+  foldAnnotDL f (JSHexInteger a _) rest = f a ++ rest
+  foldAnnotDL f (JSBinaryInteger a _) rest = f a ++ rest
+  foldAnnotDL f (JSOctal a _) rest = f a ++ rest
+  foldAnnotDL f (JSBigIntLiteral a _) rest = f a ++ rest
+  foldAnnotDL f (JSStringLiteral a _) rest = f a ++ rest
+  foldAnnotDL f (JSRegEx a _) rest = f a ++ rest
+  foldAnnotDL f (JSArrayLiteral a1 es a2) rest = f a1 ++ foldr (foldAnnotDL f) (f a2 ++ rest) es
+  foldAnnotDL f (JSAssignExpression e1 op e2) rest = foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 rest))
+  foldAnnotDL f (JSAwaitExpression a e) rest = f a ++ foldAnnotDL f e rest
+  foldAnnotDL f (JSCallExpression e a1 args a2) rest = foldAnnotDL f e (f a1 ++ foldAnnotDL f args (f a2 ++ rest))
+  foldAnnotDL f (JSCallExpressionDot e a x) rest = foldAnnotDL f e (f a ++ foldAnnotDL f x rest)
+  foldAnnotDL f (JSCallExpressionSquare e a1 x a2) rest = foldAnnotDL f e (f a1 ++ foldAnnotDL f x (f a2 ++ rest))
+  foldAnnotDL f (JSClassExpression a1 i h a2 es a3) rest = f a1 ++ foldAnnotDL f i (foldAnnotDL f h (f a2 ++ foldr (foldAnnotDL f) (f a3 ++ rest) es))
+  foldAnnotDL f (JSCommaExpression e1 a e2) rest = foldAnnotDL f e1 (f a ++ foldAnnotDL f e2 rest)
+  foldAnnotDL f (JSExpressionBinary e1 op e2) rest = foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 rest))
+  foldAnnotDL f (JSExpressionParen a1 e a2) rest = f a1 ++ foldAnnotDL f e (f a2 ++ rest)
+  foldAnnotDL f (JSExpressionPostfix e op) rest = foldAnnotDL f e (foldAnnotDL f op rest)
+  foldAnnotDL f (JSExpressionTernary e1 a1 e2 a2 e3) rest = foldAnnotDL f e1 (f a1 ++ foldAnnotDL f e2 (f a2 ++ foldAnnotDL f e3 rest))
+  foldAnnotDL f (JSArrowExpression ps a b) rest = foldAnnotDL f ps (f a ++ foldAnnotDL f b rest)
+  foldAnnotDL f (JSFunctionExpression a1 i a2 ps a3 b) rest = f a1 ++ foldAnnotDL f i (f a2 ++ foldAnnotDL f ps (f a3 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSGeneratorExpression a1 a2 i a3 ps a4 b) rest = f a1 ++ f a2 ++ foldAnnotDL f i (f a3 ++ foldAnnotDL f ps (f a4 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSAsyncFunctionExpression a1 a2 i a3 ps a4 b) rest = f a1 ++ f a2 ++ foldAnnotDL f i (f a3 ++ foldAnnotDL f ps (f a4 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSAsyncArrowExpression a1 ps a2 b) rest = f a1 ++ foldAnnotDL f ps (f a2 ++ foldAnnotDL f b rest)
+  foldAnnotDL f (JSAsyncGeneratorExpression a1 a2 a3 i a4 ps a5 b) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f i (f a4 ++ foldAnnotDL f ps (f a5 ++ foldAnnotDL f b rest))
+  foldAnnotDL f (JSMemberDot e1 a e2) rest = foldAnnotDL f e1 (f a ++ foldAnnotDL f e2 rest)
+  foldAnnotDL f (JSMemberPrivateDot e1 a1 a2 _name) rest = foldAnnotDL f e1 (f a1 ++ f a2 ++ rest)
+  foldAnnotDL f (JSMemberExpression e a1 args a2) rest = foldAnnotDL f e (f a1 ++ foldAnnotDL f args (f a2 ++ rest))
+  foldAnnotDL f (JSMemberNew a1 e a2 args a3) rest = f a1 ++ foldAnnotDL f e (f a2 ++ foldAnnotDL f args (f a3 ++ rest))
+  foldAnnotDL f (JSMemberSquare e a1 x a2) rest = foldAnnotDL f e (f a1 ++ foldAnnotDL f x (f a2 ++ rest))
+  foldAnnotDL f (JSNewExpression a e) rest = f a ++ foldAnnotDL f e rest
+  foldAnnotDL f (JSOptionalMemberDot e1 a e2) rest = foldAnnotDL f e1 (f a ++ foldAnnotDL f e2 rest)
+  foldAnnotDL f (JSOptionalMemberSquare e1 a1 e2 a2) rest = foldAnnotDL f e1 (f a1 ++ foldAnnotDL f e2 (f a2 ++ rest))
+  foldAnnotDL f (JSOptionalCallExpression e a1 args a2) rest = foldAnnotDL f e (f a1 ++ foldAnnotDL f args (f a2 ++ rest))
+  foldAnnotDL f (JSObjectLiteral a1 props a2) rest = f a1 ++ foldAnnotDL f props (f a2 ++ rest)
+  foldAnnotDL f (JSSpreadExpression a e) rest = f a ++ foldAnnotDL f e rest
+  foldAnnotDL f (JSTemplateLiteral mt a _ ps) rest = maybe id (\x -> foldAnnotDL f x) mt (f a ++ foldr (foldAnnotDL f) rest ps)
+  foldAnnotDL f (JSUnaryExpression op e) rest = foldAnnotDL f op (foldAnnotDL f e rest)
+  foldAnnotDL f (JSVarInitExpression e vi) rest = foldAnnotDL f e (foldAnnotDL f vi rest)
+  foldAnnotDL f (JSYieldExpression a me) rest = f a ++ maybe id (\x -> foldAnnotDL f x) me rest
+  foldAnnotDL f (JSYieldFromExpression a1 a2 e) rest = f a1 ++ f a2 ++ foldAnnotDL f e rest
+  foldAnnotDL f (JSImportMeta a1 a2) rest = f a1 ++ f a2 ++ rest
+  foldAnnotDL f (JSImportCall a1 a2 e a3) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ rest)
+  foldAnnotDL f (JSPrivateIdentifier a _name) rest = f a ++ rest
 
 instance HasAnnot JSStatement where
   mapAnnot f (JSStatementBlock a1 stmts a2 semi) = JSStatementBlock (f a1) (map (mapAnnot f) stmts) (f a2) (mapAnnot f semi)
@@ -1075,48 +2000,48 @@ instance HasAnnot JSStatement where
   mapAnnot f (JSForAwaitVarOf a1 a2 a3 a4 e1 op e2 a5 s) = JSForAwaitVarOf (f a1) (f a2) (f a3) (f a4) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a5) (mapAnnot f s)
   mapAnnot f (JSForAwaitLetOf a1 a2 a3 a4 e1 op e2 a5 s) = JSForAwaitLetOf (f a1) (f a2) (f a3) (f a4) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a5) (mapAnnot f s)
   mapAnnot f (JSForAwaitConstOf a1 a2 a3 a4 e1 op e2 a5 s) = JSForAwaitConstOf (f a1) (f a2) (f a3) (f a4) (mapAnnot f e1) (mapAnnot f op) (mapAnnot f e2) (f a5) (mapAnnot f s)
-  foldAnnot f (JSStatementBlock a1 stmts a2 semi) = f a1 ++ concatMap (foldAnnot f) stmts ++ f a2 ++ foldAnnot f semi
-  foldAnnot f (JSBreak a i semi) = f a ++ foldAnnot f i ++ foldAnnot f semi
-  foldAnnot f (JSLet a es semi) = f a ++ foldAnnot f es ++ foldAnnot f semi
-  foldAnnot f (JSClass a1 i h a2 es a3 semi) = f a1 ++ foldAnnot f i ++ foldAnnot f h ++ f a2 ++ concatMap (foldAnnot f) es ++ f a3 ++ foldAnnot f semi
-  foldAnnot f (JSConstant a es semi) = f a ++ foldAnnot f es ++ foldAnnot f semi
-  foldAnnot f (JSContinue a i semi) = f a ++ foldAnnot f i ++ foldAnnot f semi
-  foldAnnot f (JSDoWhile a1 s a2 a3 e a4 semi) = f a1 ++ foldAnnot f s ++ f a2 ++ f a3 ++ foldAnnot f e ++ f a4 ++ foldAnnot f semi
-  foldAnnot f (JSFor a1 a2 es1 a3 es2 a4 es3 a5 s) = f a1 ++ f a2 ++ foldAnnot f es1 ++ f a3 ++ foldAnnot f es2 ++ f a4 ++ foldAnnot f es3 ++ f a5 ++ foldAnnot f s
-  foldAnnot f (JSForIn a1 a2 e1 op e2 a3 s) = f a1 ++ f a2 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a3 ++ foldAnnot f s
-  foldAnnot f (JSForVar a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f es1 ++ f a4 ++ foldAnnot f es2 ++ f a5 ++ foldAnnot f es3 ++ f a6 ++ foldAnnot f s
-  foldAnnot f (JSForVarIn a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSForLet a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f es1 ++ f a4 ++ foldAnnot f es2 ++ f a5 ++ foldAnnot f es3 ++ f a6 ++ foldAnnot f s
-  foldAnnot f (JSForLetIn a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSForLetOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSForConst a1 a2 a3 es1 a4 es2 a5 es3 a6 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f es1 ++ f a4 ++ foldAnnot f es2 ++ f a5 ++ foldAnnot f es3 ++ f a6 ++ foldAnnot f s
-  foldAnnot f (JSForConstIn a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSForConstOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSForOf a1 a2 e1 op e2 a3 s) = f a1 ++ f a2 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a3 ++ foldAnnot f s
-  foldAnnot f (JSForVarOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSAsyncFunction a1 a2 i a3 ps a4 b semi) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b ++ foldAnnot f semi
-  foldAnnot f (JSFunction a1 i a2 ps a3 b semi) = f a1 ++ foldAnnot f i ++ f a2 ++ foldAnnot f ps ++ f a3 ++ foldAnnot f b ++ foldAnnot f semi
-  foldAnnot f (JSGenerator a1 a2 i a3 ps a4 b semi) = f a1 ++ f a2 ++ foldAnnot f i ++ f a3 ++ foldAnnot f ps ++ f a4 ++ foldAnnot f b ++ foldAnnot f semi
-  foldAnnot f (JSIf a1 a2 e a3 s) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s
-  foldAnnot f (JSIfElse a1 a2 e a3 s1 a4 s2) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s1 ++ f a4 ++ foldAnnot f s2
-  foldAnnot f (JSLabelled i a s) = foldAnnot f i ++ f a ++ foldAnnot f s
-  foldAnnot f (JSEmptyStatement a) = f a
-  foldAnnot f (JSExpressionStatement e semi) = foldAnnot f e ++ foldAnnot f semi
-  foldAnnot f (JSAssignStatement e1 op e2 semi) = foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ foldAnnot f semi
-  foldAnnot f (JSMethodCall e a1 args a2 semi) = foldAnnot f e ++ f a1 ++ foldAnnot f args ++ f a2 ++ foldAnnot f semi
-  foldAnnot f (JSReturn a me semi) = f a ++ maybe [] (foldAnnot f) me ++ foldAnnot f semi
-  foldAnnot f (JSSwitch a1 a2 e a3 a4 parts a5 semi) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ f a4 ++ concatMap (foldAnnot f) parts ++ f a5 ++ foldAnnot f semi
-  foldAnnot f (JSThrow a e semi) = f a ++ foldAnnot f e ++ foldAnnot f semi
-  foldAnnot f (JSTry a b catches fin) = f a ++ foldAnnot f b ++ concatMap (foldAnnot f) catches ++ foldAnnot f fin
-  foldAnnot f (JSVariable a es semi) = f a ++ foldAnnot f es ++ foldAnnot f semi
-  foldAnnot f (JSWhile a1 a2 e a3 s) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s
-  foldAnnot f (JSWith a1 a2 e a3 s semi) = f a1 ++ f a2 ++ foldAnnot f e ++ f a3 ++ foldAnnot f s ++ foldAnnot f semi
-  foldAnnot f (JSDebugger a semi) = f a ++ foldAnnot f semi
-  foldAnnot f (JSAsyncGenerator a1 a2 a3 i a4 ps a5 b semi) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f i ++ f a4 ++ foldAnnot f ps ++ f a5 ++ foldAnnot f b ++ foldAnnot f semi
-  foldAnnot f (JSForAwaitOf a1 a2 a3 e1 op e2 a4 s) = f a1 ++ f a2 ++ f a3 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a4 ++ foldAnnot f s
-  foldAnnot f (JSForAwaitVarOf a1 a2 a3 a4 e1 op e2 a5 s) = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a5 ++ foldAnnot f s
-  foldAnnot f (JSForAwaitLetOf a1 a2 a3 a4 e1 op e2 a5 s) = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a5 ++ foldAnnot f s
-  foldAnnot f (JSForAwaitConstOf a1 a2 a3 a4 e1 op e2 a5 s) = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnot f e1 ++ foldAnnot f op ++ foldAnnot f e2 ++ f a5 ++ foldAnnot f s
+  foldAnnotDL f (JSStatementBlock a1 stmts a2 semi) rest = f a1 ++ foldr (foldAnnotDL f) (f a2 ++ foldAnnotDL f semi rest) stmts
+  foldAnnotDL f (JSBreak a i semi) rest = f a ++ foldAnnotDL f i (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSLet a es semi) rest = f a ++ foldAnnotDL f es (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSClass a1 i h a2 es a3 semi) rest = f a1 ++ foldAnnotDL f i (foldAnnotDL f h (f a2 ++ foldr (foldAnnotDL f) (f a3 ++ foldAnnotDL f semi rest) es))
+  foldAnnotDL f (JSConstant a es semi) rest = f a ++ foldAnnotDL f es (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSContinue a i semi) rest = f a ++ foldAnnotDL f i (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSDoWhile a1 s a2 a3 e a4 semi) rest = f a1 ++ foldAnnotDL f s (f a2 ++ f a3 ++ foldAnnotDL f e (f a4 ++ foldAnnotDL f semi rest))
+  foldAnnotDL f (JSFor a1 a2 es1 a3 es2 a4 es3 a5 s) rest = f a1 ++ f a2 ++ foldAnnotDL f es1 (f a3 ++ foldAnnotDL f es2 (f a4 ++ foldAnnotDL f es3 (f a5 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForIn a1 a2 e1 op e2 a3 s) rest = f a1 ++ f a2 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a3 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForVar a1 a2 a3 es1 a4 es2 a5 es3 a6 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f es1 (f a4 ++ foldAnnotDL f es2 (f a5 ++ foldAnnotDL f es3 (f a6 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForVarIn a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForLet a1 a2 a3 es1 a4 es2 a5 es3 a6 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f es1 (f a4 ++ foldAnnotDL f es2 (f a5 ++ foldAnnotDL f es3 (f a6 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForLetIn a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForLetOf a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForConst a1 a2 a3 es1 a4 es2 a5 es3 a6 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f es1 (f a4 ++ foldAnnotDL f es2 (f a5 ++ foldAnnotDL f es3 (f a6 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForConstIn a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForConstOf a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForOf a1 a2 e1 op e2 a3 s) rest = f a1 ++ f a2 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a3 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForVarOf a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSAsyncFunction a1 a2 i a3 ps a4 b semi) rest = f a1 ++ f a2 ++ foldAnnotDL f i (f a3 ++ foldAnnotDL f ps (f a4 ++ foldAnnotDL f b (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSFunction a1 i a2 ps a3 b semi) rest = f a1 ++ foldAnnotDL f i (f a2 ++ foldAnnotDL f ps (f a3 ++ foldAnnotDL f b (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSGenerator a1 a2 i a3 ps a4 b semi) rest = f a1 ++ f a2 ++ foldAnnotDL f i (f a3 ++ foldAnnotDL f ps (f a4 ++ foldAnnotDL f b (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSIf a1 a2 e a3 s) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ foldAnnotDL f s rest)
+  foldAnnotDL f (JSIfElse a1 a2 e a3 s1 a4 s2) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ foldAnnotDL f s1 (f a4 ++ foldAnnotDL f s2 rest))
+  foldAnnotDL f (JSLabelled i a s) rest = foldAnnotDL f i (f a ++ foldAnnotDL f s rest)
+  foldAnnotDL f (JSEmptyStatement a) rest = f a ++ rest
+  foldAnnotDL f (JSExpressionStatement e semi) rest = foldAnnotDL f e (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSAssignStatement e1 op e2 semi) rest = foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSMethodCall e a1 args a2 semi) rest = foldAnnotDL f e (f a1 ++ foldAnnotDL f args (f a2 ++ foldAnnotDL f semi rest))
+  foldAnnotDL f (JSReturn a me semi) rest = f a ++ maybe id (\x -> foldAnnotDL f x) me (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSSwitch a1 a2 e a3 a4 parts a5 semi) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ f a4 ++ foldr (foldAnnotDL f) (f a5 ++ foldAnnotDL f semi rest) parts)
+  foldAnnotDL f (JSThrow a e semi) rest = f a ++ foldAnnotDL f e (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSTry a b catches fin) rest = f a ++ foldAnnotDL f b (foldr (foldAnnotDL f) (foldAnnotDL f fin rest) catches)
+  foldAnnotDL f (JSVariable a es semi) rest = f a ++ foldAnnotDL f es (foldAnnotDL f semi rest)
+  foldAnnotDL f (JSWhile a1 a2 e a3 s) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ foldAnnotDL f s rest)
+  foldAnnotDL f (JSWith a1 a2 e a3 s semi) rest = f a1 ++ f a2 ++ foldAnnotDL f e (f a3 ++ foldAnnotDL f s (foldAnnotDL f semi rest))
+  foldAnnotDL f (JSDebugger a semi) rest = f a ++ foldAnnotDL f semi rest
+  foldAnnotDL f (JSAsyncGenerator a1 a2 a3 i a4 ps a5 b semi) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f i (f a4 ++ foldAnnotDL f ps (f a5 ++ foldAnnotDL f b (foldAnnotDL f semi rest)))
+  foldAnnotDL f (JSForAwaitOf a1 a2 a3 e1 op e2 a4 s) rest = f a1 ++ f a2 ++ f a3 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a4 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForAwaitVarOf a1 a2 a3 a4 e1 op e2 a5 s) rest = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a5 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForAwaitLetOf a1 a2 a3 a4 e1 op e2 a5 s) rest = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a5 ++ foldAnnotDL f s rest)))
+  foldAnnotDL f (JSForAwaitConstOf a1 a2 a3 a4 e1 op e2 a5 s) rest = f a1 ++ f a2 ++ f a3 ++ f a4 ++ foldAnnotDL f e1 (foldAnnotDL f op (foldAnnotDL f e2 (f a5 ++ foldAnnotDL f s rest)))
 
 instance HasAnnot JSAST where
   mapAnnot f (JSAstProgram stmts a) = JSAstProgram (map (mapAnnot f) stmts) (f a)
@@ -1124,11 +2049,11 @@ instance HasAnnot JSAST where
   mapAnnot f (JSAstStatement s a) = JSAstStatement (mapAnnot f s) (f a)
   mapAnnot f (JSAstExpression e a) = JSAstExpression (mapAnnot f e) (f a)
   mapAnnot f (JSAstLiteral e a) = JSAstLiteral (mapAnnot f e) (f a)
-  foldAnnot f (JSAstProgram stmts a) = concatMap (foldAnnot f) stmts ++ f a
-  foldAnnot f (JSAstModule items a) = concatMap (foldAnnot f) items ++ f a
-  foldAnnot f (JSAstStatement s a) = foldAnnot f s ++ f a
-  foldAnnot f (JSAstExpression e a) = foldAnnot f e ++ f a
-  foldAnnot f (JSAstLiteral e a) = foldAnnot f e ++ f a
+  foldAnnotDL f (JSAstProgram stmts a) rest = foldr (foldAnnotDL f) (f a ++ rest) stmts
+  foldAnnotDL f (JSAstModule items a) rest = foldr (foldAnnotDL f) (f a ++ rest) items
+  foldAnnotDL f (JSAstStatement s a) rest = foldAnnotDL f s (f a ++ rest)
+  foldAnnotDL f (JSAstExpression e a) rest = foldAnnotDL f e (f a ++ rest)
+  foldAnnotDL f (JSAstLiteral e a) rest = foldAnnotDL f e (f a ++ rest)
 
 -- -----------------------------------------------------------------------------
 
@@ -1208,7 +2133,7 @@ instance ShowStripped JSStatement where
 instance ShowStripped JSExpression where
   ss (JSArrayLiteral _lb xs _rb) = "JSArrayLiteral " <> ss xs
   ss (JSAssignExpression lhs op rhs) = "JSOpAssign (" <> ss op <> "," <> ss lhs <> "," <> ss rhs <> ")"
-  ss (JSAwaitExpression _ e) = "JSAwaitExpresson " <> ss e
+  ss (JSAwaitExpression _ e) = "JSAwaitExpression " <> ss e
   ss (JSCallExpression ex _ xs _) = "JSCallExpression (" <> ss ex <> ",JSArguments " <> ss xs <> ")"
   ss (JSCallExpressionDot ex _os xs) = "JSCallExpressionDot (" <> ss ex <> "," <> ss xs <> ")"
   ss (JSCallExpressionSquare ex _os xs _cs) = "JSCallExpressionSquare (" <> ss ex <> "," <> ss xs <> ")"
@@ -1251,6 +2176,7 @@ instance ShowStripped JSExpression where
   ss (JSYieldFromExpression _ _ x) = "JSYieldFromExpression (" <> ss x <> ")"
   ss (JSImportMeta _ _) = "JSImportMeta"
   ss (JSImportCall _ _ expr _) = "JSImportCall (" <> ss expr <> ")"
+  ss (JSPrivateIdentifier _ name) = "JSPrivateIdentifier " <> singleQuote ("#" <> bsToStr name)
   ss (JSSpreadExpression _ x1) = "JSSpreadExpression (" <> ss x1 <> ")"
   ss (JSTemplateLiteral Nothing _ s ps) = "JSTemplateLiteral (()," <> singleQuote (bsToStr s) <> "," <> ss ps <> ")"
   ss (JSTemplateLiteral (Just t) _ s ps) = "JSTemplateLiteral ((" <> ss t <> ")," <> singleQuote (bsToStr s) <> "," <> ss ps <> ")"

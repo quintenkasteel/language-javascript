@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoOverloadedStrings #-}
+{-# OPTIONS_GHC -O2 #-}
 
 -- | JavaScript pretty printer — renders a parsed AST back to source text.
 --
@@ -9,14 +10,27 @@
 -- comments and whitespace annotations. Uses 'Blaze.ByteString.Builder' for
 -- efficient incremental output with zero-copy 'ByteString' rendering.
 --
+-- ==== Rendering Targets
+--
+--   * 'renderToString' — most convenient, returns 'String'
+--   * 'renderToText' — returns lazy 'Text', avoids String allocation overhead
+--   * 'renderJS' — returns 'Builder' for composition with other blaze-builder output
+--
+-- ==== Whitespace and Formatting
+--
+-- The printer preserves the whitespace and comment annotations stored in
+-- 'JSAnnot' nodes throughout the AST. This means a round-trip
+-- @parse . renderToString@ produces output that is semantically identical
+-- and whitespace-equivalent to the original source (modulo minification).
+--
 -- ==== Usage
 --
 -- @
--- import Language.JavaScript.Parser (readJsSafe)
+-- import Language.JavaScript.Parser (parse)
 -- import Language.JavaScript.Pretty.Printer (renderToString)
 --
 -- roundTrip :: String -> String
--- roundTrip src = case readJsSafe src of
+-- roundTrip src = case parse src "input.js" of
 --   Right ast -> renderToString ast
 --   Left err  -> err
 -- @
@@ -40,10 +54,9 @@ import Data.Semigroup ((<>))
 #endif
 
 import qualified Blaze.ByteString.Builder.Char.Utf8 as BS
-import qualified Codec.Binary.UTF8.String as US
-import qualified Data.ByteString.Lazy as LB
 import Data.List (foldl')
 import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as LT
 import Language.JavaScript.Parser.AST
 import Language.JavaScript.Parser.SrcLocation
@@ -87,21 +100,39 @@ renderBigInt n = show n <> "n"
 
 -- ---------------------------------------------------------------------
 
+-- | Render a JavaScript AST to a 'Builder'.
+--
+-- This is the lowest-level rendering function, returning a blaze-builder
+-- 'Builder' for composition with other blaze-builder output or for
+-- custom serialization. Use 'renderToString' or 'renderToText' for
+-- convenience.
 renderJS :: JSAST -> Builder
 renderJS node = bb
   where
     PosAccum _ bb = PosAccum (1, 1) mempty |> node
 
+-- | Render a JavaScript AST to a 'String'.
+--
+-- This is the most convenient rendering function. For better performance
+-- in production code, prefer 'renderToText' to avoid the intermediate
+-- String allocation.
 renderToString :: JSAST -> String
--- need to be careful to not lose the unicode encoding on output
-renderToString js = US.decode (LB.unpack (toLazyByteString (renderJS js)))
+renderToString js = TL.unpack (LT.decodeUtf8 (toLazyByteString (renderJS js)))
 
+-- | Render a JavaScript AST to lazy 'Text'.
+--
+-- More efficient than 'renderToString' as it avoids the intermediate
+-- String allocation. Uses UTF-8 decoding of the builder output.
 renderToText :: JSAST -> Text
--- need to be careful to not lose the unicode encoding on output
 renderToText = LT.decodeUtf8 . toLazyByteString . renderJS
 
+-- | Typeclass for rendering AST nodes to JavaScript source.
+--
+-- Each AST node type implements this class to define how it is serialized
+-- back to JavaScript text. The rendering uses a left-fold accumulator
+-- pattern via '(|>)' for efficient incremental output.
 class RenderJS a where
-  -- Render node.
+  -- | Render an AST node, accumulating output into the 'PosAccum'.
   (|>) :: PosAccum -> a -> PosAccum
 
 instance RenderJS JSAST where
@@ -154,6 +185,7 @@ instance RenderJS JSExpression where
   (|>) pacc (JSYieldFromExpression y s x) = pacc |> y |> "yield" |> s |> "*" |> x
   (|>) pacc (JSImportMeta i d) = pacc |> i |> "import" |> d |> ".meta"
   (|>) pacc (JSImportCall i lb expr rb) = pacc |> i |> "import" |> lb |> expr |> rb
+  (|>) pacc (JSPrivateIdentifier a name) = pacc |> a |> "#" |> name
   (|>) pacc (JSSpreadExpression a e) = pacc |> a |> "..." |> e
   (|>) pacc (JSBigIntLiteral annot n) = pacc |> annot |> renderBigInt n
   (|>) pacc (JSOptionalMemberDot e a p) = pacc |> e |> a |> "?." |> p
@@ -358,7 +390,7 @@ instance RenderJS JSModuleItem where
   (|>) pacc (JSModuleStatementListItem s) = pacc |> s
 
 instance RenderJS JSBlock where
-  (|>) pacc (JSBlock alb ss arb) = pacc |> alb |> "{" |> ss |> arb |> "}"
+  (|>) pacc (JSBlock alb stmts arb) = pacc |> alb |> "{" |> stmts |> arb |> "}"
 
 instance RenderJS JSObjectProperty where
   (|>) pacc (JSPropertyNameandValue n c vs) = pacc |> n |> c |> ":" |> vs

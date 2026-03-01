@@ -97,7 +97,6 @@ import Language.JavaScript.Parser.Token (CommentAnnotation(..))
 import Language.JavaScript.Parser.CommentScanner (CommentEntry(..), scanComments)
 
 import Language.JavaScript.Parser.Grammar (expression, statementList, moduleItemList)
-import Language.JavaScript.Parser.Lexer (ParseError(..))
 import qualified Language.JavaScript.Parser.Lexer as Lexer
 import qualified Language.JavaScript.Parser.Pos as JSPos
 import Language.JavaScript.Parser.Primitives
@@ -112,10 +111,9 @@ data ParseResult a
   | ParseError !(ParseFailure)
   deriving (Eq, Show)
 
--- Note: NFData instance simplified due to ParseError constraint
 instance NFData a => NFData (ParseResult a) where
   rnf (ParseOK s) = rnf s
-  rnf (ParseError _f) = () -- Skip rnf on ParseError
+  rnf (ParseError f) = rnf f
 
 -- | Successful parse result with value and remaining input.
 data ParseSuccess a = ParseSuccess
@@ -134,9 +132,8 @@ data ParseFailure = ParseFailure
   , parseOffset :: !Int        -- ^ Byte offset where error occurred
   } deriving (Eq, Show)
 
--- Note: NFData instance omitted due to ParseError not having NFData
--- instance NFData ParseFailure where
---   rnf (ParseFailure err inp off) = rnf err `seq` rnf inp `seq` rnf off
+instance NFData ParseFailure where
+  rnf (ParseFailure e i o) = rnf e `seq` rnf i `seq` rnf o
 
 -- ---------------------------------------------------------------------
 -- Main Parsing Functions
@@ -226,36 +223,54 @@ parseExpressionByteString input =
 -- ---------------------------------------------------------------------
 
 -- | Format parse error for human-readable display.
+--
+-- When the error position is the placeholder @(1,1)@, computes the real
+-- position from the byte offset stored in 'ParseFailure'. This handles
+-- errors raised by @FP.cut@ and @FP.Fail@ that don't have position info.
 formatParseError :: ParseFailure -> Text
-formatParseError (ParseFailure pErr _pInput _pOffset) =
+formatParseError (ParseFailure pErr pInput pOffset) =
   case pErr of
     SyntaxError pos msg suggestions ->
       Text.unlines $
-        [ "Syntax Error at " <> Text.pack (JSPos.showPos pos)
+        [ "Syntax Error at " <> showErrPos pos
         , "  " <> msg
         ] ++ map ("  Suggestion: " <>) suggestions
 
     UnexpectedEOF pos ->
-      "Unexpected end of input at " <> Text.pack (JSPos.showPos pos)
+      "Unexpected end of input at " <> showErrPos pos
 
     UnexpectedChar pos found expected ->
       Text.unlines
-        [ "Unexpected character at " <> Text.pack (JSPos.showPos pos)
+        [ "Unexpected character at " <> showErrPos pos
         , "  Found: '" <> Text.singleton found <> "'"
         , "  Expected: " <> expected
         ]
 
     InvalidEscape pos escape ->
       Text.unlines
-        [ "Invalid escape sequence at " <> Text.pack (JSPos.showPos pos)
+        [ "Invalid escape sequence at " <> showErrPos pos
         , "  Escape: " <> escape
         ]
 
     InvalidNumeric pos numeric ->
       Text.unlines
-        [ "Invalid numeric literal at " <> Text.pack (JSPos.showPos pos)
+        [ "Invalid numeric literal at " <> showErrPos pos
         , "  Literal: " <> numeric
         ]
+  where
+    inputLen = BS.length pInput
+    ls = buildLineStarts pInput
+    showErrPos pos
+      | JSPos.posColumn pos == 0 =
+          -- Raw FlatParse position: line field holds remaining bytes count
+          let remainingBytes = JSPos.posLine pos
+              byteOffset = max 0 (min (inputLen - 1) (inputLen - remainingBytes))
+              (line, col) = offsetToLineCol ls byteOffset
+          in Text.pack (show line <> ":" <> show col)
+      | JSPos.posLine pos == 1 && JSPos.posColumn pos == 1 && pOffset > 0 =
+          let (line, col) = offsetToLineCol ls (min pOffset (inputLen - 1))
+          in Text.pack (show line <> ":" <> show col)
+      | otherwise = Text.pack (JSPos.showPos pos)
 
 -- | Extract position from parse error.
 parseErrorPosition :: ParseError -> JSPos.Pos
@@ -273,6 +288,7 @@ parseErrorPosition parseErr = case parseErr of
 -- | Run JavaScript parser on ByteString input.
 --
 -- Returns either an error or a tuple of (result, remaining_input, consumed_bytes).
+-- Propagates structured 'ParseError' from both 'Fail' (generic) and 'Err' (specific) cases.
 runJSParser :: JSParser a -> ByteString -> Either ParseError (a, ByteString, Int)
 runJSParser parser input =
   case FP.runParser parser input of
@@ -280,9 +296,9 @@ runJSParser parser input =
       let consumed = BS.length input - BS.length remaining
       in Right (result, remaining, consumed)
 
-    FP.Fail -> Left (SyntaxError (JSPos.mkPos 1 1) "lexical error" [])
+    FP.Fail -> Left (SyntaxError (JSPos.mkPos 1 1) "unexpected input" [])
 
-    FP.Err _err -> Left (SyntaxError (JSPos.mkPos 1 1) "lexical error" [])
+    FP.Err parseErr -> Left parseErr
 
 -- | Run JavaScript parser with position tracking.
 runJSParserWithPos :: JSParser a -> ByteString -> Either ParseError ((FP.Pos, a), ByteString, Int)

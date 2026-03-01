@@ -54,6 +54,8 @@ module Language.JavaScript.Parser.Operators
     -- * Statement termination
   , expectSemiOrNewline
   , expectStatementEnd
+    -- * Error helpers
+  , cutWithPos
     -- * Assignment operators
   , assignmentOperator
     -- * Binary operators and precedence
@@ -64,9 +66,11 @@ module Language.JavaScript.Parser.Operators
   ) where
 
 import Data.ByteString (ByteString)
+import Data.Text (Text)
 import qualified FlatParse.Basic as FP
 
 import Language.JavaScript.Parser.AST
+import qualified Language.JavaScript.Parser.Pos as JSPos
 import Language.JavaScript.Parser.SrcLocation (TokenPosn(TokenPn))
 
 import Language.JavaScript.Parser.Lexer
@@ -95,6 +99,19 @@ defaultAnnot = JSAnnot (TokenPn (-1) 0 0) []
 -- | Default semicolon.
 defaultSemi :: JSSemi
 defaultSemi = JSSemiAuto
+
+-- =====================================================================
+-- Error Helpers
+-- =====================================================================
+
+-- | Like 'FP.cut' but captures the current FlatParse position for accurate
+-- error reporting. Stores the FP.Pos (remaining-bytes) in the error's offset
+-- field for later resolution by 'formatParseError'.
+{-# INLINE cutWithPos #-}
+cutWithPos :: JSParser a -> Text -> JSParser a
+cutWithPos p msg = do
+  fpPos <- FP.getPos
+  FP.cut p (SyntaxError (JSPos.mkPos (FP.unPos fpPos) 0) msg [])
 
 -- =====================================================================
 -- Character and String Matching

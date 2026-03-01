@@ -1137,6 +1137,8 @@ validateExpression ctx expr = case expr of
     [ImportMetaOutsideModule (extractAnnotationPos import_annot) | not (contextInModule ctx)]
   JSImportCall _import _lparen importArg _rparen ->
     validateExpression ctx importArg
+  JSPrivateIdentifier _annot _name ->
+    [PrivateFieldOutsideClass (Text.decodeUtf8 _name) (extractAnnotationPos _annot) | not (contextInClass ctx)]
   JSAsyncArrowExpression _ params _ body ->
     let asyncCtx = ctx {contextInFunction = True, contextInAsync = True}
      in validateArrowParameters ctx params
@@ -2201,6 +2203,7 @@ extractExpressionPos expr = case expr of
   JSYieldFromExpression annot _ _ -> extractAnnotationPos annot
   JSImportMeta annot _ -> extractAnnotationPos annot
   JSImportCall annot _ _ _ -> extractAnnotationPos annot
+  JSPrivateIdentifier annot _ -> extractAnnotationPos annot
   JSSpreadExpression annot _ -> extractAnnotationPos annot
   JSOptionalMemberDot obj _ _ -> extractExpressionPos obj
   JSOptionalMemberSquare obj _ _ _ -> extractExpressionPos obj
