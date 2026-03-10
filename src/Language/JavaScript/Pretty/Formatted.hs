@@ -739,11 +739,11 @@ fmtObjProp (JSObjectMethod m) = fmtMethodDef m
 fmtObjProp (JSObjectSpread _ e) = fromByteString "..." <> fmtExprRaw e
 
 fmtArrayElems :: FmtCtx -> [JSArrayElement] -> Builder
-fmtArrayElems _ elems = mconcat (intersperse (fromByteString ", ") (map fmtArrayElem elems))
-
-fmtArrayElem :: JSArrayElement -> Builder
-fmtArrayElem (JSArrayElement e) = fmtExprRaw e
-fmtArrayElem (JSArrayComma _) = mempty
+fmtArrayElems _ elems =
+  mconcat (intersperse (fromByteString ", ") (concatMap extractElem elems))
+  where
+    extractElem (JSArrayElement e) = [fmtExprRaw e]
+    extractElem (JSArrayComma _) = []
 
 fmtTplPart :: JSTemplatePart -> Builder
 fmtTplPart (JSTemplatePart expr _ suffix) =
