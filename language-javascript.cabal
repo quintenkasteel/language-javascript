@@ -50,11 +50,13 @@ Library
                        Language.JavaScript.Parser.Token
                        Language.JavaScript.Parser.Build
                        Language.JavaScript.Parser.Validator
+                       Language.JavaScript.DSL
                        Language.JavaScript.QQ
                        Language.JavaScript.QQ.Validate
                        Language.JavaScript.QQ.Compile
                        Language.JavaScript.QQ.Antiquote
                        Language.JavaScript.Pretty.Printer
+                       Language.JavaScript.Pretty.Formatted
                        Language.JavaScript.Pretty.JSON
                        Language.JavaScript.Pretty.XML
                        Language.JavaScript.Pretty.SExpr

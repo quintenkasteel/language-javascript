@@ -81,6 +81,15 @@ module Language.JavaScript.Parser
     js,
     jsast,
     jsx,
+
+    -- * Formatted Pretty Printing
+    Fmt.formatJS,
+    Fmt.formatToText,
+    Fmt.formatToBuilder,
+    Fmt.FormatStyle (..),
+    Fmt.defaultStyle,
+    Fmt.compactStyle,
+    Fmt.twoSpaceStyle,
   )
 where
 
@@ -89,6 +98,7 @@ import qualified Language.JavaScript.Parser.Core as Core
 import qualified Language.JavaScript.Parser.Parser as PA
 import Language.JavaScript.Parser.SrcLocation
 import Language.JavaScript.Parser.Token
+import qualified Language.JavaScript.Pretty.Formatted as Fmt
 import Language.JavaScript.Pretty.Printer
 import Language.JavaScript.QQ (js, jsast, jsx)
 
